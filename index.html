@@ -1006,10 +1006,9 @@ function renderVehicleDetail() {
   const brakes = BRAKE_TESTS.filter(r => r.vehicleId === v.id).sort((a,b) => b.testDate.localeCompare(a.testDate));
   const tyres = TYRE_RECORDS.filter(r => r.vehicleId === v.id).sort((a,b) => b.photoDate.localeCompare(a.photoDate));
   const dots = DOT_INSPECTIONS.filter(r => r.vehicleId === v.id).sort((a,b) => b.inspectionDate.localeCompare(a.inspectionDate));
-  const miles = MILEAGE.filter(r => r.vehicleId === v.id).sort((a,b) => b.date.localeCompare(a.date));
 
-  const tabs = ['maintenance','brakes','tyres','dot','mileage'];
-  const tabLabels = { maintenance:'🔧 Service', brakes:'🛑 Brakes', tyres:'⭕ Tyres', dot:'📋 DOT', mileage:'📍 Mileage' };
+  const tabs = ['maintenance','brakes','tyres','dot'];
+  const tabLabels = { maintenance:'🔧 Service', brakes:'🛑 Brakes', tyres:'⭕ Tyres', dot:'📋 DOT' };
 
   let html = `
   <div style="margin-bottom:16px; display:flex; align-items:center; gap:12px">
@@ -1196,40 +1195,6 @@ function renderVehicleDetail() {
     html += `</div></div></div>`;
   }
 
-  if (currentVehicleTab === 'mileage') {
-    const totalMiles = miles.reduce((sum, r) => sum + (r.mileage||0), 0);
-    html += `<div class="two-col">
-    <div class="card">
-      <div class="card-header">Record Mileage</div>
-      <div class="card-body">
-        <div class="form-grid">
-          <div><label>Current Mileage</label><input type="number" id="mil-val" placeholder="e.g. 125000" min="0"/></div>
-          <div><label>Driver</label>
-            <select id="mil-driver">
-              <option value="">— select driver —</option>
-              ${DRIVERS.map(d => `<option value="${d.id}">${d.name}</option>`).join('')}
-            </select>
-          </div>
-        </div>
-        <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddMileage('${v.id}')">Save Mileage</button>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">Mileage History (${miles.length} records · Total: ${totalMiles.toLocaleString()} mi)</div>
-      <div class="card-body">`;
-    if (miles.length === 0) html += `<div class="empty">No mileage records yet</div>`;
-    miles.forEach(r => {
-      const dName = DRIVERS.find(d => d.id === r.driverId)?.name;
-      html += `<div class="history-item">
-        <div>
-          <div class="fw-600">${r.mileage?.toLocaleString()} miles</div>
-          ${dName ? `<div class="text-sm">👤 ${dName} · ${fmtDate(r.date)}</div>` : `<div class="text-sm">${fmtDate(r.date)}</div>`}
-        </div>
-      </div>`;
-    });
-    html += `</div></div></div>`;
-  }
-
   return html;
 }
 
@@ -1299,13 +1264,7 @@ async function doAddDOT(vid) {
   showToast('DOT inspection saved!', 'success'); render();
 }
 
-async function doAddMileage(vid) {
-  const val = parseInt(document.getElementById('mil-val').value);
-  const driver = document.getElementById('mil-driver').value;
-  if (!val || val <= 0) { showToast('Enter a valid mileage', 'danger'); return; }
-  await addMileage(vid, driver || null, val);
-  showToast('Mileage saved!', 'success'); render();
-}
+
 
 async function doDeleteMaintenance(id) {
   const ok = await confirm2('Delete this service record?', 'This cannot be undone.');
