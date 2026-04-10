@@ -10,12 +10,49 @@
 <body>
 
 <div id="loading-overlay" class="loading-overlay">
-  <div class="spinner" style="border-color: var(--primary); border-top-color: transparent;"></div>
+  <div class="spinner" style="border-color:var(--primary);border-top-color:transparent;"></div>
   Loading FleetGuard...
 </div>
 
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo-icon">🚛</div>
+      <h1>FleetGuard</h1>
+      <p>Safety & Compliance Platform</p>
+    </div>
+    <div id="login-db-setup">
+      <div class="login-divider">Connect your Supabase database first</div>
+      <div id="ls-db-error" class="login-error"></div>
+      <div class="login-field">
+        <label>Supabase Project URL</label>
+        <input type="text" id="ls-sb-url" placeholder="https://xxxx.supabase.co"/>
+      </div>
+      <div class="login-field">
+        <label>Supabase Anon Key</label>
+        <input type="text" id="ls-sb-key" placeholder="eyJhbGciOiJIUzI1..."/>
+      </div>
+      <button id="ls-connect-btn" class="btn btn-primary login-btn-full" onclick="connectDbFromLogin()">Connect & Continue</button>
+    </div>
+    <div id="login-form-section">
+      <div id="login-error" class="login-error"></div>
+      <div class="login-field">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')signIn()"/>
+      </div>
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()"/>
+      </div>
+      <button id="login-btn" class="btn btn-primary login-btn-full" onclick="signIn()">Sign In</button>
+      <div class="login-divider" style="margin-top:16px">
+        <a href="#" onclick="localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');location.reload();return false" style="font-size:12px;color:var(--text3)">Change database</a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="app" style="display:none">
-  <!-- SIDEBAR -->
   <div id="sidebar">
     <div class="sidebar-logo">
       <div class="logo-icon">🚛</div>
@@ -25,108 +62,34 @@
       </div>
     </div>
     <nav>
-      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard">
-        <span class="nav-icon">📊</span> Dashboard
-      </button>
-      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles">
-        <span class="nav-icon">🚛</span> Vehicles
-      </button>
-      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers">
-        <span class="nav-icon">👤</span> Drivers
-      </button>
-      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar">
-        <span class="nav-icon">📅</span> Calendar
-      </button>
-      <button class="nav-item" onclick="navigate('reports')" id="nav-reports">
-        <span class="nav-icon">📈</span> Reports
-      </button>
-      <button class="nav-item" onclick="navigate('portal')" id="nav-portal">
-        <span class="nav-icon">🛡️</span> Driver Portal
-      </button>
+      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span> Dashboard</button>
+      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles"><span class="nav-icon">🚛</span> Vehicles</button>
+      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">👤</span> Drivers</button>
+      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar"><span class="nav-icon">📅</span> Calendar</button>
+      <button class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="nav-icon">📈</span> Reports</button>
+      <button class="nav-item" onclick="navigate('portal')" id="nav-portal"><span class="nav-icon">🛡️</span> Driver Portal</button>
+      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none"><span class="nav-icon">👥</span> Users</button>
     </nav>
+    <div style="padding:12px 10px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto">
+      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%"><span class="nav-icon">🚪</span> Sign Out</button>
+    </div>
   </div>
-
-  <!-- MAIN -->
   <div id="main">
     <div id="topbar">
       <h1 id="page-title">Dashboard</h1>
-      <div class="flex-center" style="gap:10px">
-        <span id="db-status-pill" class="badge badge-yellow">⚠ Local only</span>
-        <button class="btn btn-ghost btn-sm" onclick="showDbConfig()">⚙ Database</button>
+      <div class="user-bar">
+        <span id="role-badge" class="badge badge-gray">👁 Dispatcher</span>
+        <span id="user-pill" class="user-email"></span>
       </div>
     </div>
-    <div id="content">
-      <!-- pages render here -->
-    </div>
+    <div id="content"></div>
   </div>
 </div>
 
-<!-- DB CONFIG MODAL -->
-<div id="db-modal" class="modal-overlay" style="display:none">
-  <div class="modal">
-    <div class="modal-header">
-      ⚙ Supabase Database Setup
-      <button class="btn btn-ghost btn-sm btn-icon" onclick="closeDbConfig()">✕</button>
-    </div>
-    <div class="modal-body">
-      <p style="font-size:13px; color:var(--text2); margin-bottom:16px; line-height:1.6">
-        Connect to Supabase so all users share the same data. Get your URL and anon key from
-        <strong>supabase.com → Settings → API</strong>.
-      </p>
-      <div class="form-grid">
-        <div>
-          <label>Supabase Project URL</label>
-          <input type="text" id="sb-url" placeholder="https://xxxx.supabase.co" />
-        </div>
-        <div>
-          <label>Supabase Anon Key</label>
-          <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1..." />
-        </div>
-      </div>
-      <div style="margin-top:14px; padding:12px; background:var(--surface2); border-radius:8px; font-size:12px; color:var(--text2)">
-        <strong>Setup: run this SQL in Supabase → SQL Editor:</strong><br><br>
-        <details>
-          <summary style="cursor:pointer; font-weight:600">Show SQL setup script</summary>
-          <pre style="margin-top:8px; font-size:11px; overflow:auto; max-height:200px; white-space:pre-wrap">
-create table if not exists drivers (id uuid primary key default gen_random_uuid(), name text not null, created_at timestamptz default now());
-create table if not exists vehicles (id uuid primary key default gen_random_uuid(), truck_number text not null, trailer_number text not null, assigned_driver_id uuid, created_at timestamptz default now());
-create table if not exists maintenance_records (id uuid primary key default gen_random_uuid(), vehicle_id uuid, service_date text, next_inspection_date text, notes text, created_at timestamptz default now());
-create table if not exists brake_tests (id uuid primary key default gen_random_uuid(), vehicle_id uuid, test_date text, result text, notes text, created_at timestamptz default now());
-create table if not exists tyre_records (id uuid primary key default gen_random_uuid(), vehicle_id uuid, photo_date text, readings jsonb, created_at timestamptz default now());
-create table if not exists dot_inspections (id uuid primary key default gen_random_uuid(), vehicle_id uuid, driver_id uuid, inspection_date text, result text, notes text, created_at timestamptz default now());
-create table if not exists mileage_records (id uuid primary key default gen_random_uuid(), vehicle_id uuid, driver_id uuid, mileage integer, date text, created_at timestamptz default now());
-
-alter table drivers enable row level security;
-alter table vehicles enable row level security;
-alter table maintenance_records enable row level security;
-alter table brake_tests enable row level security;
-alter table tyre_records enable row level security;
-alter table dot_inspections enable row level security;
-alter table mileage_records enable row level security;
-
-create policy "open" on drivers for all using (true) with check (true);
-create policy "open" on vehicles for all using (true) with check (true);
-create policy "open" on maintenance_records for all using (true) with check (true);
-create policy "open" on brake_tests for all using (true) with check (true);
-create policy "open" on tyre_records for all using (true) with check (true);
-create policy "open" on dot_inspections for all using (true) with check (true);
-create policy "open" on mileage_records for all using (true) with check (true);</pre>
-        </details>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeDbConfig()">Cancel</button>
-      <button class="btn btn-ghost btn-sm" onclick="clearDb()" style="margin-right:auto; color:var(--danger)">Disconnect</button>
-      <button class="btn btn-primary" onclick="connectDb()" id="btn-connect-db">Connect & Test</button>
-    </div>
-  </div>
-</div>
-
-<!-- CONFIRM MODAL -->
 <div id="confirm-modal" class="modal-overlay" style="display:none">
   <div class="modal" style="max-width:380px">
     <div class="modal-header" id="confirm-title">Confirm</div>
-    <div class="modal-body" id="confirm-body" style="color:var(--text2); font-size:13px; line-height:1.6"></div>
+    <div class="modal-body" id="confirm-body" style="color:var(--text2);font-size:13px;line-height:1.6"></div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="confirmResolve(false)">Cancel</button>
       <button class="btn btn-danger" onclick="confirmResolve(true)">Delete</button>
