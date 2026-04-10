@@ -12,6 +12,7 @@ function getCreateClient() {
   return null;
 }
 
+
 async function initAuth() {
   const url = localStorage.getItem('sb_url');
   const key = localStorage.getItem('sb_key');
