@@ -226,10 +226,13 @@ function getVehicleStatus(vid){
   const serviceDays=lastService?daysBetween(lastService.serviceDate,now):9999;
   const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>14;
   const serviceOverdue=serviceDays>90,serviceDueSoon=serviceDays>75&&!serviceOverdue;
+  // nextDue warning: use maintenance nextInspectionDate if it has passed
+  const nextDue=maint[0]?.nextInspectionDate;
+  const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
-  const critical=brakeOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||serviceOverdue;
-  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning};
+  const critical=brakeOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||serviceOverdue||nextDueOverdue;
+  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -419,8 +422,8 @@ function renderVehicleDetail(){
   const dots=DOT_INSPECTIONS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.inspectionDate.localeCompare(a.inspectionDate));
   const miles=MILEAGE.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
   const svcs=SERVICE_RECORDS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-  const tabs=['maintenance','brakes','tyres','service','dot','mileage'];
-  const tabLabels={maintenance:'🔧 Service',brakes:'🛑 Brakes',tyres:'⭕ Tyres',service:'🔵 Vehicle Service',dot:'📋 DOT',mileage:'📍 Mileage'};
+  const tabs=['maintenance','brakes','tyres','dot'];
+  const tabLabels={maintenance:'🔧 Service',brakes:'🛑 Brakes',tyres:'⭕ Tyres',dot:'📋 DOT'};
   let html=`<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
     <button class="btn btn-ghost btn-sm" onclick="navigate('vehicles')">← Back</button>
     <div>
@@ -433,17 +436,35 @@ function renderVehicleDetail(){
   <div class="tabs">${tabs.map(t=>`<button class="tab ${currentVehicleTab===t?'active':''}" onclick="setVTab('${t}')">${tabLabels[t]}</button>`).join('')}</div>`;
 
   if(currentVehicleTab==='maintenance'){
+    // Unified service: combines maintenance records + service_records in one sorted feed
+    const allSvcRecords=[
+      ...maint.map(r=>({...r,_type:'maint',_date:r.serviceDate,_result:null})),
+      ...svcs.map(r=>({...r,_type:'svc',_date:r.serviceDate,_result:r.result}))
+    ].sort((a,b)=>b._date.localeCompare(a._date));
+    const nextDueDate=maint[0]?.nextInspectionDate||null;
+    const nextDueDays=nextDueDate?daysBetween(today(),nextDueDate):null;
+    const svcWarning=s.serviceOverdue||s.serviceDueSoon;
     html+=`<div class="two-col">`;
     if(isAdmin()) html+=`<div class="card"><div class="card-header">Record Service</div><div class="card-body">
       <div class="form-grid">
-        <div><label>Service Date</label><input type="date" id="m-date" value="${today()}" max="${today()}"/></div>
-        <div><label>Notes (optional)</label><textarea id="m-notes" rows="2" placeholder="Any notes..."></textarea></div>
+        <div><label>Service Date</label><input type="date" id="svc-date" value="${today()}" max="${today()}"/></div>
+        <div><label>Result</label><div class="toggle-group"><button class="toggle-btn active-pass" id="svctog-pass" onclick="setServiceResult('pass')">✓ Pass</button><button class="toggle-btn" id="svctog-fail" onclick="setServiceResult('fail')">✗ Fail</button></div></div>
+        <div><label>Notes (optional)</label><textarea id="svc-notes" rows="2" placeholder="Any notes..."></textarea></div>
       </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddMaintenance('${v.id}')">Save Service Record</button>
+      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddUnifiedService('${v.id}')">Save Service Record</button>
     </div></div>`;
-    html+=`<div class="card"><div class="card-header">Service History (${maint.length})</div><div class="card-body">`;
-    if(maint.length===0) html+=`<div class="empty">No records yet</div>`;
-    maint.forEach(r=>{html+=`<div class="history-item"><div><div class="fw-600">Service: ${fmtDate(r.serviceDate)}</div><div class="text-sm">Next due: ${fmtDate(r.nextInspectionDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteMaintenance('${r.id}')">🗑</button>`:''}</div>`;});
+    html+=`<div class="card"><div class="card-header">Service History (${allSvcRecords.length})`;
+    if(nextDueDate) html+=` <span class="badge ${nextDueDays!==null&&nextDueDays<0?'badge-red':nextDueDays!==null&&nextDueDays<=14?'badge-yellow':'badge-blue'}" style="margin-left:8px">Next due: ${fmtDate(nextDueDate)}</span>`;
+    html+=`</div><div class="card-body">`;
+    if(svcWarning) html+=`<div class="history-item" style="border-left:3px solid ${s.serviceOverdue?'var(--danger)':'var(--warning)'};margin-bottom:8px"><div class="fw-600" style="color:${s.serviceOverdue?'var(--danger)':'var(--warning)'}">${s.serviceOverdue?'⚠️ Service overdue — '+s.serviceDays+' days since last service':'🔔 Service due soon — '+s.serviceDays+' days since last service'}</div></div>`;
+    if(allSvcRecords.length===0) html+=`<div class="empty">No records yet</div>`;
+    allSvcRecords.forEach(r=>{
+      if(r._type==='maint'){
+        html+=`<div class="history-item"><div><div class="fw-600">Service: ${fmtDate(r.serviceDate)}</div><div class="text-sm">Next due: ${fmtDate(r.nextInspectionDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge badge-blue">LOGGED</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteMaintenance('${r.id}')">🗑</button>`:''}</div></div>`;
+      } else {
+        html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.serviceDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteService('${r.id}')">🗑</button>`:''}</div></div>`;
+      }
+    });
     html+=`</div></div></div>`;
   }
   if(currentVehicleTab==='brakes'){
@@ -479,21 +500,6 @@ function renderVehicleDetail(){
     tyres.forEach(r=>{const readings=Array.isArray(r.readings)?r.readings:[];const hasBad=readings.some(rd=>rd.status==='bad'),hasUneven=readings.some(rd=>rd.status==='uneven');html+=`<div class="history-item"><div><div class="fw-600">Photo: ${fmtDate(r.photoDate)}</div><div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${readings.map(rd=>`<div class="tyre-dot ${rd.status==='good'?'dot-good':rd.status==='bad'?'dot-bad':'dot-uneven'}" title="${rd.position}: ${rd.status}"></div>`).join('')}</div></div><div style="display:flex;gap:6px;align-items:center">${hasBad?`<span class="badge badge-red">Bad</span>`:hasUneven?`<span class="badge badge-yellow">Uneven</span>`:`<span class="badge badge-green">OK</span>`}${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteTyre('${r.id}')">🗑</button>`:''}</div></div>`;});
     html+=`</div></div></div>`;
   }
-  if(currentVehicleTab==='service'){
-    html+=`<div class="two-col">`;
-    if(isAdmin()) html+=`<div class="card"><div class="card-header">Record Vehicle Service</div><div class="card-body">
-      <div class="form-grid">
-        <div><label>Service Date</label><input type="date" id="svc-date" value="${today()}" max="${today()}"/></div>
-        <div><label>Result</label><div class="toggle-group"><button class="toggle-btn active-pass" id="svctog-pass" onclick="setServiceResult('pass')">✓ Pass</button><button class="toggle-btn" id="svctog-fail" onclick="setServiceResult('fail')">✗ Fail</button></div></div>
-        <div><label>Notes (optional)</label><textarea id="svc-notes" rows="2" placeholder="Service notes..."></textarea></div>
-      </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddService('${v.id}')">Save Service Record</button>
-    </div></div>`;
-    html+=`<div class="card"><div class="card-header">Vehicle Service History (${svcs.length})</div><div class="card-body">`;
-    if(svcs.length===0) html+=`<div class="empty">No service records yet</div>`;
-    svcs.forEach(r=>{html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.serviceDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteService('${r.id}')">🗑</button>`:''}</div></div>`;});
-    html+=`</div></div></div>`;
-  }
   if(currentVehicleTab==='dot'){
     html+=`<div class="two-col">`;
     if(isAdmin()) html+=`<div class="card"><div class="card-header">Record DOT Inspection</div><div class="card-body">
@@ -510,21 +516,6 @@ function renderVehicleDetail(){
     dots.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.inspectionDate)}</div>${dName?`<div class="text-sm">👤 ${dName}</div>`:''}${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':r.result==='violation'?'badge-yellow':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDOT('${r.id}')">🗑</button>`:''}</div></div>`;});
     html+=`</div></div></div>`;
   }
-  if(currentVehicleTab==='mileage'){
-    const totalMiles=miles.reduce((s,r)=>s+(r.mileage||0),0);
-    html+=`<div class="two-col">`;
-    if(isAdmin()) html+=`<div class="card"><div class="card-header">Record Mileage</div><div class="card-body">
-      <div class="form-grid">
-        <div><label>Current Mileage</label><input type="number" id="mil-val" placeholder="e.g. 125000" min="0"/></div>
-        <div><label>Driver</label><select id="mil-driver"><option value="">— select —</option>${DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select></div>
-      </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddMileage('${v.id}')">Save Mileage</button>
-    </div></div>`;
-    html+=`<div class="card"><div class="card-header">Mileage History (${miles.length} · Total: ${totalMiles.toLocaleString()} mi)</div><div class="card-body">`;
-    if(miles.length===0) html+=`<div class="empty">No mileage records yet</div>`;
-    miles.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${r.mileage?.toLocaleString()} miles</div>${dName?`<div class="text-sm">👤 ${dName} · ${fmtDate(r.date)}</div>`:`<div class="text-sm">${fmtDate(r.date)}</div>`}</div></div>`;});
-    html+=`</div></div></div>`;
-  }
   return html;
 }
 
@@ -535,7 +526,8 @@ function setDotResult(r){_dotResult=r;['pass','violation','oos'].forEach(x=>{con
 function setServiceResult(r){_serviceResult=r;['pass','fail'].forEach(x=>{const el=document.getElementById('svctog-'+x);if(el)el.className='toggle-btn'+(x===r?' active-'+x:'');});}
 function updateTyreDot(sel,dotId){const dot=document.getElementById(dotId);if(!dot)return;dot.className='tyre-dot '+(sel.value==='good'?'dot-good':sel.value==='bad'?'dot-bad':'dot-uneven');}
 
-async function doAddMaintenance(vid){if(!isAdmin())return;const date=document.getElementById('m-date').value,notes=document.getElementById('m-notes').value.trim();if(!date){showToast('Select a service date','danger');return;}await addMaintenance(vid,date,notes||null);showToast('Service record saved!','success');render();}
+async function doAddUnifiedService(vid){if(!isAdmin())return;const date=document.getElementById('svc-date').value,notes=document.getElementById('svc-notes').value.trim();if(!date){showToast('Select a service date','danger');return;}await Promise.all([addMaintenance(vid,date,notes||null),addServiceRecord(vid,date,_serviceResult,notes||null)]);showToast('Service record saved!','success');render();}
+async function doAddMaintenance(vid){if(!isAdmin())return;const date=document.getElementById('m-date')?document.getElementById('m-date').value:'';const notes=document.getElementById('m-notes')?document.getElementById('m-notes').value.trim():'';if(!date){showToast('Select a service date','danger');return;}await addMaintenance(vid,date,notes||null);showToast('Service record saved!','success');render();}
 async function doAddBrake(vid){if(!isAdmin())return;const date=document.getElementById('b-date').value,notes=document.getElementById('b-notes').value.trim();if(!date){showToast('Select a test date','danger');return;}await addBrakeTest(vid,date,_brakeResult,notes||null);showToast('Brake test saved!','success');render();}
 async function doAddTyre(vid){if(!isAdmin())return;const date=document.getElementById('t-date').value;if(!date){showToast('Select a photo date','danger');return;}const readings=[];AXLES.forEach((axle,ai)=>{axle.sides.forEach(pos=>{const el=document.getElementById(`t-${ai}-${pos}`);if(el)readings.push({axleIndex:ai,position:pos,status:el.value});});});await addTyreRecord(vid,date,readings);showToast('Tyre record saved!','success');render();}
 async function doAddService(vid){if(!isAdmin())return;const date=document.getElementById('svc-date').value,notes=document.getElementById('svc-notes').value.trim();if(!date){showToast('Select a service date','danger');return;}await addServiceRecord(vid,date,_serviceResult,notes||null);showToast('Service record saved!','success');render();}
