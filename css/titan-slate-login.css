@@ -1,0 +1,373 @@
+/* ================================================================
+   TITAN SLATE — Login Screen  v2
+   ----------------------------------------------------------------
+   HOW TO APPLY:
+   Option A: Paste at the very END of css/styles.css
+   Option B: Save as css/titan-slate-login.css and add in index.html:
+             <link rel="stylesheet" href="css/titan-slate-login.css">
+             (after your existing <link> stylesheet line)
+
+   ALSO REQUIRED: Small HTML addition to index.html — see
+   titan-slate-index-patch.html for the exact change.
+
+   Zero JS changes. All original IDs & classes preserved.
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+/* ── Design tokens ──────────────────────────────────────────── */
+:root {
+  --ts-base:       #0c1018;
+  --ts-left-bg:    linear-gradient(155deg, #0e1420 0%, #0a0f18 100%);
+  --ts-right-bg:   #0d1219;
+  --ts-input-bg:   #080c14;
+  --ts-border:     rgba(255, 255, 255, 0.06);
+  --ts-focus:      rgba(255, 107, 0, 0.32);
+  --ts-focus-ring: rgba(255, 107, 0, 0.09);
+  --ts-orange:     #ff7a20;
+  --ts-orange-dk:  #e03800;
+  --ts-text:       #e8eef8;
+  --ts-muted:      #4a5470;
+  --ts-label:      #5a6480;
+  --ts-subtle:     #566080;
+  --ts-blue:       #4a7cdc;
+  --ts-blue-lt:    #7aa8ff;
+  --ts-green:      #4ade80;
+  --ts-err-bg:     rgba(255, 60, 60, 0.07);
+  --ts-err-bd:     rgba(255, 100, 100, 0.16);
+  --ts-err-tx:     #f87171;
+}
+
+/* ================================================================
+   1. FULL-SCREEN SHELL
+   ================================================================ */
+#login-screen {
+  position: fixed !important;
+  inset: 0 !important;
+  display: none;                        /* controlled by app.js */
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 500 !important;
+  background: var(--ts-base) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  overflow: hidden;
+}
+
+/* ================================================================
+   2. CARD — two-panel wrapper
+   ================================================================ */
+.login-box {
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  max-width: 860px !important;
+  margin: auto !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.55) !important;
+  overflow: hidden;
+  align-self: center;
+}
+
+/* ================================================================
+   3. LEFT — BRAND PANEL  (.login-logo acts as left panel)
+   ================================================================ */
+.login-logo {
+  width: 42% !important;
+  min-height: 480px !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  text-align: left !important;
+  padding: 44px 44px 40px !important;
+  margin: 0 !important;
+  background: var(--ts-left-bg) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  position: relative;
+  overflow: hidden;
+}
+
+/* warm glow orb */
+.login-logo::before {
+  content: '';
+  position: absolute;
+  width: 280px; height: 280px;
+  border-radius: 50%;
+  top: 100px; left: -60px;
+  background: radial-gradient(circle, rgba(255, 107, 0, 0.09) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* logo icon */
+.login-logo .logo-icon {
+  width: 36px !important;
+  height: 36px !important;
+  border-radius: 9px !important;
+  background: linear-gradient(135deg, #ff7a20, #e04000) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 17px !important;
+  margin-bottom: 0 !important;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px rgba(255, 80, 0, 0.3) !important;
+}
+
+/* brand name — sits inline with icon */
+.login-logo h1 {
+  display: flex !important;
+  align-items: center !important;
+  gap: 11px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: var(--ts-text) !important;
+  letter-spacing: -0.02em !important;
+  margin: 0 !important;
+}
+
+/* tagline */
+.login-logo p {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.7 !important;
+  color: var(--ts-subtle) !important;
+  max-width: 220px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ── Hero headline — injected via .ts-headline div (see HTML patch) */
+.ts-headline {
+  margin-top: auto;
+  padding-top: 20px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -0.03em;
+  color: var(--ts-text);
+}
+.ts-headline span {
+  color: var(--ts-orange);
+}
+
+/* ── Status bar at bottom of left panel */
+.ts-status {
+  display: flex;
+  gap: 28px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  margin-top: 24px;
+}
+.ts-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ts-stat-lbl {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #38445c;
+}
+.ts-stat-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: #aec6ff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ts-stat-val.ts-white { color: #c8d0e0; }
+.ts-live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--ts-green);
+  box-shadow: 0 0 5px var(--ts-green);
+  animation: ts-pulse 2s ease-in-out infinite;
+}
+@keyframes ts-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+/* ================================================================
+   4. RIGHT — FORM PANEL
+   ================================================================ */
+#login-db-setup,
+#login-form-section {
+  flex: 1 !important;
+  background: var(--ts-right-bg) !important;
+  padding: 48px 48px 40px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+/* form heading */
+.ts-form-heading {
+  margin-bottom: 32px;
+}
+.ts-form-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--ts-text);
+  letter-spacing: -0.025em;
+  margin-bottom: 5px;
+}
+.ts-form-sub {
+  font-size: 14px;
+  color: var(--ts-muted);
+  line-height: 1.5;
+}
+
+/* ================================================================
+   5. FORM FIELDS
+   ================================================================ */
+.login-field {
+  margin-bottom: 16px !important;
+}
+
+.login-field label {
+  display: block !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--ts-label) !important;
+  letter-spacing: 0.01em !important;
+  margin-bottom: 7px !important;
+  text-transform: none !important;
+}
+
+.login-field input {
+  width: 100% !important;
+  height: 48px !important;
+  background: var(--ts-input-bg) !important;
+  border: 1px solid var(--ts-border) !important;
+  border-radius: 8px !important;
+  padding: 0 16px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 14px !important;
+  color: var(--ts-text) !important;
+  outline: none !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-field input::placeholder {
+  color: #1e2540 !important;
+}
+.login-field input:focus {
+  border-color: var(--ts-focus) !important;
+  box-shadow: 0 0 0 3px var(--ts-focus-ring) !important;
+}
+
+/* ================================================================
+   6. ERROR BOX
+   ================================================================ */
+.login-error {
+  background: var(--ts-err-bg) !important;
+  border: 1px solid var(--ts-err-bd) !important;
+  color: var(--ts-err-tx) !important;
+  border-radius: 7px !important;
+  padding: 11px 14px !important;
+  font-size: 13px !important;
+  margin-bottom: 16px !important;
+  display: none;
+}
+
+/* ================================================================
+   7. DIVIDER  ("Change database" link)
+   ================================================================ */
+.login-divider {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--ts-muted) !important;
+  text-align: center !important;
+  margin: 16px 0 0 !important;
+  padding: 0 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+.login-divider a {
+  color: var(--ts-blue) !important;
+  text-decoration: none !important;
+  transition: color 0.15s;
+}
+.login-divider a:hover {
+  color: var(--ts-blue-lt) !important;
+}
+
+/* ================================================================
+   8. PRIMARY BUTTON
+   ================================================================ */
+.btn-primary {
+  background: linear-gradient(135deg, var(--ts-orange) 0%, var(--ts-orange-dk) 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 4px 20px rgba(224, 56, 0, 0.25) !important;
+  transition: filter 0.15s, transform 0.1s, box-shadow 0.15s !important;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  filter: brightness(1.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    0 6px 28px rgba(224, 56, 0, 0.4) !important;
+}
+.btn-primary:active {
+  transform: scale(0.987) !important;
+  filter: brightness(0.96) !important;
+}
+
+.login-btn-full {
+  width: 100% !important;
+  height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-top: 8px !important;
+  padding: 0 !important;
+}
+
+/* ================================================================
+   9. RESPONSIVE — stack on small screens
+   ================================================================ */
+@media (max-width: 700px) {
+  .login-box {
+    flex-direction: column !important;
+    max-width: 420px !important;
+    margin: 16px !important;
+  }
+  .login-logo {
+    width: 100% !important;
+    min-height: 240px !important;
+    padding: 32px !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+  }
+  .ts-headline {
+    font-size: 24px;
+    padding-top: 12px;
+  }
+  .ts-status { display: none; }
+  #login-db-setup,
+  #login-form-section {
+    padding: 36px 32px !important;
+  }
+}
