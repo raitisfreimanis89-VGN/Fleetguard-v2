@@ -1,37 +1,27 @@
-/* ================================================================
-   TITAN SLATE — Login Screen  v4  (final)
-   ----------------------------------------------------------------
-   HOW TO APPLY:
-   1. Save as  css/titan-slate-login.css
-   2. In index.html after line 8, add:
-      <link rel="stylesheet" href="css/titan-slate-login.css"/>
-   ================================================================ */
-
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 :root {
-  --ts-base:       #0c1018;
-  --ts-right:      #0d1219;
-  --ts-input-bg:   #080c14;
-  --ts-border:     rgba(255,255,255,0.06);
-  --ts-focus-bd:   rgba(255,107,0,0.32);
+  --ts-base: #0c1018;
+  --ts-right: #0d1219;
+  --ts-input-bg: #080c14;
+  --ts-border: rgba(255,255,255,0.06);
+  --ts-focus-bd: rgba(255,107,0,0.32);
   --ts-focus-ring: rgba(255,107,0,0.09);
-  --ts-orange:     #ff7a20;
-  --ts-orange-dk:  #e03800;
-  --ts-text:       #e8eef8;
-  --ts-muted:      #4a5470;
-  --ts-label:      #5a6480;
-  --ts-subtle:     #566080;
-  --ts-blue:       #4a7cdc;
-  --ts-blue-lt:    #7aa8ff;
-  --ts-green:      #4ade80;
-  --ts-err-bg:     rgba(255,60,60,0.07);
-  --ts-err-bd:     rgba(255,100,100,0.16);
-  --ts-err-tx:     #f87171;
+  --ts-orange: #ff7a20;
+  --ts-orange-dk: #e03800;
+  --ts-text: #e8eef8;
+  --ts-muted: #4a5470;
+  --ts-label: #5a6480;
+  --ts-subtle: #566080;
+  --ts-blue: #4a7cdc;
+  --ts-blue-lt: #7aa8ff;
+  --ts-green: #4ade80;
+  --ts-err-bg: rgba(255,60,60,0.07);
+  --ts-err-bd: rgba(255,100,100,0.16);
+  --ts-err-tx: #f87171;
 }
 
-/* 1. SHELL */
-#login-screen {
+body #login-screen {
   position: fixed !important;
   inset: 0 !important;
   display: none;
@@ -41,31 +31,25 @@
   background: var(--ts-base) !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   padding: 24px !important;
-  overflow: hidden;
+  overflow: hidden !important;
 }
 
-/* 2. CARD */
-.login-box {
+body #login-screen .login-box {
   display: flex !important;
   flex-direction: row !important;
   width: min(900px, 96vw) !important;
   max-width: 900px !important;
   min-height: 520px !important;
-  height: auto !important;
   margin: auto !important;
   padding: 0 !important;
   background: transparent !important;
   border-radius: 14px !important;
   border: 1px solid rgba(255,255,255,0.05) !important;
   box-shadow: 0 40px 80px rgba(0,0,0,0.55) !important;
-  overflow: hidden;
-  align-self: center;
-  /* ensure children don't push past card bounds */
-  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
-/* 3. LEFT PANEL — fixed pixel width, no flex-grow */
-.login-logo {
+body #login-screen .login-logo {
   width: 360px !important;
   min-width: 360px !important;
   max-width: 360px !important;
@@ -76,7 +60,7 @@
   align-items: flex-start !important;
   justify-content: flex-start !important;
   text-align: left !important;
-  padding: 40px 40px !important;
+  padding: 40px !important;
   margin: 0 !important;
   background: linear-gradient(155deg, #0e1420 0%, #0a0f18 100%) !important;
   border-right: 1px solid rgba(255,255,255,0.05) !important;
@@ -84,8 +68,7 @@
   overflow: hidden !important;
   box-sizing: border-box !important;
 }
-
-.login-logo::before {
+body #login-screen .login-logo::before {
   content: '';
   position: absolute;
   width: 260px; height: 260px; border-radius: 50%;
@@ -93,187 +76,147 @@
   background: radial-gradient(circle, rgba(255,107,0,0.09) 0%, transparent 65%);
   pointer-events: none;
 }
-
-.login-logo .logo-icon {
+body #login-screen .login-logo .logo-icon {
   width: 38px !important; height: 38px !important;
   border-radius: 9px !important;
   background: linear-gradient(135deg, #ff7a20, #e04000) !important;
   display: inline-flex !important;
   align-items: center !important; justify-content: center !important;
   font-size: 18px !important; margin-bottom: 0 !important;
-  flex-shrink: 0 !important;
   box-shadow: 0 4px 16px rgba(255,80,0,0.3) !important;
 }
-
-.login-logo h1 {
-  display: flex !important;
-  align-items: center !important; gap: 10px !important;
+body #login-screen .login-logo h1 {
+  display: flex !important; align-items: center !important; gap: 10px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 16px !important; font-weight: 700 !important;
   color: var(--ts-text) !important;
-  letter-spacing: -0.02em !important;
-  margin: 0 !important; white-space: nowrap !important;
+  letter-spacing: -0.02em !important; margin: 0 !important; white-space: nowrap !important;
 }
-
-.login-logo p {
+body #login-screen .login-logo p {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 12px !important; font-weight: 400 !important;
-  line-height: 1.6 !important; color: var(--ts-subtle) !important;
-  margin: 3px 0 0 !important; padding: 0 !important;
-  white-space: nowrap !important;
+  font-size: 12px !important; color: var(--ts-subtle) !important;
+  margin: 3px 0 0 !important; padding: 0 !important; white-space: nowrap !important;
 }
-
-/* hero headline */
-.ts-headline {
-  margin-top: auto;
-  padding-top: 16px;
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 26px; font-weight: 700;
-  line-height: 1.2; letter-spacing: -0.03em;
-  color: var(--ts-text);
-  word-break: break-word;
+body #login-screen .login-logo .ts-headline {
+  margin-top: auto !important; padding-top: 16px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 26px !important; font-weight: 700 !important;
+  line-height: 1.2 !important; letter-spacing: -0.03em !important;
+  color: var(--ts-text) !important; word-break: break-word !important;
 }
-.ts-headline span { color: var(--ts-orange); }
-
-/* status bar */
-.ts-status {
-  display: flex; gap: 24px;
-  padding-top: 20px;
-  border-top: 1px solid rgba(255,255,255,0.04);
-  margin-top: 18px; width: 100%;
-  flex-wrap: wrap;
+body #login-screen .login-logo .ts-headline span { color: var(--ts-orange) !important; }
+body #login-screen .login-logo .ts-status {
+  display: flex !important; gap: 24px !important;
+  padding-top: 20px !important; border-top: 1px solid rgba(255,255,255,0.04) !important;
+  margin-top: 18px !important; width: 100% !important; flex-wrap: wrap !important;
 }
-.ts-stat { display: flex; flex-direction: column; gap: 3px; }
-.ts-stat-lbl {
-  font-size: 9px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: 0.12em; color: #38445c;
+body #login-screen .ts-stat { display: flex !important; flex-direction: column !important; gap: 3px !important; }
+body #login-screen .ts-stat-lbl {
+  font-size: 9px !important; font-weight: 600 !important;
+  text-transform: uppercase !important; letter-spacing: 0.12em !important; color: #38445c !important;
 }
-.ts-stat-val {
-  font-size: 11px; font-weight: 600; color: #aec6ff;
-  display: flex; align-items: center; gap: 5px;
+body #login-screen .ts-stat-val {
+  font-size: 11px !important; font-weight: 600 !important; color: #aec6ff !important;
+  display: flex !important; align-items: center !important; gap: 5px !important;
 }
-.ts-stat-val.ts-white { color: #c8d0e0; }
-.ts-live-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: var(--ts-green); box-shadow: 0 0 4px var(--ts-green);
-  animation: ts-pulse 2s ease-in-out infinite; flex-shrink: 0;
+body #login-screen .ts-stat-val.ts-white { color: #c8d0e0 !important; }
+body #login-screen .ts-live-dot {
+  width: 5px !important; height: 5px !important; border-radius: 50% !important;
+  background: var(--ts-green) !important; flex-shrink: 0 !important;
+  box-shadow: 0 0 4px var(--ts-green) !important;
+  animation: ts-pulse 2s ease-in-out infinite !important;
 }
 @keyframes ts-pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-/* 4. RIGHT PANEL — flex:1 fills remaining space */
-#login-db-setup,
-#login-form-section {
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  background: var(--ts-right) !important;
-  padding: 44px 44px !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  overflow: visible !important;
-  box-sizing: border-box !important;
+body #login-screen #login-db-setup,
+body #login-screen #login-form-section {
+  flex: 1 1 auto !important; min-width: 0 !important; max-width: 100% !important;
+  background: var(--ts-right) !important; padding: 44px !important;
+  flex-direction: column !important; justify-content: center !important;
+  overflow: visible !important; box-sizing: border-box !important;
 }
+body #login-screen #login-db-setup[style*="display: none"],
+body #login-screen #login-db-setup[style*="display:none"] { display: none !important; }
+body #login-screen #login-form-section[style*="display: none"],
+body #login-screen #login-form-section[style*="display:none"] { display: none !important; }
+body #login-screen #login-form-section[style*="display: block"],
+body #login-screen #login-form-section[style*="display:block"] { display: flex !important; }
+body #login-screen #login-db-setup[style*="display: block"],
+body #login-screen #login-db-setup[style*="display:block"] { display: flex !important; }
 
-/* app.js display control — MUST NOT be overridden */
-#login-db-setup[style*="display: none"],
-#login-db-setup[style*="display:none"] { display: none !important; }
-#login-form-section[style*="display: none"],
-#login-form-section[style*="display:none"] { display: none !important; }
-#login-form-section[style*="display: block"],
-#login-form-section[style*="display:block"] { display: flex !important; }
-#login-db-setup[style*="display: block"],
-#login-db-setup[style*="display:block"] { display: flex !important; }
-
-/* form heading */
-.ts-form-heading { margin-bottom: 26px; }
-.ts-form-title {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 23px; font-weight: 700;
-  color: var(--ts-text); letter-spacing: -0.025em;
-  margin-bottom: 5px;
-}
-.ts-form-sub { font-size: 13px; color: var(--ts-muted); line-height: 1.5; }
-
-/* 5. DIVIDER */
-.login-divider {
+body #login-screen .ts-form-heading { margin-bottom: 26px !important; }
+body #login-screen .ts-form-title {
   font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 12px !important; font-weight: 500 !important;
-  color: var(--ts-muted) !important;
-  text-align: center !important;
-  margin: 0 0 18px !important; padding: 0 !important;
-  letter-spacing: 0 !important; text-transform: none !important;
+  font-size: 23px !important; font-weight: 700 !important;
+  color: var(--ts-text) !important; letter-spacing: -0.025em !important; margin-bottom: 5px !important;
 }
-.login-divider a { color: var(--ts-blue) !important; text-decoration: none !important; }
-.login-divider a:hover { color: var(--ts-blue-lt) !important; }
+body #login-screen .ts-form-sub { font-size: 13px !important; color: var(--ts-muted) !important; }
 
-/* 6. FIELDS */
-.login-field { margin-bottom: 14px !important; }
-.login-field label {
+body #login-screen .login-divider {
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 12px !important; font-weight: 500 !important; color: var(--ts-muted) !important;
+  text-align: center !important; margin: 0 0 18px !important; padding: 0 !important;
+  letter-spacing: 0 !important; text-transform: none !important;
+  background: none !important; border: none !important;
+}
+body #login-screen .login-divider a { color: var(--ts-blue) !important; text-decoration: none !important; }
+body #login-screen .login-divider a:hover { color: var(--ts-blue-lt) !important; }
+
+body #login-screen .login-field { margin-bottom: 14px !important; }
+body #login-screen .login-field label {
   display: block !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-size: 12px !important; font-weight: 600 !important;
-  color: var(--ts-label) !important;
-  letter-spacing: 0.01em !important; margin-bottom: 6px !important;
-  text-transform: none !important;
+  font-size: 12px !important; font-weight: 600 !important; color: var(--ts-label) !important;
+  letter-spacing: 0.01em !important; margin-bottom: 6px !important; text-transform: none !important;
 }
-.login-field input {
+body #login-screen .login-field input {
   width: 100% !important; height: 46px !important;
   background: var(--ts-input-bg) !important;
   border: 1px solid var(--ts-border) !important;
   border-radius: 8px !important; padding: 0 14px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 14px !important; color: var(--ts-text) !important;
-  outline: none !important;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-sizing: border-box !important;
+  outline: none !important; box-sizing: border-box !important;
 }
-.login-field input::placeholder { color: #1e2540 !important; }
-.login-field input:focus {
+body #login-screen .login-field input::placeholder { color: #1e2540 !important; }
+body #login-screen .login-field input:focus {
   border-color: var(--ts-focus-bd) !important;
   box-shadow: 0 0 0 3px var(--ts-focus-ring) !important;
 }
 
-/* 7. ERROR */
-.login-error {
-  background: var(--ts-err-bg) !important;
-  border: 1px solid var(--ts-err-bd) !important;
-  color: var(--ts-err-tx) !important;
-  border-radius: 7px !important; padding: 10px 13px !important;
-  font-size: 13px !important; margin-bottom: 14px !important;
+body #login-screen .login-error {
+  background: var(--ts-err-bg) !important; border: 1px solid var(--ts-err-bd) !important;
+  color: var(--ts-err-tx) !important; border-radius: 7px !important;
+  padding: 10px 13px !important; font-size: 13px !important; margin-bottom: 14px !important;
   display: none;
 }
 
-/* 8. BUTTON */
-.btn-primary {
+body #login-screen .btn-primary {
   background: linear-gradient(135deg, var(--ts-orange) 0%, var(--ts-orange-dk) 100%) !important;
-  color: #fff !important; border: none !important;
-  border-radius: 8px !important;
+  color: #fff !important; border: none !important; border-radius: 8px !important;
   font-family: 'Plus Jakarta Sans', sans-serif !important;
   font-size: 14px !important; font-weight: 600 !important;
   letter-spacing: 0.01em !important; text-transform: none !important;
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 4px 20px rgba(224,56,0,0.25) !important;
-  transition: filter 0.15s, transform 0.1s !important;
-  cursor: pointer;
+  cursor: pointer !important;
 }
-.btn-primary:hover { filter: brightness(1.08) !important; }
-.btn-primary:active { transform: scale(0.987) !important; }
-.login-btn-full {
+body #login-screen .btn-primary:hover { filter: brightness(1.08) !important; }
+body #login-screen .btn-primary:active { transform: scale(0.987) !important; }
+body #login-screen .login-btn-full {
   width: 100% !important; height: 48px !important;
-  display: flex !important; align-items: center !important;
-  justify-content: center !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
   margin-top: 6px !important; padding: 0 !important;
 }
 
-/* 9. RESPONSIVE */
 @media (max-width: 680px) {
-  .login-box { flex-direction: column !important; width: 100% !important; }
-  .login-logo {
+  body #login-screen .login-box { flex-direction: column !important; width: 100% !important; }
+  body #login-screen .login-logo {
     width: 100% !important; min-width: 0 !important; max-width: 100% !important;
-    padding: 28px 28px !important;
-    border-right: none !important;
+    padding: 28px !important; border-right: none !important;
     border-bottom: 1px solid rgba(255,255,255,0.05) !important;
   }
-  .ts-headline { font-size: 22px; }
-  .ts-status { display: none; }
-  #login-db-setup, #login-form-section { padding: 28px 28px !important; }
-}
+  body #login-screen .ts-headline { font-size: 22px !important; }
+  body #login-screen .ts-status { display: none !important; }
+  body #login-screen #login-db-setup,
+  body #login-screen #login-form-section { padding: 28px !important; }
+     }
