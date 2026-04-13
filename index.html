@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FleetGuard – Safety & Compliance</title>
+<title>FleetGuard â Safety & Compliance</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <link rel="stylesheet" href="css/titan-slate-login.css">
 </head>
@@ -17,7 +17,7 @@
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">
-      <div class="logo-icon">🚛</div>
+      <div class="logo-icon">ð</div>
       <h1>FleetGuard</h1>
       <p>Safety & Compliance Platform</p>
       <div class="ts-headline">
@@ -34,6 +34,8 @@
           <span class="ts-stat-lbl">Security</span>
           <span class="ts-stat-val ts-white">AES-256</span>
         </div>
+      </div>
+    </div>
     <div id="login-db-setup">
       <div class="login-divider">Connect your Supabase database first</div>
       <div id="ls-db-error" class="login-error"></div>
@@ -59,7 +61,7 @@
       </div>
       <div class="login-field">
         <label>Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" onkeydown="if(event.key==='Enter')signIn()"/>
+        <input type="password" id="login-password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" onkeydown="if(event.key==='Enter')signIn()"/>
       </div>
       <button id="login-btn" class="btn btn-primary login-btn-full" onclick="signIn()">Sign In</button>
       <div class="login-divider" style="margin-top:16px">
@@ -72,30 +74,30 @@
 <div id="app" style="display:none">
   <div id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">🚛</div>
+      <div class="logo-icon">ð</div>
       <div>
         <div class="logo-title">FleetGuard</div>
         <div class="logo-sub">Safety & Compliance</div>
       </div>
     </div>
     <nav>
-      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">📊</span> Dashboard</button>
-      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles"><span class="nav-icon">🚛</span> Vehicles</button>
-      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">👤</span> Drivers</button>
-      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar"><span class="nav-icon">📅</span> Calendar</button>
-      <button class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="nav-icon">📈</span> Reports</button>
-      <button class="nav-item" onclick="navigate('portal')" id="nav-portal"><span class="nav-icon">🛡️</span> Driver Portal</button>
-      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none"><span class="nav-icon">👥</span> Users</button>
+      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">ð</span> Dashboard</button>
+      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles"><span class="nav-icon">ð</span> Vehicles</button>
+      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">ð¤</span> Drivers</button>
+      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar"><span class="nav-icon">ð</span> Calendar</button>
+      <button class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="nav-icon">ð</span> Reports</button>
+      <button class="nav-item" onclick="navigate('portal')" id="nav-portal"><span class="nav-icon">ð¡ï¸</span> Driver Portal</button>
+      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none"><span class="nav-icon">ð¥</span> Users</button>
     </nav>
     <div style="padding:12px 10px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto">
-      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%"><span class="nav-icon">🚪</span> Sign Out</button>
+      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%"><span class="nav-icon">ðª</span> Sign Out</button>
     </div>
   </div>
   <div id="main">
     <div id="topbar">
       <h1 id="page-title">Dashboard</h1>
       <div class="user-bar">
-        <span id="role-badge" class="badge badge-gray">👁 Dispatcher</span>
+        <span id="role-badge" class="badge badge-gray">ð Dispatcher</span>
         <span id="user-pill" class="user-email"></span>
       </div>
     </div>
