@@ -13,9 +13,12 @@ function getCreateClient() {
 }
 
 async function initAuth() {
-  const url = localStorage.getItem('sb_url');
-  const key = localStorage.getItem('sb_key');
-  if (!url || !key) { showLoginScreen('db'); return; }
+  const HARDCODED_URL = 'https://tmpdsiuadafbkmldvlki.supabase.co';
+  const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
+  if (!localStorage.getItem('sb_url')) localStorage.setItem('sb_url', HARDCODED_URL);
+  if (!localStorage.getItem('sb_key')) localStorage.setItem('sb_key', HARDCODED_KEY);
+  const url = HARDCODED_URL;
+  const key = HARDCODED_KEY;
   const fn = getCreateClient();
   if (!fn) { showLoginScreen('db'); return; }
   try {
