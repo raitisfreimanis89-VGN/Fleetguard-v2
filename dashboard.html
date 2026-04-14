@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>FleetGuard — Dashboard</title>
+<link href="./dist/output.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+:root{--c-surface:#10131a;--c-surface-low:#191c22;--c-surface-container:#1d2026;--c-surface-high:#272a31;--c-surface-highest:#32353c;--c-on-surface:#e1e2eb;--c-primary:#ffb5a0;--c-primary-container:#ff5722;--c-tertiary:#78dc77;--c-error:#ffb4ab;--c-outline-variant:#5b4039;--c-text-muted:#6b7280;--shadow-ambient:0px 24px 48px rgba(0,0,0,.4);--shadow-card:0 4px 24px rgba(0,0,0,.25)}
+html.light{--c-surface:#f5f5f7;--c-surface-low:#ebebed;--c-surface-container:#fff;--c-surface-high:#e4e4e6;--c-surface-highest:#d8d8da;--c-on-surface:#1a1a1e;--c-primary:#c94a1a;--c-primary-container:#e84e1d;--c-tertiary:#1f7a1e;--c-error:#c62828;--c-outline-variant:#d1a99e;--c-text-muted:#9ca3af;--shadow-ambient:0px 12px 32px rgba(0,0,0,.12);--shadow-card:0 2px 12px rgba(0,0,0,.08)}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--c-surface);color:var(--c-on-surface);min-height:100dvh;transition:background .3s,color .3s;margin:0}
+h1,h2,h3,.brand{font-family:'Manrope',sans-serif}
+.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;user-select:none}
+.sidebar{position:fixed;inset-block:0;left:0;width:15rem;background:var(--c-surface-low);display:flex;flex-direction:column;z-index:50;border-right:1px solid color-mix(in srgb,var(--c-outline-variant) 15%,transparent);transition:background .3s,transform .3s}
+.main-content{margin-left:15rem;min-height:100dvh}
+.nav-item{display:flex;align-items:center;gap:.75rem;padding:.625rem 1.25rem;margin:.125rem .5rem;border-radius:.625rem;font-size:.75rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--c-text-muted);transition:background .2s,color .2s;cursor:pointer;text-decoration:none}
+.nav-item:hover{background:color-mix(in srgb,var(--c-surface-highest) 50%,transparent);color:var(--c-on-surface)}
+.nav-item.active{background:var(--c-primary-container);color:#fff;box-shadow:0 0 12px color-mix(in srgb,var(--c-primary-container) 50%,transparent)}
+.top-bar{position:sticky;top:0;z-index:40;display:flex;justify-content:space-between;align-items:center;padding:1rem 2rem;background:var(--c-surface);border-bottom:1px solid color-mix(in srgb,var(--c-outline-variant) 12%,transparent);transition:background .3s}
+.card{background:var(--c-surface-container);border-radius:.75rem;padding:1.5rem;box-shadow:var(--shadow-card);transition:background .2s}
+.card:hover{background:var(--c-surface-high)}
+.kpi-card{background:var(--c-surface-container);border-radius:.75rem;padding:1.25rem 1.5rem;box-shadow:var(--shadow-card);border-left:4px solid var(--c-primary-container)}
+.kpi-card.green{border-left-color:var(--c-tertiary)}
+.kpi-card.red{border-left-color:var(--c-error)}
+.icon-btn{display:flex;align-items:center;justify-content:center;width:2rem;height:2rem;border-radius:.5rem;border:none;background:transparent;cursor:pointer;color:var(--c-text-muted);transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--c-surface-highest);color:var(--c-on-surface)}
+.theme-toggle{display:flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:9999px;background:color-mix(in srgb,var(--c-surface-highest) 60%,transparent);border:1px solid color-mix(in srgb,var(--c-outline-variant) 20%,transparent);cursor:pointer;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c-on-surface);transition:background .2s}
+.badge{display:inline-flex;align-items:center;gap:.375rem;padding:.25rem .625rem;border-radius:9999px;font-size:.7rem;font-weight:700}
+.badge-ok{background:color-mix(in srgb,var(--c-tertiary) 12%,transparent);border:1px solid color-mix(in srgb,var(--c-tertiary) 25%,transparent);color:var(--c-tertiary)}
+.badge-warn{background:color-mix(in srgb,var(--c-primary-container) 12%,transparent);border:1px solid color-mix(in srgb,var(--c-primary-container) 25%,transparent);color:var(--c-primary)}
+.badge-danger{background:color-mix(in srgb,var(--c-error) 12%,transparent);border:1px solid color-mix(in srgb,var(--c-error) 25%,transparent);color:var(--c-error)}
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{font-size:.625rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-text-muted);padding:.75rem 1rem;text-align:left;border-bottom:1px solid color-mix(in srgb,var(--c-outline-variant) 15%,transparent)}
+.data-table td{padding:.875rem 1rem;font-size:.875rem;border-bottom:1px solid color-mix(in srgb,var(--c-outline-variant) 8%,transparent)}
+.data-table tr:hover td{background:color-mix(in srgb,var(--c-surface-highest) 30%,transparent)}
+.btn-primary{display:inline-flex;align-items:center;gap:.5rem;background:var(--c-primary-container);color:#fff;font-family:'Inter',sans-serif;font-weight:700;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;padding:.625rem 1.25rem;border-radius:.625rem;border:none;cursor:pointer;box-shadow:0 0 16px color-mix(in srgb,var(--c-primary-container) 30%,transparent);transition:filter .2s,transform .15s}
+.btn-primary:hover{filter:brightness(1.12)}
+.btn-ghost{display:inline-flex;align-items:center;gap:.375rem;padding:.5rem .875rem;border-radius:.5rem;border:1px solid color-mix(in srgb,var(--c-outline-variant) 25%,transparent);background:transparent;color:var(--c-on-surface);font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;transition:background .2s}
+.btn-ghost:hover{background:color-mix(in srgb,var(--c-surface-highest) 50%,transparent)}
+.input{width:100%;background:color-mix(in srgb,var(--c-surface-highest) 30%,transparent);border:none;border-bottom:2px solid var(--c-surface-highest);color:var(--c-on-surface);padding:.75rem 1rem;border-radius:.375rem .375rem 0 0;outline:none;font-family:'Inter',sans-serif;font-size:.875rem}
+.input:focus{border-bottom-color:var(--c-primary-container)}
+@media(max-width:900px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main-content{margin-left:0}}
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <div style="padding:1.5rem 1.25rem 1rem">
+    <div style="display:flex;align-items:center;gap:.625rem;margin-bottom:1.5rem">
+      <div style="width:2rem;height:2rem;background:var(--c-primary-container);border-radius:.5rem;display:flex;align-items:center;justify-content:center">
+        <span class="material-symbols-outlined" style="color:#fff;font-size:1.1rem;font-variation-settings:'FILL' 1">local_shipping</span>
+      </div>
+      <span class="brand" style="color:var(--c-primary-container);font-size:1.25rem;font-weight:800;letter-spacing:-.03em">FleetGuard</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:.75rem;padding:.625rem .75rem;background:var(--c-surface-container);border-radius:.75rem;margin-bottom:1.5rem">
+      <div style="width:2.25rem;height:2.25rem;border-radius:.5rem;background:color-mix(in srgb,var(--c-primary-container) 20%,transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span class="material-symbols-outlined" style="color:var(--c-primary-container);font-size:1.1rem;font-variation-settings:'FILL' 1">manage_accounts</span>
+      </div>
+      <div>
+        <p style="font-size:.65rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-primary-container)" id="nav-user">Admin</p>
+        <p style="font-size:.7rem;color:var(--c-text-muted)">Fleet Command</p>
+      </div>
+    </div>
+  </div>
+  <nav style="flex:1;padding:0 0 1rem">
+    <a href="./dashboard.html" class="nav-item active"><span class="material-symbols-outlined" style="font-size:1.1rem;font-variation-settings:'FILL' 1">dashboard</span>Dashboard</a>
+    <a href="./index.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">directions_car</span>Vehicles</a>
+    <a href="./drivers.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">person</span>Drivers</a>
+    <a href="./calendar.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">calendar_today</span>Calendar</a>
+    <a href="./reports.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">analytics</span>Reports</a>
+    <a href="./driver-portal.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">minor_crash</span>Driver Portal</a>
+    <a href="./users.html" class="nav-item"><span class="material-symbols-outlined" style="font-size:1.1rem">group</span>Users</a>
+  </nav>
+  <div style="padding:1rem 1.25rem;border-top:1px solid color-mix(in srgb,var(--c-outline-variant) 15%,transparent)">
+    <button onclick="logout()" class="btn-ghost" style="width:100%;justify-content:center">
+      <span class="material-symbols-outlined" style="font-size:1rem">logout</span>Sign Out
+    </button>
+  </div>
+</aside>
+<main class="main-content">
+  <header class="top-bar">
+    <div style="display:flex;align-items:center;gap:1rem">
+      <button class="icon-btn" id="sidebar-toggle" aria-label="Toggle sidebar"><span class="material-symbols-outlined">menu</span></button>
+      <span style="color:color-mix(in srgb,var(--c-on-surface) 25%,transparent)">|</span>
+      <h1 style="font-family:'Manrope',sans-serif;font-size:1rem;font-weight:700;letter-spacing:-.01em;color:var(--c-on-surface)">Dashboard</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:.875rem">
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <span class="material-symbols-outlined" style="font-size:1rem" id="theme-icon">light_mode</span>
+        <span id="theme-label">Light</span>
+      </button>
+      <button class="icon-btn" style="position:relative" aria-label="Notifications">
+        <span class="material-symbols-outlined" style="font-size:1.1rem">notifications</span>
+        <span style="position:absolute;top:4px;right:4px;width:7px;height:7px;background:var(--c-primary-container);border-radius:50%;border:2px solid var(--c-surface)"></span>
+      </button>
+      <div style="width:2.25rem;height:2.25rem;border-radius:50%;background:color-mix(in srgb,var(--c-primary-container) 20%,transparent);border:2px solid var(--c-primary-container);display:flex;align-items:center;justify-content:center">
+        <span class="material-symbols-outlined" style="color:var(--c-primary-container);font-size:1.1rem;font-variation-settings:'FILL' 1">account_circle</span>
+      </div>
+    </div>
+  </header>
+  <div style="padding:1.75rem 2rem;max-width:1280px;margin:0 auto">
+    
+<div style="margin-bottom:1.5rem">
+  <h2 style="font-family:'Manrope',sans-serif;font-size:1.75rem;font-weight:800;letter-spacing:-.02em">Command Overview</h2>
+  <p style="font-size:.8rem;color:var(--c-text-muted)">Live fleet health at a glance</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1rem;margin-bottom:2rem">
+  <div class="kpi-card green">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:.5rem">Active Vehicles</p>
+    <p style="font-family:'Manrope',sans-serif;font-size:2rem;font-weight:800;color:var(--c-tertiary)" id="kpi-active">—</p>
+    <p style="font-size:.75rem;color:var(--c-text-muted);margin-top:.25rem">On the road today</p>
+  </div>
+  <div class="kpi-card">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:.5rem">Service Due</p>
+    <p style="font-family:'Manrope',sans-serif;font-size:2rem;font-weight:800;color:var(--c-primary)" id="kpi-due">—</p>
+    <p style="font-size:.75rem;color:var(--c-text-muted);margin-top:.25rem">Within 14 days</p>
+  </div>
+  <div class="kpi-card red">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:.5rem">Overdue</p>
+    <p style="font-family:'Manrope',sans-serif;font-size:2rem;font-weight:800;color:var(--c-error)" id="kpi-overdue">—</p>
+    <p style="font-size:.75rem;color:var(--c-text-muted);margin-top:.25rem">Requires attention</p>
+  </div>
+  <div class="kpi-card">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:.5rem">Fleet Uptime</p>
+    <p style="font-family:'Manrope',sans-serif;font-size:2rem;font-weight:800;color:var(--c-on-surface)" id="kpi-uptime">—</p>
+    <p style="font-size:.75rem;color:var(--c-text-muted);margin-top:.25rem">This month</p>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem">
+  <div class="card">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:1rem">Recent Activity</p>
+    <div id="activity-list" style="display:flex;flex-direction:column;gap:.75rem"></div>
+  </div>
+  <div class="card">
+    <p style="font-size:.625rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:1rem">Fleet Status Breakdown</p>
+    <div id="status-breakdown" style="display:flex;flex-direction:column;gap:.75rem"></div>
+  </div>
+</div>
+<script>
+(function(){
+  const vehicles=JSON.parse(localStorage.getItem('fg_vehicles_v3')||'[]');
+  function getDays(ts){if(!ts)return null;const n=Number(ts);if(isNaN(n)||n<=0)return null;return Math.floor((Date.now()-n)/86400000)}
+  function getStatus(v){const d=getDays(v.lastServiceTs);const i=v.serviceInterval||90;if(d===null)return'ok';const r=i-d;if(r<0)return'danger';if(r<=14)return'warn';return'ok'}
+  const total=vehicles.length;
+  const overdue=vehicles.filter(v=>getStatus(v)==='danger').length;
+  const warn=vehicles.filter(v=>getStatus(v)==='warn').length;
+  const ok=total-overdue-warn;
+  document.getElementById('kpi-active').textContent=total;
+  document.getElementById('kpi-due').textContent=warn;
+  document.getElementById('kpi-overdue').textContent=overdue;
+  document.getElementById('kpi-uptime').textContent=total>0?((ok/total)*100).toFixed(0)+'%':'N/A';
+  const act=document.getElementById('activity-list');
+  if(vehicles.length===0){act.innerHTML='<p style="color:var(--c-text-muted);font-size:.8rem">No vehicles yet. <a href="./index.html" style="color:var(--c-primary-container)">Add vehicles</a></p>'}
+  else{vehicles.slice(-5).reverse().forEach(v=>{const s=getStatus(v);const colors={ok:'var(--c-tertiary)',warn:'var(--c-primary)',danger:'var(--c-error)'};act.innerHTML+=`<div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;border-bottom:1px solid color-mix(in srgb,var(--c-outline-variant) 10%,transparent)"><span class="material-symbols-outlined" style="color:${colors[s]};font-size:1.2rem;font-variation-settings:'FILL' 1">local_shipping</span><div><p style="font-size:.875rem;font-weight:600">Truck #${v.truckNumber} — Trailer #${v.trailerNumber}</p><p style="font-size:.7rem;color:var(--c-text-muted)">Driver: ${v.driver||'Unassigned'}</p></div></div>`})}
+  const br=document.getElementById('status-breakdown');
+  [{label:'Operational',count:ok,color:'var(--c-tertiary)'},{label:'Service Due Soon',count:warn,color:'var(--c-primary)'},{label:'Overdue',count:overdue,color:'var(--c-error)'}].forEach(item=>{const pct=total>0?Math.round((item.count/total)*100):0;br.innerHTML+=`<div><div style="display:flex;justify-content:space-between;margin-bottom:.25rem"><span style="font-size:.8rem;font-weight:600">${item.label}</span><span style="font-size:.8rem;color:var(--c-text-muted)">${item.count} / ${total}</span></div><div style="height:6px;background:var(--c-surface-highest);border-radius:3px"><div style="height:100%;width:${pct}%;background:${item.color};border-radius:3px;transition:width .5s"></div></div></div>`})
+})();
+</script>
+
+  </div>
+</main>
+<script>
+(function(){
+  const saved=localStorage.getItem('fg-theme')||'dark';
+  applyTheme(saved);
+  if(localStorage.getItem('fg-auth')!=='1'){window.location.href='./login.html'}
+  const user=localStorage.getItem('fg-user')||'Admin';
+  const el=document.getElementById('nav-user');
+  if(el)el.textContent=user.split('@')[0];
+})();
+function applyTheme(m){document.documentElement.classList.remove('dark','light');document.documentElement.classList.add(m);const i=document.getElementById('theme-icon');const l=document.getElementById('theme-label');if(i)i.textContent=m==='dark'?'light_mode':'dark_mode';if(l)l.textContent=m==='dark'?'Light':'Dark';localStorage.setItem('fg-theme',m)}
+document.getElementById('theme-toggle').addEventListener('click',()=>{const c=document.documentElement.classList.contains('dark')?'dark':'light';applyTheme(c==='dark'?'light':'dark')});
+document.getElementById('sidebar-toggle').addEventListener('click',()=>{document.getElementById('sidebar').classList.toggle('open')});
+function logout(){localStorage.removeItem('fg-auth');localStorage.removeItem('fg-user');window.location.href='./login.html'}
+</script>
+</body>
+</html>
