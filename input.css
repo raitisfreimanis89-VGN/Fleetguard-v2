@@ -1,0 +1,16 @@
+/*
+ * FleetGuard — Tailwind CSS Entry Point
+ *
+ * Build:  npm run build:css
+ * Watch:  npm run watch:css
+ * Output: dist/output.css  (minified in production)
+ *
+ * Layer order matters:
+ *   @tailwind base       → Preflight reset (normalizes browser defaults)
+ *   @tailwind components → Component classes (none custom here, but layer is required)
+ *   @tailwind utilities  → All utility classes (tree-shaken via content[] paths)
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

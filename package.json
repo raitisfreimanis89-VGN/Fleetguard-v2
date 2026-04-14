@@ -1,0 +1,14 @@
+{
+  "name": "fleetguard",
+  "version": "1.0.0",
+  "description": "FleetGuard — Vehicle Asset Management",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/input.css -o ./dist/output.css --minify",
+    "watch:css": "tailwindcss -i ./src/input.css -o ./dist/output.css --watch",
+    "build": "npm run build:css"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}

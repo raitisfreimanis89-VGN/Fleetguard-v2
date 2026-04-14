@@ -1,122 +1,1002 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FleetGuard â Safety & Compliance</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="css/styles.css"/>
-<link rel="stylesheet" href="css/titan-slate-login.css"/>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FleetGuard — Vehicle Assets</title>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  TAILWIND CDN → CLI MIGRATION                               ║
+  ║                                                              ║
+  ║  REMOVED:                                                    ║
+  ║    <script src="https://cdn.tailwindcss.com...">            ║
+  ║    <script id="tailwind-config"> tailwind.config = {...}    ║
+  ║                                                              ║
+  ║  REPLACED WITH:                                              ║
+  ║    <link href="./dist/output.css" rel="stylesheet">         ║
+  ║                                                              ║
+  ║  Build pipeline:                                             ║
+  ║    npm run build:css   → one-time minified build            ║
+  ║    npm run watch:css   → dev watch mode                     ║
+  ║                                                              ║
+  ║  Config lives in: tailwind.config.js                        ║
+  ║  Entry CSS in:    src/input.css                             ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+
+<!-- Tailwind compiled output (replaces CDN) -->
+<link href="./dist/output.css" rel="stylesheet"/>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+<style>
+/* ============================================================
+   CSS VARIABLES — THEME SYSTEM
+   (Dark is default; .light class on <html> overrides)
+   ============================================================ */
+:root {
+  --c-surface:             #10131a;
+  --c-surface-low:         #191c22;
+  --c-surface-container:   #1d2026;
+  --c-surface-high:        #272a31;
+  --c-surface-highest:     #32353c;
+  --c-on-surface:          #e1e2eb;
+  --c-on-surface-dim:      #9ca3af;
+  --c-primary:             #ffb5a0;
+  --c-primary-container:   #ff5722;
+  --c-tertiary:            #78dc77;
+  --c-error:               #ffb4ab;
+  --c-outline-variant:     #5b4039;
+  --c-text-muted:          #6b7280;
+  --shadow-ambient:        0px 24px 48px rgba(0,0,0,0.4);
+  --shadow-card:           0 4px 24px rgba(0,0,0,0.25);
+}
+
+/* ---- LIGHT THEME ---- */
+html.light {
+  --c-surface:             #f5f5f7;
+  --c-surface-low:         #ebebed;
+  --c-surface-container:   #ffffff;
+  --c-surface-high:        #e4e4e6;
+  --c-surface-highest:     #d8d8da;
+  --c-on-surface:          #1a1a1e;
+  --c-on-surface-dim:      #4b5563;
+  --c-primary:             #c94a1a;
+  --c-primary-container:   #e84e1d;
+  --c-tertiary:            #1f7a1e;
+  --c-error:               #c62828;
+  --c-outline-variant:     #d1a99e;
+  --c-text-muted:          #9ca3af;
+  --shadow-ambient:        0px 12px 32px rgba(0,0,0,0.12);
+  --shadow-card:           0 2px 12px rgba(0,0,0,0.08);
+}
+
+/* ============================================================
+   BASE
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--c-surface);
+  color: var(--c-on-surface);
+  min-height: 100dvh;
+  transition: background 0.3s, color 0.3s;
+}
+
+h1,h2,h3,.brand { font-family: 'Manrope', sans-serif; }
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  user-select: none;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--c-surface-highest); border-radius:4px; }
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.sidebar {
+  position: fixed;
+  inset-block: 0;
+  left: 0;
+  width: 15rem;
+  background: var(--c-surface-low);
+  display: flex;
+  flex-direction: column;
+  z-index: 50;
+  border-right: 1px solid color-mix(in srgb, var(--c-outline-variant) 15%, transparent);
+  transition: background 0.3s, transform 0.3s;
+}
+
+.main-content { margin-left: 15rem; min-height: 100dvh; }
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1.25rem;
+  margin: 0.125rem 0.5rem;
+  border-radius: 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer;
+  text-decoration: none;
+}
+.nav-item:hover { background: color-mix(in srgb, var(--c-surface-highest) 50%, transparent); color: var(--c-on-surface); }
+.nav-item.active {
+  background: var(--c-primary-container);
+  color: #fff;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c-primary-container) 50%, transparent);
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: var(--c-surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--c-outline-variant) 12%, transparent);
+  transition: background 0.3s;
+}
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.card {
+  background: var(--c-surface-container);
+  border-radius: 0.75rem;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.card:hover { background: var(--c-surface-high); }
+.card-form {
+  background: var(--c-surface-low);
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: var(--shadow-card);
+}
+
+/* ============================================================
+   FORM INPUTS
+   ============================================================ */
+.fg-input {
+  width: 100%;
+  background: color-mix(in srgb, var(--c-surface-highest) 30%, transparent);
+  border: none;
+  border-bottom: 2px solid var(--c-surface-highest);
+  color: var(--c-on-surface);
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem 0.375rem 0 0;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  transition: border-color 0.25s, background 0.25s;
+}
+.fg-input::placeholder { color: var(--c-text-muted); }
+.fg-input:focus { border-bottom-color: var(--c-primary-container); background: color-mix(in srgb, var(--c-surface-highest) 45%, transparent); }
+.fg-label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-text-muted);
+  padding: 0 0.25rem;
+  margin-bottom: 0.25rem;
+  transition: color 0.25s;
+}
+.fg-field:focus-within .fg-label { color: var(--c-primary); }
+
+/* ============================================================
+   BUTTONS
+   ============================================================ */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  background: var(--c-primary-container);
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.875rem 1.5rem;
+  border-radius: 0.75rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 0 20px color-mix(in srgb, var(--c-primary-container) 35%, transparent);
+  transition: filter 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+.btn-primary:hover { filter: brightness(1.12); box-shadow: 0 0 28px color-mix(in srgb, var(--c-primary-container) 50%, transparent); }
+.btn-primary:active { transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+
+.btn-ghost {
+  display: flex; align-items: center; justify-content: center; gap:0.375rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--c-outline-variant) 25%, transparent);
+  background: transparent;
+  color: var(--c-on-surface);
+  font-size: 0.75rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+}
+.btn-ghost:hover { background: color-mix(in srgb, var(--c-surface-highest) 50%, transparent); border-color: color-mix(in srgb, var(--c-outline-variant) 45%, transparent); }
+
+/* ============================================================
+   THEME TOGGLE
+   ============================================================ */
+.theme-toggle {
+  display: flex; align-items: center; gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--c-surface-highest) 60%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-outline-variant) 20%, transparent);
+  cursor: pointer;
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--c-on-surface);
+  transition: background 0.2s;
+}
+.theme-toggle:hover { background: var(--c-surface-highest); }
+
+/* ============================================================
+   STATUS BADGES
+   ============================================================ */
+.badge {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.7rem; font-weight: 700;
+}
+.badge-ok {
+  background: color-mix(in srgb, var(--c-tertiary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-tertiary) 25%, transparent);
+  color: var(--c-tertiary);
+}
+.badge-warn {
+  background: color-mix(in srgb, var(--c-primary-container) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-primary-container) 25%, transparent);
+  color: var(--c-primary);
+}
+.badge-danger {
+  background: color-mix(in srgb, var(--c-error) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c-error) 25%, transparent);
+  color: var(--c-error);
+}
+.badge-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink:0;
+}
+.badge-ok    .badge-dot { background: var(--c-tertiary);           box-shadow: 0 0 5px var(--c-tertiary);           animation: pulse 2s   infinite; }
+.badge-warn  .badge-dot { background: var(--c-primary-container);  box-shadow: 0 0 5px var(--c-primary-container);  animation: pulse 1.4s infinite; }
+.badge-danger .badge-dot{ background: var(--c-error);              box-shadow: 0 0 5px var(--c-error);              animation: pulse 1s   infinite; }
+
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:0.4; }
+}
+
+/* ============================================================
+   VEHICLE CARDS
+   ============================================================ */
+.vehicle-card {
+  background: var(--c-surface-container);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  border-left: 4px solid var(--c-tertiary);
+  box-shadow: var(--shadow-card);
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.3s;
+  position: relative;
+  overflow: hidden;
+}
+.vehicle-card:hover { background: var(--c-surface-high); box-shadow: var(--shadow-ambient); }
+.vehicle-card.overdue { border-left-color: var(--c-error); }
+.vehicle-card.warning { border-left-color: var(--c-primary-container); }
+
+.vehicle-card .actions {
+  display: flex; gap: 0.375rem;
+  opacity: 0; transition: opacity 0.2s;
+}
+.vehicle-card:hover .actions { opacity: 1; }
+
+.vehicle-id-block {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 0.875rem; background: #0b0e14;
+  border-radius: 0.5rem; min-width: 5rem;
+  border: 1px solid color-mix(in srgb, var(--c-outline-variant) 15%, transparent);
+}
+
+/* ============================================================
+   KPI BAR
+   ============================================================ */
+.kpi-bar {
+  background: color-mix(in srgb, var(--c-surface-highest) 20%, transparent);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--c-outline-variant) 10%, transparent);
+}
+
+/* ============================================================
+   SPARKLINE BARS
+   ============================================================ */
+.spark-bar { background: color-mix(in srgb, var(--c-tertiary) 20%, transparent); border-radius: 4px 4px 0 0; flex:1; transition: background 0.3s; }
+.spark-bar.active { background: var(--c-tertiary); }
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-overlay {
+  position: fixed; inset:0;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.25s;
+}
+.modal-overlay.open { opacity:1; pointer-events: all; }
+.modal-box {
+  background: var(--c-surface-low);
+  border-radius: 1rem;
+  padding: 2rem;
+  width: min(480px, 94vw);
+  box-shadow: var(--shadow-ambient);
+  transform: translateY(16px) scale(0.97);
+  transition: transform 0.25s, opacity 0.25s;
+  border: 1px solid color-mix(in srgb, var(--c-outline-variant) 15%, transparent);
+}
+.modal-overlay.open .modal-box { transform: translateY(0) scale(1); }
+
+/* ============================================================
+   TOAST NOTIFICATION
+   ============================================================ */
+.toast-container {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  display: flex; flex-direction: column; gap: 0.5rem;
+  z-index: 200;
+}
+.toast {
+  background: var(--c-surface-high);
+  border-left: 4px solid var(--c-tertiary);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--c-on-surface);
+  box-shadow: var(--shadow-ambient);
+  transform: translateX(120%);
+  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  min-width: 260px;
+  max-width: 320px;
+}
+.toast.show  { transform: translateX(0); }
+.toast.error { border-left-color: var(--c-error); }
+.toast.warn  { border-left-color: var(--c-primary-container); }
+
+/* ============================================================
+   OVERDUE HIGHLIGHT
+   ============================================================ */
+.overdue-text { color: var(--c-error); font-weight: 700; }
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width: 900px) {
+  .sidebar { transform: translateX(-100%); }
+  .sidebar.open { transform: translateX(0); }
+  .main-content { margin-left: 0; }
+  .bento-grid { display: flex !important; flex-direction: column; }
+  .vehicle-card { flex-wrap: wrap; }
+  .vehicle-card .actions { opacity:1; }
+}
+
+/* ============================================================
+   LIGHT MODE — element-level overrides
+   ============================================================ */
+html.light .fg-input {
+  background: color-mix(in srgb, var(--c-surface-highest) 30%, transparent);
+  color: var(--c-on-surface);
+}
+html.light .vehicle-id-block { background: var(--c-surface-low); }
+
+/* ============================================================
+   ANIMATION — staggered card entry
+   ============================================================ */
+@keyframes fadeUp {
+  from { opacity:0; transform: translateY(14px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+.vehicle-card                { animation: fadeUp 0.35s ease both; }
+.vehicle-card:nth-child(1)   { animation-delay: 0.05s; }
+.vehicle-card:nth-child(2)   { animation-delay: 0.12s; }
+.vehicle-card:nth-child(3)   { animation-delay: 0.19s; }
+.vehicle-card:nth-child(n+4) { animation-delay: 0.25s; }
+
+/* ============================================================
+   ICON BUTTON
+   ============================================================ */
+.icon-btn {
+  display:flex; align-items:center; justify-content:center;
+  width:2rem; height:2rem; border-radius:0.5rem; border:none;
+  background:transparent; cursor:pointer;
+  color: var(--c-text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+.icon-btn:hover     { background: var(--c-surface-highest); color: var(--c-on-surface); }
+.icon-btn.del:hover { background: color-mix(in srgb, var(--c-error) 15%, transparent); color: var(--c-error); }
+</style>
 </head>
+
 <body>
 
-<div id="loading-overlay" class="loading-overlay">
-  <div class="spinner" style="border-color:var(--primary);border-top-color:transparent;"></div>
-  Loading FleetGuard...
-</div>
-
-<div id="login-screen">
-  <div class="login-box">
-    <div class="login-logo">
-      <div class="logo-icon">ð</div>
-      <h1>FleetGuard</h1>
-      <p>Safety & Compliance Platform</p>
-      <div class="ts-headline">
-        Every route.<br>
-        Every driver.<br>
-        <span>Under control.</span>
+<!-- ============================================================
+     SIDEBAR
+     ============================================================ -->
+<aside class="sidebar" id="sidebar">
+  <div style="padding:1.5rem 1.25rem 1rem;">
+    <!-- Brand -->
+    <div style="display:flex;align-items:center;gap:0.625rem;margin-bottom:1.5rem;">
+      <div style="width:2rem;height:2rem;background:var(--c-primary-container);border-radius:0.5rem;display:flex;align-items:center;justify-content:center;">
+        <span class="material-symbols-outlined" style="color:#fff;font-size:1.1rem;font-variation-settings:'FILL' 1;">local_shipping</span>
       </div>
-      <div class="ts-status">
-        <div class="ts-stat">
-          <span class="ts-stat-lbl">System</span>
-          <span class="ts-stat-val"><span class="ts-live-dot"></span>All nodes live</span>
-        </div>
-        <div class="ts-stat">
-          <span class="ts-stat-lbl">Security</span>
-          <span class="ts-stat-val ts-white">AES-256</span>
-        </div>
-      </div>
+      <span class="brand" style="color:var(--c-primary-container);font-size:1.25rem;font-weight:800;letter-spacing:-0.03em;">FleetGuard</span>
     </div>
-    <div id="login-db-setup">
-      <div class="login-divider">Connect your Supabase database first</div>
-      <div id="ls-db-error" class="login-error"></div>
-      <div class="login-field">
-        <label>Supabase Project URL</label>
-        <input type="text" id="ls-sb-url" placeholder="https://xxxx.supabase.co"/>
+    <!-- Admin profile -->
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:0.625rem 0.75rem;background:var(--c-surface-container);border-radius:0.75rem;margin-bottom:1.5rem;">
+      <div style="width:2.25rem;height:2.25rem;border-radius:0.5rem;background:color-mix(in srgb,var(--c-primary-container) 20%,transparent);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <span class="material-symbols-outlined" style="color:var(--c-primary-container);font-size:1.1rem;font-variation-settings:'FILL' 1;">manage_accounts</span>
       </div>
-      <div class="login-field">
-        <label>Supabase Anon Key</label>
-        <input type="text" id="ls-sb-key" placeholder="eyJhbGciOiJIUzI1..."/>
-      </div>
-      <button id="ls-connect-btn" class="btn btn-primary login-btn-full" onclick="connectDbFromLogin()">Connect & Continue</button>
-    </div>
-    <div id="login-form-section">
-     <div class="ts-form-heading">
-       <div class="ts-form-title">Welcome back</div>
-       <p class="ts-form-sub">Sign in to your fleet dashboard</p>
-      </div>
-      <div id="login-error" class="login-error"></div>
-      <div class="login-field">
-        <label>Email</label>
-        <input type="email" id="login-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')signIn()"/>
-      </div>
-      <div class="login-field">
-        <label>Password</label>
-        <input type="password" id="login-password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" onkeydown="if(event.key==='Enter')signIn()"/>
-      </div>
-      <button id="login-btn" class="btn btn-primary login-btn-full" onclick="signIn()">Sign In</button>
-      <div class="login-divider" style="margin-top:16px">
-        <a href="#" onclick="localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');location.reload();return false" style="font-size:12px;color:var(--text3)">Change database</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="app" style="display:none">
-  <div id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">ð</div>
       <div>
-        <div class="logo-title">FleetGuard</div>
-        <div class="logo-sub">Safety & Compliance</div>
+        <p style="font-size:0.65rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-primary-container);">Admin Panel</p>
+        <p style="font-size:0.7rem;color:var(--c-text-muted);">Fleet Command</p>
       </div>
-    </div>
-    <nav>
-      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">ð</span> Dashboard</button>
-      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles"><span class="nav-icon">ð</span> Vehicles</button>
-      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">ð¤</span> Drivers</button>
-      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar"><span class="nav-icon">ð</span> Calendar</button>
-      <button class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="nav-icon">ð</span> Reports</button>
-      <button class="nav-item" onclick="navigate('portal')" id="nav-portal"><span class="nav-icon">ð¡ï¸</span> Driver Portal</button>
-      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none"><span class="nav-icon">ð¥</span> Users</button>
-    </nav>
-    <div style="padding:12px 10px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto">
-      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%"><span class="nav-icon">ðª</span> Sign Out</button>
     </div>
   </div>
-  <div id="main">
-    <div id="topbar">
-      <h1 id="page-title">Dashboard</h1>
-      <div class="user-bar">
-        <span id="role-badge" class="badge badge-gray">ð Dispatcher</span>
-        <span id="user-pill" class="user-email"></span>
+
+  <nav style="flex:1;padding:0 0 1rem;">
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">dashboard</span>Dashboard
+    </a>
+    <a href="#" class="nav-item active">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;font-variation-settings:'FILL' 1;">directions_car</span>Vehicles
+    </a>
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">person</span>Drivers
+    </a>
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">calendar_today</span>Calendar
+    </a>
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">analytics</span>Reports
+    </a>
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">minor_crash</span>Driver Portal
+    </a>
+    <a href="#" class="nav-item">
+      <span class="material-symbols-outlined" style="font-size:1.1rem;">group</span>Users
+    </a>
+  </nav>
+</aside>
+
+<!-- ============================================================
+     MAIN CONTENT
+     ============================================================ -->
+<main class="main-content">
+
+  <!-- TOP BAR -->
+  <header class="top-bar">
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <button class="icon-btn" id="sidebar-toggle" aria-label="Toggle sidebar">
+        <span class="material-symbols-outlined">menu</span>
+      </button>
+      <span style="color:color-mix(in srgb,var(--c-on-surface) 25%,transparent);">|</span>
+      <h1 style="font-family:'Manrope',sans-serif;font-size:1rem;font-weight:700;letter-spacing:-0.01em;color:var(--c-on-surface);">Vehicle Assets</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.875rem;">
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+        <span class="material-symbols-outlined" style="font-size:1rem;" id="theme-icon">light_mode</span>
+        <span id="theme-label">Light</span>
+      </button>
+      <!-- Notification -->
+      <button class="icon-btn" style="position:relative;" aria-label="Notifications">
+        <span class="material-symbols-outlined" style="font-size:1.1rem;">notifications</span>
+        <span style="position:absolute;top:4px;right:4px;width:7px;height:7px;background:var(--c-primary-container);border-radius:50%;border:2px solid var(--c-surface);"></span>
+      </button>
+      <!-- Avatar -->
+      <div style="width:2.25rem;height:2.25rem;border-radius:50%;background:color-mix(in srgb,var(--c-primary-container) 20%,transparent);border:2px solid var(--c-primary-container);display:flex;align-items:center;justify-content:center;">
+        <span class="material-symbols-outlined" style="color:var(--c-primary-container);font-size:1.1rem;font-variation-settings:'FILL' 1;">account_circle</span>
       </div>
     </div>
-    <div id="content"></div>
+  </header>
+
+  <!-- PAGE BODY -->
+  <div style="padding:1.75rem 2rem;max-width:1280px;margin:0 auto;">
+
+    <!-- BENTO GRID -->
+    <div class="bento-grid" style="display:grid;grid-template-columns:320px 1fr;gap:1.75rem;align-items:start;">
+
+      <!-- LEFT COLUMN: FORM + KPI -->
+      <div style="display:flex;flex-direction:column;gap:1.25rem;">
+
+        <!-- ADD VEHICLE FORM -->
+        <div class="card-form" style="position:relative;overflow:hidden;">
+          <!-- Decorative accent -->
+          <div style="position:absolute;top:-2rem;right:-2rem;width:7rem;height:7rem;background:color-mix(in srgb,var(--c-primary-container) 5%,transparent);border-radius:50%;"></div>
+
+          <h2 style="font-family:'Manrope',sans-serif;font-size:1rem;font-weight:800;display:flex;align-items:center;gap:0.625rem;margin-bottom:1.5rem;color:var(--c-on-surface);">
+            <span style="width:3px;height:1.25rem;background:var(--c-primary-container);border-radius:2px;flex-shrink:0;"></span>
+            Add New Vehicle
+          </h2>
+
+          <form id="add-vehicle-form" onsubmit="handleAddVehicle(event)" style="display:flex;flex-direction:column;gap:1rem;">
+            <div class="fg-field">
+              <label class="fg-label" for="truck-number">Truck Number</label>
+              <input class="fg-input" id="truck-number" type="text" placeholder="e.g. #101" autocomplete="off" required/>
+            </div>
+            <div class="fg-field">
+              <label class="fg-label" for="trailer-number">Trailer Number</label>
+              <input class="fg-input" id="trailer-number" type="text" placeholder="e.g. #202" autocomplete="off" required/>
+            </div>
+            <div class="fg-field">
+              <label class="fg-label" for="assign-driver">Assign Driver</label>
+              <select class="fg-input" id="assign-driver" required>
+                <option value="" disabled selected>Select Driver</option>
+                <option>Andris Gaisais</option>
+                <option>Maris Bob</option>
+                <option>Jamshid Alex</option>
+              </select>
+            </div>
+            <div class="fg-field">
+              <label class="fg-label" for="assign-dispatcher">Assign Dispatcher</label>
+              <select class="fg-input" id="assign-dispatcher" required>
+                <option value="" disabled selected>Select Dispatcher</option>
+                <option>Dispatcher Alpha</option>
+                <option>Dispatcher Beta</option>
+              </select>
+            </div>
+            <div class="fg-field">
+              <label class="fg-label" for="last-service">Last Service Date</label>
+              <input class="fg-input" id="last-service" type="date"/>
+              <p style="font-size:0.65rem;color:var(--c-text-muted);padding:0.25rem 0.25rem 0;font-style:italic;">Leave blank if no prior service recorded</p>
+            </div>
+            <div class="fg-field">
+              <label class="fg-label" for="service-interval">Service Interval (days)</label>
+              <input class="fg-input" id="service-interval" type="number" min="1" max="365" placeholder="e.g. 90"/>
+            </div>
+            <button class="btn-primary" type="submit" id="add-btn">
+              <span class="material-symbols-outlined" style="font-size:1rem;">add</span>
+              Add Vehicle
+            </button>
+          </form>
+        </div>
+
+        <!-- LIVE KPI CARD -->
+        <div class="kpi-bar">
+          <p style="font-size:0.625rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:1rem;">Live Fleet Status</p>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:3rem;margin-bottom:0.75rem;" id="spark-chart"></div>
+          <p style="font-family:'Manrope',sans-serif;font-size:1.5rem;font-weight:800;color:var(--c-tertiary);" id="uptime-kpi">
+            — <span style="font-size:0.75rem;font-weight:400;color:var(--c-text-muted);">Uptime</span>
+          </p>
+          <div style="display:flex;gap:1rem;margin-top:0.75rem;" id="fleet-summary"></div>
+        </div>
+
+      </div><!-- end left col -->
+
+      <!-- RIGHT COLUMN: FLEET INVENTORY -->
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:1.25rem;flex-wrap:wrap;gap:0.75rem;">
+          <div>
+            <h2 style="font-family:'Manrope',sans-serif;font-size:1.75rem;font-weight:800;letter-spacing:-0.02em;color:var(--c-on-surface);">Fleet Inventory</h2>
+            <p style="font-size:0.8rem;color:var(--c-text-muted);">Real-time status and maintenance tracking</p>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn-ghost" onclick="filterVehicles('all')" data-filter="all">
+              <span class="material-symbols-outlined" style="font-size:0.9rem;">filter_list</span> All
+            </button>
+            <button class="btn-ghost" onclick="filterVehicles('overdue')" data-filter="overdue">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--c-error);display:inline-block;"></span> Overdue
+            </button>
+            <button class="btn-ghost" onclick="filterVehicles('warning')" data-filter="warning">
+              <span style="width:6px;height:6px;border-radius:50%;background:var(--c-primary-container);display:inline-block;"></span> Warning
+            </button>
+          </div>
+        </div>
+
+        <div id="vehicle-list" style="display:flex;flex-direction:column;gap:0.75rem;"></div>
+
+        <div id="empty-state" style="display:none;text-align:center;padding:3rem 1rem;color:var(--c-text-muted);">
+          <span class="material-symbols-outlined" style="font-size:3rem;opacity:0.4;">local_shipping</span>
+          <p style="margin-top:0.5rem;font-size:0.875rem;">No vehicles match this filter.</p>
+        </div>
+      </div><!-- end right col -->
+
+    </div><!-- end bento-grid -->
+  </div><!-- end page body -->
+</main>
+
+<!-- ============================================================
+     EDIT MODAL
+     ============================================================ -->
+<div class="modal-overlay" id="edit-modal" role="dialog" aria-modal="true" aria-label="Edit Vehicle">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+      <h3 style="font-family:'Manrope',sans-serif;font-size:1rem;font-weight:800;color:var(--c-on-surface);">Edit Vehicle</h3>
+      <button class="icon-btn" onclick="closeModal()" aria-label="Close modal">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="edit-form" onsubmit="handleEditSave(event)" style="display:flex;flex-direction:column;gap:1rem;">
+      <input type="hidden" id="edit-id"/>
+      <div class="fg-field">
+        <label class="fg-label" for="edit-truck">Truck Number</label>
+        <input class="fg-input" id="edit-truck" type="text" required/>
+      </div>
+      <div class="fg-field">
+        <label class="fg-label" for="edit-trailer">Trailer Number</label>
+        <input class="fg-input" id="edit-trailer" type="text" required/>
+      </div>
+      <div class="fg-field">
+        <label class="fg-label" for="edit-driver">Driver</label>
+        <select class="fg-input" id="edit-driver">
+          <option>Andris Gaisais</option>
+          <option>Maris Bob</option>
+          <option>Jamshid Alex</option>
+        </select>
+      </div>
+      <div class="fg-field">
+        <label class="fg-label" for="edit-last-service">Last Service Date</label>
+        <input class="fg-input" id="edit-last-service" type="date"/>
+      </div>
+      <div class="fg-field">
+        <label class="fg-label" for="edit-interval">Service Interval (days)</label>
+        <input class="fg-input" id="edit-interval" type="number" min="1" max="365"/>
+      </div>
+      <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
+        <button type="button" class="btn-ghost" style="flex:1;" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary" style="flex:2;">Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
-<div id="confirm-modal" class="modal-overlay" style="display:none">
-  <div class="modal" style="max-width:380px">
-    <div class="modal-header" id="confirm-title">Confirm</div>
-    <div class="modal-body" id="confirm-body" style="color:var(--text2);font-size:13px;line-height:1.6"></div>
-    <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="confirmResolve(false)">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmResolve(true)">Delete</button>
-    </div>
-  </div>
-</div>
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
 
-<script src="js/app.js"></script>
+<!-- ============================================================
+     JAVASCRIPT — unchanged from previous version
+     ============================================================ -->
+<script>
+/* ============================================================
+   THEME SYSTEM
+   ============================================================ */
+(function initTheme() {
+  const saved = localStorage.getItem('fg-theme') || 'dark';
+  applyTheme(saved);
+})();
+
+function applyTheme(mode) {
+  const html = document.documentElement;
+  html.classList.remove('dark','light');
+  html.classList.add(mode);
+  const icon  = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (icon)  icon.textContent  = mode === 'dark' ? 'light_mode' : 'dark_mode';
+  if (label) label.textContent = mode === 'dark' ? 'Light' : 'Dark';
+  localStorage.setItem('fg-theme', mode);
+}
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  applyTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+/* ============================================================
+   SIDEBAR TOGGLE (MOBILE)
+   ============================================================ */
+document.getElementById('sidebar-toggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+/* ============================================================
+   DATA LAYER — safe localStorage helpers
+   ============================================================ */
+const STORAGE_KEY = 'fg_vehicles_v3';
+
+function loadVehicles() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveVehicles(vehicles) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(vehicles));
+}
+
+/* ============================================================
+   getServiceDays — safe date calculation (bug fix retained)
+   ============================================================ */
+function getServiceDays(lastServiceTimestamp) {
+  if (!lastServiceTimestamp) return null;
+  const ts = Number(lastServiceTimestamp);
+  if (isNaN(ts) || ts <= 0) return null;
+  return Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+}
+
+function getServiceStatus(vehicle) {
+  const days     = getServiceDays(vehicle.lastServiceTs);
+  const interval = vehicle.serviceInterval || 90;
+  if (days === null) return { label: 'No Record', days: null, state: 'ok' };
+  const remaining = interval - days;
+  if (remaining < 0)   return { label: `Overdue ${Math.abs(remaining)}d`, days, state: 'danger' };
+  if (remaining <= 14) return { label: `Due in ${remaining}d`,            days, state: 'warn'   };
+  return { label: `OK (${remaining}d left)`, days, state: 'ok' };
+}
+
+/* ============================================================
+   SEED DATA
+   ============================================================ */
+const SEED_VEHICLES = [
+  { id:'v_001', truckNumber:'112', trailerNumber:'222', driver:'Andris Gaisais', dispatcher:'Dispatcher Alpha',
+    lastServiceTs: new Date(Date.now() - (2   * 86400000)).getTime(), serviceInterval:90, brakesAlertDays:1, tyresAlertDays:1 },
+  { id:'v_002', truckNumber:'441', trailerNumber:'447', driver:'Maris Bob',      dispatcher:'Dispatcher Beta',
+    lastServiceTs: new Date(Date.now() - (80  * 86400000)).getTime(), serviceInterval:90, brakesAlertDays:1, tyresAlertDays:4 },
+  { id:'v_003', truckNumber:'999', trailerNumber:'991', driver:'Jamshid Alex',   dispatcher:'Dispatcher Alpha',
+    lastServiceTs: new Date(Date.now() - (100 * 86400000)).getTime(), serviceInterval:90, brakesAlertDays:1, tyresAlertDays:1 },
+];
+
+let vehicles     = loadVehicles() || SEED_VEHICLES.map(v => ({...v}));
+let currentFilter = 'all';
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderVehicles() {
+  const list  = document.getElementById('vehicle-list');
+  const empty = document.getElementById('empty-state');
+
+  const filtered = vehicles.filter(v => {
+    if (currentFilter === 'all') return true;
+    const s = getServiceStatus(v);
+    if (currentFilter === 'overdue') return s.state === 'danger';
+    if (currentFilter === 'warning') return s.state === 'warn';
+    return true;
+  });
+
+  list.innerHTML = '';
+
+  if (filtered.length === 0) { empty.style.display = ''; return; }
+  empty.style.display = 'none';
+
+  filtered.forEach(v => {
+    const svc   = getServiceStatus(v);
+    const card  = document.createElement('div');
+    card.className = 'vehicle-card' + (svc.state === 'danger' ? ' overdue' : svc.state === 'warn' ? ' warning' : '');
+
+    const brakeBadge = buildBadge(v.brakesAlertDays <= 1 ? 'warn' : 'ok', v.brakesAlertDays <= 1 ? `Brakes ${v.brakesAlertDays}d` : 'Brakes OK');
+    const tyreBadge  = buildBadge(v.tyresAlertDays  <= 1 ? 'warn' : 'ok', `Tyres ${v.tyresAlertDays}d`);
+    const svcBadge   = buildBadge(svc.state, svc.label);
+
+    card.innerHTML = `
+      <div class="vehicle-id-block">
+        <span class="material-symbols-outlined" style="color:var(--c-text-muted);font-size:1.5rem;font-variation-settings:'FILL' 1;">local_shipping</span>
+        <span style="font-family:'Manrope',sans-serif;font-size:1.1rem;font-weight:800;margin-top:0.25rem;color:var(--c-on-surface);">${escHtml(v.truckNumber)}</span>
+      </div>
+      <div style="flex:1;display:grid;grid-template-columns:1fr 2fr;gap:0.75rem;min-width:0;">
+        <div>
+          <p style="font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-text-muted);">Asset Details</p>
+          <p style="font-weight:700;font-size:0.875rem;color:var(--c-on-surface);">Trailer #${escHtml(v.trailerNumber)}</p>
+          <p style="font-size:0.75rem;color:var(--c-text-muted);">Driver: ${escHtml(v.driver)}</p>
+        </div>
+        <div>
+          <p style="font-size:0.6rem;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:0.5rem;">Maintenance Status</p>
+          <div style="display:flex;flex-wrap:wrap;gap:0.375rem;">${brakeBadge}${tyreBadge}${svcBadge}</div>
+          ${svc.days !== null ? `<p style="font-size:0.65rem;color:var(--c-text-muted);margin-top:0.375rem;">${svc.days} day${svc.days !== 1 ? 's' : ''} since last service</p>` : ''}
+        </div>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" onclick="openEditModal('${v.id}')" aria-label="Edit vehicle ${escHtml(v.truckNumber)}">
+          <span class="material-symbols-outlined" style="font-size:1.1rem;">edit</span>
+        </button>
+        <button class="icon-btn del" onclick="deleteVehicle('${v.id}')" aria-label="Delete vehicle ${escHtml(v.truckNumber)}">
+          <span class="material-symbols-outlined" style="font-size:1.1rem;">delete</span>
+        </button>
+      </div>`;
+    list.appendChild(card);
+  });
+
+  renderKPI();
+}
+
+function buildBadge(state, label) {
+  return `<span class="badge badge-${state}"><span class="badge-dot"></span>${escHtml(label)}</span>`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ============================================================
+   KPI PANEL
+   ============================================================ */
+function renderKPI() {
+  const total   = vehicles.length;
+  const overdue = vehicles.filter(v => getServiceStatus(v).state === 'danger').length;
+  const warning = vehicles.filter(v => getServiceStatus(v).state === 'warn').length;
+  const ok      = total - overdue - warning;
+  const uptime  = total > 0 ? ((ok / total) * 100).toFixed(1) : '—';
+
+  const kpiEl = document.getElementById('uptime-kpi');
+  if (kpiEl) kpiEl.innerHTML = `${uptime}% <span style="font-size:0.75rem;font-weight:400;color:var(--c-text-muted);">Fleet OK</span>`;
+
+  const summaryEl = document.getElementById('fleet-summary');
+  if (summaryEl) summaryEl.innerHTML = `
+    <div style="text-align:center;"><p style="font-family:'Manrope',sans-serif;font-size:1.1rem;font-weight:800;color:var(--c-on-surface);">${total}</p><p style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-text-muted);">Total</p></div>
+    <div style="text-align:center;"><p style="font-family:'Manrope',sans-serif;font-size:1.1rem;font-weight:800;color:var(--c-tertiary);">${ok}</p><p style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-text-muted);">OK</p></div>
+    <div style="text-align:center;"><p style="font-family:'Manrope',sans-serif;font-size:1.1rem;font-weight:800;color:var(--c-primary);">${warning}</p><p style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-text-muted);">Warning</p></div>
+    <div style="text-align:center;"><p style="font-family:'Manrope',sans-serif;font-size:1.1rem;font-weight:800;color:var(--c-error);">${overdue}</p><p style="font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--c-text-muted);">Overdue</p></div>`;
+
+  const sparkEl = document.getElementById('spark-chart');
+  if (sparkEl) {
+    sparkEl.innerHTML = [40,70,50,90,60,75,55].map((h,i) =>
+      `<div class="spark-bar${i===3?' active':''}" style="height:${h}%;"></div>`).join('');
+  }
+}
+
+/* ============================================================
+   ADD VEHICLE
+   ============================================================ */
+function handleAddVehicle(e) {
+  e.preventDefault();
+  const truckNumber    = document.getElementById('truck-number').value.trim();
+  const trailerNumber  = document.getElementById('trailer-number').value.trim();
+  const driver         = document.getElementById('assign-driver').value;
+  const dispatcher     = document.getElementById('assign-dispatcher').value;
+  const lastServiceRaw = document.getElementById('last-service').value;
+  const intervalVal    = document.getElementById('service-interval').value;
+
+  let lastServiceTs = null;
+  if (lastServiceRaw) {
+    const [y,m,d] = lastServiceRaw.split('-').map(Number);
+    if (y && m && d) lastServiceTs = new Date(y, m-1, d, 0,0,0,0).getTime();
+  }
+
+  vehicles.push({
+    id: 'v_' + Date.now(), truckNumber, trailerNumber, driver, dispatcher,
+    lastServiceTs, serviceInterval: intervalVal ? Math.max(1, parseInt(intervalVal,10)) : 90,
+    brakesAlertDays:90, tyresAlertDays:90,
+  });
+  saveVehicles(vehicles);
+  renderVehicles();
+  document.getElementById('add-vehicle-form').reset();
+  showToast(`Vehicle #${truckNumber} added successfully.`, 'ok');
+}
+
+/* ============================================================
+   FILTER
+   ============================================================ */
+function filterVehicles(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('[data-filter]').forEach(btn => {
+    btn.style.borderColor = btn.dataset.filter === filter
+      ? 'color-mix(in srgb, var(--c-primary-container) 60%, transparent)' : '';
+  });
+  renderVehicles();
+}
+
+/* ============================================================
+   DELETE
+   ============================================================ */
+function deleteVehicle(id) {
+  const idx = vehicles.findIndex(v => v.id === id);
+  if (idx === -1) return;
+  const truck = vehicles[idx].truckNumber;
+  vehicles.splice(idx, 1);
+  saveVehicles(vehicles);
+  renderVehicles();
+  showToast(`Vehicle #${truck} removed.`, 'warn');
+}
+
+/* ============================================================
+   EDIT MODAL
+   ============================================================ */
+function openEditModal(id) {
+  const v = vehicles.find(v => v.id === id);
+  if (!v) return;
+  document.getElementById('edit-id').value       = v.id;
+  document.getElementById('edit-truck').value    = v.truckNumber;
+  document.getElementById('edit-trailer').value  = v.trailerNumber;
+  document.getElementById('edit-driver').value   = v.driver;
+  document.getElementById('edit-interval').value = v.serviceInterval || '';
+
+  let dateStr = '';
+  if (v.lastServiceTs) {
+    const dt = new Date(Number(v.lastServiceTs));
+    if (!isNaN(dt.getTime())) {
+      dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+    }
+  }
+  document.getElementById('edit-last-service').value = dateStr;
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('edit-modal').classList.remove('open'); }
+
+document.getElementById('edit-modal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+function handleEditSave(e) {
+  e.preventDefault();
+  const id            = document.getElementById('edit-id').value;
+  const truckNumber   = document.getElementById('edit-truck').value.trim();
+  const trailerNumber = document.getElementById('edit-trailer').value.trim();
+  const driver        = document.getElementById('edit-driver').value;
+  const lastServiceRaw= document.getElementById('edit-last-service').value;
+  const intervalVal   = document.getElementById('edit-interval').value;
+  const idx = vehicles.findIndex(v => v.id === id);
+  if (idx === -1) { closeModal(); return; }
+
+  let lastServiceTs = null;
+  if (lastServiceRaw) {
+    const [y,m,d] = lastServiceRaw.split('-').map(Number);
+    if (y && m && d) lastServiceTs = new Date(y, m-1, d, 0,0,0,0).getTime();
+  }
+
+  vehicles[idx] = { ...vehicles[idx], truckNumber, trailerNumber, driver, lastServiceTs,
+    serviceInterval: intervalVal ? Math.max(1, parseInt(intervalVal,10)) : vehicles[idx].serviceInterval };
+  saveVehicles(vehicles);
+  renderVehicles();
+  closeModal();
+  showToast(`Vehicle #${truckNumber} updated.`, 'ok');
+}
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function showToast(message, type = 'ok') {
+  const container = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast${type === 'warn' ? ' warn' : type === 'error' ? ' error' : ''}`;
+  el.textContent = message;
+  container.appendChild(el);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('show')));
+  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 350); }, 3500);
+}
+
+/* ============================================================
+   INIT
+   ============================================================ */
+renderVehicles();
+</script>
 </body>
 </html>
