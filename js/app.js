@@ -208,7 +208,7 @@ const AXLES=[
   {name:'Trailer Axle 1',sides:['left-outer','left-inner','right-inner','right-outer']},
   {name:'Trailer Axle 2',sides:['left-outer','left-inner','right-inner','right-outer']},
 ];
-function daysBetween(a,b){return Math.round((new Date(b)-new Date(a))/86400000);}
+function daysBetween(a,b){if(a==null||b==null||a===''||b==='')return null;function toLocal(d){var s=String(d).split('T')[0];var p=s.split('-');if(p.length!==3||isNaN(+p[0])||isNaN(+p[1])||isNaN(+p[2]))return new Date('invalid');return new Date(+p[0],+p[1]-1,+p[2]);}var diff=toLocal(b)-toLocal(a);if(isNaN(diff))return null;return Math.round(diff/86400000);}
 function fmtDate(s){if(!s)return'—';return new Date(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});}
 function today(){return new Date().toISOString().split('T')[0];}
 function dispatcherNotice(){return`<div class="dispatcher-notice">👁 View only — contact an admin to make changes</div>`;}
@@ -221,9 +221,9 @@ function getVehicleStatus(vid){
   const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===vid).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
   const lastBrake=brakes[0],lastTyre=tyres[0],lastDot=dots[0],lastService=svcs[0];
   const now=today();
-  const brakeDays=lastBrake?daysBetween(lastBrake.testDate,now):9999;
-  const tyreDays=lastTyre?daysBetween(lastTyre.photoDate,now):9999;
-  const serviceDays=lastService?daysBetween(lastService.serviceDate,now):9999;
+  const brakeDays=lastBrake?daysBetween(lastBrake.testDate,now):null;
+  const tyreDays=lastTyre?daysBetween(lastTyre.photoDate,now):null;
+  const serviceDays=lastService?daysBetween(lastService.serviceDate,now):null;
   const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>14;
   const serviceOverdue=serviceDays>90,serviceDueSoon=serviceDays>75&&!serviceOverdue;
   // nextDue warning: use maintenance nextInspectionDate if it has passed
@@ -302,7 +302,7 @@ function renderDashboard(){
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟠 Tyre Check Overdue</div><div class="card-body">`;
   if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
-  tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===9999?'NONE':x.s.tyreDays+' days'}</span></div>`;});
+  tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🔵 Service Overdue (90-day)</div><div class="card-body">`;
   if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 90-day service schedule</div>`;
