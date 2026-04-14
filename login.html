@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FleetGuard — Login</title>
+<link href="./dist/output.css" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+:root{--c-surface:#10131a;--c-surface-low:#191c22;--c-surface-container:#1d2026;--c-surface-high:#272a31;--c-surface-highest:#32353c;--c-on-surface:#e1e2eb;--c-primary:#ffb5a0;--c-primary-container:#ff5722;--c-tertiary:#78dc77;--c-error:#ffb4ab;--c-outline-variant:#5b4039;--c-text-muted:#6b7280;--shadow-ambient:0px 24px 48px rgba(0,0,0,0.4);--shadow-card:0 4px 24px rgba(0,0,0,0.25)}
+html.light{--c-surface:#f5f5f7;--c-surface-low:#ebebed;--c-surface-container:#ffffff;--c-surface-high:#e4e4e6;--c-surface-highest:#d8d8da;--c-on-surface:#1a1a1e;--c-primary:#c94a1a;--c-primary-container:#e84e1d;--c-tertiary:#1f7a1e;--c-error:#c62828;--c-outline-variant:#d1a99e;--c-text-muted:#9ca3af;--shadow-ambient:0px 12px 32px rgba(0,0,0,0.12);--shadow-card:0 2px 12px rgba(0,0,0,0.08)}
+*,*::before,*::after{box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--c-surface);color:var(--c-on-surface);min-height:100dvh;display:flex;align-items:center;justify-content:center;transition:background .3s,color .3s}
+.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;user-select:none}
+.login-card{background:var(--c-surface-low);border-radius:1rem;padding:2.5rem;width:min(420px,94vw);box-shadow:var(--shadow-ambient);border:1px solid color-mix(in srgb,var(--c-outline-variant) 15%,transparent)}
+.fg-input{width:100%;background:color-mix(in srgb,var(--c-surface-highest) 30%,transparent);border:none;border-bottom:2px solid var(--c-surface-highest);color:var(--c-on-surface);padding:.75rem 1rem;border-radius:.375rem .375rem 0 0;outline:none;font-family:'Inter',sans-serif;font-size:.875rem;transition:border-color .25s,background .25s}
+.fg-input:focus{border-bottom-color:var(--c-primary-container);background:color-mix(in srgb,var(--c-surface-highest) 45%,transparent)}
+.fg-label{display:block;font-size:.625rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--c-text-muted);padding:0 .25rem;margin-bottom:.25rem}
+.btn-primary{display:flex;align-items:center;justify-content:center;gap:.5rem;width:100%;background:var(--c-primary-container);color:#fff;font-family:'Inter',sans-serif;font-weight:700;font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;padding:.875rem 1.5rem;border-radius:.75rem;border:none;cursor:pointer;box-shadow:0 0 20px color-mix(in srgb,var(--c-primary-container) 35%,transparent);transition:filter .2s,transform .15s}
+.btn-primary:hover{filter:brightness(1.12)}
+.btn-primary:active{transform:scale(.97)}
+.error-msg{display:none;color:var(--c-error);font-size:.75rem;margin-top:.5rem;padding:.5rem .75rem;background:color-mix(in srgb,var(--c-error) 10%,transparent);border-radius:.5rem;border:1px solid color-mix(in srgb,var(--c-error) 25%,transparent)}
+.theme-btn{position:fixed;top:1rem;right:1rem;display:flex;align-items:center;gap:.375rem;padding:.375rem .75rem;border-radius:9999px;background:color-mix(in srgb,var(--c-surface-highest) 60%,transparent);border:1px solid color-mix(in srgb,var(--c-outline-variant) 20%,transparent);cursor:pointer;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--c-on-surface);transition:background .2s}
+</style>
+</head>
+<body>
+<button class="theme-btn" id="theme-toggle" aria-label="Toggle theme">
+  <span class="material-symbols-outlined" style="font-size:1rem" id="theme-icon">light_mode</span>
+  <span id="theme-label">Light</span>
+</button>
+<div class="login-card">
+  <div style="text-align:center;margin-bottom:2rem">
+    <div style="display:inline-flex;align-items:center;gap:.625rem;margin-bottom:1rem">
+      <div style="width:2.25rem;height:2.25rem;background:var(--c-primary-container);border-radius:.625rem;display:flex;align-items:center;justify-content:center">
+        <span class="material-symbols-outlined" style="color:#fff;font-size:1.25rem;font-variation-settings:'FILL' 1">local_shipping</span>
+      </div>
+      <span style="font-family:'Manrope',sans-serif;font-size:1.5rem;font-weight:800;letter-spacing:-.03em;color:var(--c-primary-container)">FleetGuard</span>
+    </div>
+    <p style="font-size:.8rem;color:var(--c-text-muted)">Fleet Command Center — Sign in to continue</p>
+  </div>
+  <form id="login-form" style="display:flex;flex-direction:column;gap:1rem">
+    <div>
+      <label class="fg-label" for="email">Email Address</label>
+      <input class="fg-input" id="email" type="email" placeholder="admin@fleetguard.io" autocomplete="email"/>
+    </div>
+    <div>
+      <label class="fg-label" for="password">Password</label>
+      <input class="fg-input" id="password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <div id="error-msg" class="error-msg">Invalid email or password. Try admin@fleetguard.io / admin123</div>
+    <button class="btn-primary" type="submit" style="margin-top:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem">login</span>
+      Sign In
+    </button>
+  </form>
+  <p style="text-align:center;font-size:.7rem;color:var(--c-text-muted);margin-top:1.5rem">Demo credentials: admin@fleetguard.io / admin123</p>
+</div>
+<script>
+(function(){const s=localStorage.getItem('fg-theme')||'dark';applyTheme(s)})();
+function applyTheme(m){document.documentElement.classList.remove('dark','light');document.documentElement.classList.add(m);const i=document.getElementById('theme-icon');const l=document.getElementById('theme-label');if(i)i.textContent=m==='dark'?'light_mode':'dark_mode';if(l)l.textContent=m==='dark'?'Light':'Dark';localStorage.setItem('fg-theme',m)}
+document.getElementById('theme-toggle').addEventListener('click',()=>{const c=document.documentElement.classList.contains('dark')?'dark':'light';applyTheme(c==='dark'?'light':'dark')});
+document.getElementById('login-form').addEventListener('submit',function(e){
+  e.preventDefault();
+  const email=document.getElementById('email').value.trim();
+  const pass=document.getElementById('password').value;
+  const err=document.getElementById('error-msg');
+  if(email==='admin@fleetguard.io'&&pass==='admin123'){
+    localStorage.setItem('fg-auth','1');
+    localStorage.setItem('fg-user',email);
+    window.location.href='./dashboard.html';
+  } else {
+    err.style.display='block';
+  }
+});
+if(localStorage.getItem('fg-auth')==='1'){window.location.href='./dashboard.html'}
+</script>
+</body>
+</html>
