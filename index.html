@@ -3,26 +3,26 @@
 <head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>FleetGuard — Vehicle Assets</title>
+<title>FleetGuard â Vehicle Assets</title>
 
 <!--
-  ╔══════════════════════════════════════════════════════════════╗
-  ║  TAILWIND CDN → CLI MIGRATION                               ║
-  ║                                                              ║
-  ║  REMOVED:                                                    ║
-  ║    <script src="https://cdn.tailwindcss.com...">            ║
-  ║    <script id="tailwind-config"> tailwind.config = {...}    ║
-  ║                                                              ║
-  ║  REPLACED WITH:                                              ║
-  ║    <link href="./dist/output.css" rel="stylesheet">         ║
-  ║                                                              ║
-  ║  Build pipeline:                                             ║
-  ║    npm run build:css   → one-time minified build            ║
-  ║    npm run watch:css   → dev watch mode                     ║
-  ║                                                              ║
-  ║  Config lives in: tailwind.config.js                        ║
-  ║  Entry CSS in:    src/input.css                             ║
-  ╚══════════════════════════════════════════════════════════════╝
+  ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
+  â  TAILWIND CDN â CLI MIGRATION                               â
+  â                                                              â
+  â  REMOVED:                                                    â
+  â    <script src="https://cdn.tailwindcss.com...">            â
+  â    <script id="tailwind-config"> tailwind.config = {...}    â
+  â                                                              â
+  â  REPLACED WITH:                                              â
+  â    <link href="./dist/output.css" rel="stylesheet">         â
+  â                                                              â
+  â  Build pipeline:                                             â
+  â    npm run build:css   â one-time minified build            â
+  â    npm run watch:css   â dev watch mode                     â
+  â                                                              â
+  â  Config lives in: tailwind.config.js                        â
+  â  Entry CSS in:    src/input.css                             â
+  ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
 -->
 
 <!-- Tailwind compiled output (replaces CDN) -->
@@ -34,7 +34,7 @@
 
 <style>
 /* ============================================================
-   CSS VARIABLES — THEME SYSTEM
+   CSS VARIABLES â THEME SYSTEM
    (Dark is default; .light class on <html> overrides)
    ============================================================ */
 :root {
@@ -420,7 +420,7 @@ h1,h2,h3,.brand { font-family: 'Manrope', sans-serif; }
 }
 
 /* ============================================================
-   LIGHT MODE — element-level overrides
+   LIGHT MODE â element-level overrides
    ============================================================ */
 html.light .fg-input {
   background: color-mix(in srgb, var(--c-surface-highest) 30%, transparent);
@@ -429,7 +429,7 @@ html.light .fg-input {
 html.light .vehicle-id-block { background: var(--c-surface-low); }
 
 /* ============================================================
-   ANIMATION — staggered card entry
+   ANIMATION â staggered card entry
    ============================================================ */
 @keyframes fadeUp {
   from { opacity:0; transform: translateY(14px); }
@@ -483,29 +483,29 @@ html.light .vehicle-id-block { background: var(--c-surface-low); }
   </div>
 
   <nav style="flex:1;padding:0 0 1rem;">
-    <a href="#" class="nav-item">
+    <a href="./dashboard.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">dashboard</span>Dashboard
     </a>
-    <a href="#" class="nav-item active">
+    <a href="./index.html" class="nav-item active">
       <span class="material-symbols-outlined" style="font-size:1.1rem;font-variation-settings:'FILL' 1;">directions_car</span>Vehicles
     </a>
-    <a href="#" class="nav-item">
+    <a href="./drivers.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">person</span>Drivers
     </a>
-    <a href="#" class="nav-item">
+    <a href="./calendar.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">calendar_today</span>Calendar
     </a>
-    <a href="#" class="nav-item">
+    <a href="./reports.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">analytics</span>Reports
     </a>
-    <a href="#" class="nav-item">
+    <a href="./driver-portal.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">minor_crash</span>Driver Portal
     </a>
-    <a href="#" class="nav-item">
+    <a href="./users.html" class="nav-item">
       <span class="material-symbols-outlined" style="font-size:1.1rem;">group</span>Users
     </a>
   </nav>
-</aside>
+<div style="padding:1rem 1.25rem;border-top:1px solid color-mix(in srgb,var(--c-outline-variant) 15%,transparent)"><button onclick="logout()" style="display:inline-flex;align-items:center;justify-content:center;gap:.375rem;padding:.5rem .875rem;border-radius:.5rem;border:1px solid color-mix(in srgb,var(--c-outline-variant) 25%,transparent);background:transparent;color:var(--c-on-surface);font-size:.75rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;width:100%"><span class="material-symbols-outlined" style="font-size:1rem">logout</span>Sign Out</button></div></aside>
 
 <!-- ============================================================
      MAIN CONTENT
@@ -605,7 +605,7 @@ html.light .vehicle-id-block { background: var(--c-surface-low); }
           <p style="font-size:0.625rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--c-text-muted);margin-bottom:1rem;">Live Fleet Status</p>
           <div style="display:flex;align-items:flex-end;gap:3px;height:3rem;margin-bottom:0.75rem;" id="spark-chart"></div>
           <p style="font-family:'Manrope',sans-serif;font-size:1.5rem;font-weight:800;color:var(--c-tertiary);" id="uptime-kpi">
-            — <span style="font-size:0.75rem;font-weight:400;color:var(--c-text-muted);">Uptime</span>
+            â <span style="font-size:0.75rem;font-weight:400;color:var(--c-text-muted);">Uptime</span>
           </p>
           <div style="display:flex;gap:1rem;margin-top:0.75rem;" id="fleet-summary"></div>
         </div>
@@ -693,7 +693,7 @@ html.light .vehicle-id-block { background: var(--c-surface-low); }
 <div class="toast-container" id="toast-container" aria-live="polite"></div>
 
 <!-- ============================================================
-     JAVASCRIPT — unchanged from previous version
+     JAVASCRIPT â unchanged from previous version
      ============================================================ -->
 <script>
 /* ============================================================
@@ -728,7 +728,7 @@ document.getElementById('sidebar-toggle').addEventListener('click', () => {
 });
 
 /* ============================================================
-   DATA LAYER — safe localStorage helpers
+   DATA LAYER â safe localStorage helpers
    ============================================================ */
 const STORAGE_KEY = 'fg_vehicles_v3';
 
@@ -744,7 +744,7 @@ function saveVehicles(vehicles) {
 }
 
 /* ============================================================
-   getServiceDays — safe date calculation (bug fix retained)
+   getServiceDays â safe date calculation (bug fix retained)
    ============================================================ */
 function getServiceDays(lastServiceTimestamp) {
   if (!lastServiceTimestamp) return null;
@@ -854,7 +854,7 @@ function renderKPI() {
   const overdue = vehicles.filter(v => getServiceStatus(v).state === 'danger').length;
   const warning = vehicles.filter(v => getServiceStatus(v).state === 'warn').length;
   const ok      = total - overdue - warning;
-  const uptime  = total > 0 ? ((ok / total) * 100).toFixed(1) : '—';
+  const uptime  = total > 0 ? ((ok / total) * 100).toFixed(1) : 'â';
 
   const kpiEl = document.getElementById('uptime-kpi');
   if (kpiEl) kpiEl.innerHTML = `${uptime}% <span style="font-size:0.75rem;font-weight:400;color:var(--c-text-muted);">Fleet OK</span>`;
@@ -897,7 +897,9 @@ function handleAddVehicle(e) {
     brakesAlertDays:90, tyresAlertDays:90,
   });
   saveVehicles(vehicles);
-  renderVehicles();
+  if(localStorage.getItem('fg-auth')!=='1'){window.location.href='./login.html'}
+function logout(){localStorage.removeItem('fg-auth');localStorage.removeItem('fg-user');window.location.href='./login.html'}
+renderVehicles();
   document.getElementById('add-vehicle-form').reset();
   showToast(`Vehicle #${truckNumber} added successfully.`, 'ok');
 }
