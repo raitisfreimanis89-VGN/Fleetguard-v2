@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FleetGuard â Safety & Compliance</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<link rel="stylesheet" href="css/styles.css"/>
-<link rel="stylesheet" href="css/titan-slate-login.css"/>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FleetGuard - Safety &amp; Compliance</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+  <link rel="stylesheet" href="css/styles.css"/>
+  <link rel="stylesheet" href="css/titan-slate-login.css"/>
 </head>
 <body>
 
@@ -18,9 +22,9 @@
 <div id="login-screen">
   <div class="login-box">
     <div class="login-logo">
-      <div class="logo-icon">ð</div>
+      <div class="logo-icon">&#x1F69B;</div>
       <h1>FleetGuard</h1>
-      <p>Safety & Compliance Platform</p>
+      <p>Safety &amp; Compliance Platform</p>
       <div class="ts-headline">
         Every route.<br>
         Every driver.<br>
@@ -48,12 +52,12 @@
         <label>Supabase Anon Key</label>
         <input type="text" id="ls-sb-key" placeholder="eyJhbGciOiJIUzI1..."/>
       </div>
-      <button id="ls-connect-btn" class="btn btn-primary login-btn-full" onclick="connectDbFromLogin()">Connect & Continue</button>
+      <button id="ls-connect-btn" class="btn btn-primary login-btn-full" onclick="connectDbFromLogin()">Connect &amp; Continue</button>
     </div>
     <div id="login-form-section">
-     <div class="ts-form-heading">
-       <div class="ts-form-title">Welcome back</div>
-       <p class="ts-form-sub">Sign in to your fleet dashboard</p>
+      <div class="ts-form-heading">
+        <div class="ts-form-title">Welcome back</div>
+        <p class="ts-form-sub">Sign in to your fleet dashboard</p>
       </div>
       <div id="login-error" class="login-error"></div>
       <div class="login-field">
@@ -62,7 +66,7 @@
       </div>
       <div class="login-field">
         <label>Password</label>
-        <input type="password" id="login-password" placeholder="â¢â¢â¢â¢â¢â¢â¢â¢" onkeydown="if(event.key==='Enter')signIn()"/>
+        <input type="password" id="login-password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" onkeydown="if(event.key==='Enter')signIn()"/>
       </div>
       <button id="login-btn" class="btn btn-primary login-btn-full" onclick="signIn()">Sign In</button>
       <div class="login-divider" style="margin-top:16px">
@@ -75,31 +79,59 @@
 <div id="app" style="display:none">
   <div id="sidebar">
     <div class="sidebar-logo">
-      <div class="logo-icon">ð</div>
+      <div class="logo-icon">&#x1F69B;</div>
       <div>
         <div class="logo-title">FleetGuard</div>
-        <div class="logo-sub">Safety & Compliance</div>
+        <div class="logo-sub">Safety &amp; Compliance</div>
       </div>
     </div>
     <nav>
-      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard"><span class="nav-icon">ð</span> Dashboard</button>
-      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles"><span class="nav-icon">ð</span> Vehicles</button>
-      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers"><span class="nav-icon">ð¤</span> Drivers</button>
-      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar"><span class="nav-icon">ð</span> Calendar</button>
-      <button class="nav-item" onclick="navigate('reports')" id="nav-reports"><span class="nav-icon">ð</span> Reports</button>
-      <button class="nav-item" onclick="navigate('portal')" id="nav-portal"><span class="nav-icon">ð¡ï¸</span> Driver Portal</button>
-      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none"><span class="nav-icon">ð¥</span> Users</button>
+      <button class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">dashboard</span>
+        Dashboard
+      </button>
+      <button class="nav-item" onclick="navigate('vehicles')" id="nav-vehicles">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">local_shipping</span>
+        Vehicles
+      </button>
+      <button class="nav-item" onclick="navigate('drivers')" id="nav-drivers">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">person</span>
+        Drivers
+      </button>
+      <button class="nav-item" onclick="navigate('calendar')" id="nav-calendar">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">calendar_today</span>
+        Calendar
+      </button>
+      <button class="nav-item" onclick="navigate('reports')" id="nav-reports">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">analytics</span>
+        Reports
+      </button>
+      <button class="nav-item" onclick="navigate('portal')" id="nav-portal">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">minor_crash</span>
+        Driver Portal
+      </button>
+      <button class="nav-item" onclick="navigate('users')" id="nav-users" style="display:none">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">group</span>
+        Users
+      </button>
     </nav>
-    <div style="padding:12px 10px;border-top:1px solid rgba(255,255,255,.06);margin-top:auto">
-      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%"><span class="nav-icon">ðª</span> Sign Out</button>
+    <div id="sidebar-footer" style="padding:12px 10px;border-top:1px solid rgba(255,255,255,.05);margin-top:auto">
+      <button class="nav-item" onclick="signOut()" style="color:#f87171;width:100%">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:20px;font-weight:300;line-height:1">logout</span>
+        Sign Out
+      </button>
     </div>
   </div>
+
   <div id="main">
     <div id="topbar">
       <h1 id="page-title">Dashboard</h1>
       <div class="user-bar">
-        <span id="role-badge" class="badge badge-gray">ð Dispatcher</span>
+        <span id="role-badge" class="badge badge-gray">&#x1F396; Dispatcher</span>
         <span id="user-pill" class="user-email"></span>
+        <button id="theme-toggle" title="Toggle dark/light mode" onclick="toggleTheme()">
+          <span id="theme-icon" style="font-family:'Material Symbols Outlined';font-size:20px;line-height:1;font-weight:300">light_mode</span>
+        </button>
       </div>
     </div>
     <div id="content"></div>
@@ -116,6 +148,30 @@
     </div>
   </div>
 </div>
+
+<script>
+  (function() {
+    var saved = localStorage.getItem('fg_theme') || 'dark';
+    if (saved === 'light') {
+      document.documentElement.classList.add('light');
+      document.body.classList.add('light');
+    }
+  })();
+  function toggleTheme() {
+    var isLight = document.body.classList.contains('light');
+    var next = isLight ? 'dark' : 'light';
+    document.body.classList.toggle('light', !isLight);
+    document.documentElement.classList.toggle('light', !isLight);
+    localStorage.setItem('fg_theme', next);
+    var icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = next === 'light' ? 'dark_mode' : 'light_mode';
+  }
+  window.addEventListener('DOMContentLoaded', function() {
+    var saved = localStorage.getItem('fg_theme') || 'dark';
+    var icon = document.getElementById('theme-icon');
+    if (icon) icon.textContent = saved === 'light' ? 'dark_mode' : 'light_mode';
+  });
+</script>
 
 <script src="js/app.js"></script>
 </body>
