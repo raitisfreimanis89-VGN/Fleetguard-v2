@@ -244,6 +244,7 @@ const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',c
 
 function navigate(page,vehicleId){
   if(page==='users'&&!isAdmin()) return;
+  if(page==='portal'&&currentRole==='dispatcher') return;
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const navEl=document.getElementById('nav-'+page);
@@ -260,10 +261,12 @@ function render(){
   else if(currentPage==='drivers') c.innerHTML=renderDrivers();
   else if(currentPage==='calendar') c.innerHTML=renderCalendar();
   else if(currentPage==='reports') c.innerHTML=renderReports();
-  else if(currentPage==='portal') c.innerHTML=renderPortal();
+  else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
   const usersNav=document.getElementById('nav-users');
   if(usersNav) usersNav.style.display=isAdmin()?'flex':'none';
+  const portalNav=document.getElementById('nav-portal');
+  if(portalNav) portalNav.style.display=currentRole==='dispatcher'?'none':'';
 }
 
 async function renderUsersAsync(){
