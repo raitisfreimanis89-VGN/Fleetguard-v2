@@ -223,9 +223,12 @@ function getVehicleStatus(vid){
   const now=today();
   const brakeDays=lastBrake?daysBetween(lastBrake.testDate,now):null;
   const tyreDays=lastTyre?daysBetween(lastTyre.photoDate,now):null;
-  const serviceDays=lastService?daysBetween(lastService.serviceDate,now):null;
+  // FIX: fall back to maintenance record date if no service_records entry exists
+  const lastMaint=maint[0];
+  const serviceRefDate=lastService?.serviceDate||lastMaint?.serviceDate||null;
+  const serviceDays=serviceRefDate?daysBetween(serviceRefDate,now):null;
   const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>14;
-  const serviceOverdue = serviceDays > 60, serviceDueSoon = serviceDays > 53 && !serviceOverdue;
+  const serviceOverdue=serviceDays>60,serviceDueSoon=serviceDays>53&&!serviceOverdue;
   // nextDue warning: use maintenance nextInspectionDate if it has passed
   const nextDue=maint[0]?.nextInspectionDate;
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
@@ -309,7 +312,7 @@ function renderDashboard(){
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🔵 Service Overdue (60-day)</div><div class="card-body">`;
   if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 60-day service schedule</div>`;
-  serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastService?x.s.serviceDays+' days since last service':'No service on record'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
+  serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.serviceDays+' days since last service'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:`Service – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:`Brake ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:`Vehicle Service ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   html+=`<div class="card"><div class="card-header">📋 Recent Activity</div><div class="card-body">`;
@@ -360,7 +363,7 @@ function renderVehicles(){
         <div class="status-row" style="margin-top:10px">
           <span class="status-pill ${s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green'}">🔧 Brakes ${s.lastBrake?s.brakeDays+'d':'None'}</span>
           <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
-          <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.lastService?s.serviceDays+'d':'None'}</span>
+          <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
         </div>
       </div>
       <!-- EDIT MODE -->
@@ -439,7 +442,6 @@ function renderVehicleDetail(){
   <div class="tabs">${tabs.map(t=>`<button class="tab ${currentVehicleTab===t?'active':''}" onclick="setVTab('${t}')">${tabLabels[t]}</button>`).join('')}</div>`;
 
   if(currentVehicleTab==='maintenance'){
-    // Unified service: combines maintenance records + service_records in one sorted feed
     const allSvcRecords=[
       ...maint.map(r=>({...r,_type:'maint',_date:r.serviceDate,_result:null})),
       ...svcs.map(r=>({...r,_type:'svc',_date:r.serviceDate,_result:r.result}))
@@ -597,7 +599,9 @@ function renderCalendar(){
     const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+42);events.push({date:d.toISOString().split('T')[0],label:`Truck #${v.truckNumber} brake due`,type:'brake'});}
     if(maint[0]) events.push({date:maint[0].nextInspectionDate,label:`Truck #${v.truckNumber} inspection`,type:'maint'});
-    if(svcs[0]){const d=new Date(svcs[0].serviceDate);d.setDate(d.getDate()+90);events.push({date:d.toISOString().split('T')[0],label:`Truck #${v.truckNumber} service due`,type:'svc'});}
+    // FIX: use 60-day interval and fall back to maintenance date if no service_records
+    const svcRefDate=svcs[0]?.serviceDate||maint[0]?.serviceDate||null;
+    if(svcRefDate){const d=new Date(svcRefDate);d.setDate(d.getDate()+60);events.push({date:d.toISOString().split('T')[0],label:`Truck #${v.truckNumber} service due`,type:'svc'});}
   });
   const monthName=calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   let html=`<div class="card" style="margin-bottom:20px"><div class="card-body">
@@ -646,7 +650,7 @@ function renderReports(){
   </div></div></div>
   <div class="card"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
     <thead><tr><th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th></tr></thead>
-    <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${v.truckNumber}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
+    <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${v.truckNumber}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
   </table></div></div></div>
   </div>`;
   return html;
