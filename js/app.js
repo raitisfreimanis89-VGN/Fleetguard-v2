@@ -225,7 +225,7 @@ function getVehicleStatus(vid){
   const tyreDays=lastTyre?daysBetween(lastTyre.photoDate,now):null;
   const serviceDays=lastService?daysBetween(lastService.serviceDate,now):null;
   const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>14;
-  const serviceOverdue=serviceDays>90,serviceDueSoon=serviceDays>75&&!serviceOverdue;
+  const serviceOverdue = serviceDays > 60, serviceDueSoon = serviceDays > 53 && !serviceOverdue;
   // nextDue warning: use maintenance nextInspectionDate if it has passed
   const nextDue=maint[0]?.nextInspectionDate;
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
@@ -307,8 +307,8 @@ function renderDashboard(){
   if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
   tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
   html+=`</div></div>`;
-  html+=`<div class="card"><div class="card-header">🔵 Service Overdue (90-day)</div><div class="card-body">`;
-  if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 90-day service schedule</div>`;
+  html+=`<div class="card"><div class="card-header">🔵 Service Overdue (60-day)</div><div class="card-body">`;
+  if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 60-day service schedule</div>`;
   serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastService?x.s.serviceDays+' days since last service':'No service on record'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:`Service – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:`Brake ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:`Vehicle Service ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
