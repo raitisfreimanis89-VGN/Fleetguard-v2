@@ -129,14 +129,16 @@ async function loadAll() {
     sb.from('mileage_records').select('*').order('created_at'),
     sb.from('service_records').select('*').order('created_at'),
   ]);
-  DRIVERS = d.data||[];
-  VEHICLES = (v.data||[]).map(v=>({...v,truckNumber:v.truck_number,trailerNumber:v.trailer_number,assignedDriverId:v.assigned_driver_id,assignedDispatcher:v.assigned_dispatcher||''}));
-  MAINTENANCE = (m.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date,nextInspectionDate:r.next_inspection_date}));
-  BRAKE_TESTS = (b.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,testDate:r.test_date}));
-  TYRE_RECORDS = (t.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,photoDate:r.photo_date}));
-  DOT_INSPECTIONS = (dot.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,inspectionDate:r.inspection_date}));
-  MILEAGE = (mil.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
-  SERVICE_RECORDS = (svc.data||[]).map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
+  // Guard: only overwrite each array if the query succeeded.
+  // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
+  if (!d.error && d.data) DRIVERS = d.data;
+  if (!v.error && v.data) VEHICLES = v.data.map(v=>({...v,truckNumber:v.truck_number,trailerNumber:v.trailer_number,assignedDriverId:v.assigned_driver_id,assignedDispatcher:v.assigned_dispatcher||''}));
+  if (!m.error && m.data) MAINTENANCE = m.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date,nextInspectionDate:r.next_inspection_date}));
+  if (!b.error && b.data) BRAKE_TESTS = b.data.map(r=>({...r,vehicleId:r.vehicle_id,testDate:r.test_date}));
+  if (!t.error && t.data) TYRE_RECORDS = t.data.map(r=>({...r,vehicleId:r.vehicle_id,photoDate:r.photo_date}));
+  if (!dot.error && dot.data) DOT_INSPECTIONS = dot.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,inspectionDate:r.inspection_date}));
+  if (!mil.error && mil.data) MILEAGE = mil.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
+  if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
 }
 
 async function addDriver(name) {
