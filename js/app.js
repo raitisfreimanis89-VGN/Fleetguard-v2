@@ -14,9 +14,10 @@ function getCreateClient() {
 
 async function initAuth() {
   const HARDCODED_URL = 'https://tmpdsiuadafbkmldvlki.supabase.co';
-  const HARDCODED_KEY = 'sb_publishable_kDrWQrBR-PtGfVXyOiOjTQ_BTwiXRtv';
+  const HARDCODED_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
   if (!localStorage.getItem('sb_url')) localStorage.setItem('sb_url', HARDCODED_URL);
-  if (!localStorage.getItem('sb_key')) localStorage.setItem('sb_key', HARDCODED_KEY);
+  // Clear any cached publishable key so the correct JWT anon key takes effect
+  localStorage.setItem('sb_key', HARDCODED_KEY);
   const url = HARDCODED_URL;
   const key = HARDCODED_KEY;
   const fn = getCreateClient();
@@ -236,7 +237,7 @@ function getVehicleStatus(vid){
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
-  const critical=brakeOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||serviceOverdue||nextDueOverdue;
+  const critical=brakeOverdue||serviceOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue;
   return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning};
 }
 
