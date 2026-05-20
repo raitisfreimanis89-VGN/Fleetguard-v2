@@ -335,6 +335,46 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .chart-bar { width: 100%; border-radius: 4px 4px 0 0; transition: height 0.4s ease; min-height: 4px; }
 .chart-bar-label { font-size: 10.5px; color: var(--text2); }
 .chart-bar-val { font-size: 11px; font-weight: 700; color: var(--text); }
+
+/* ── Dispatcher Board: 2-column layout ── */
+.db-board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 720px) { .db-board { grid-template-columns: 1fr; } }
+
+/* Fleet health chips inside dispatcher block header */
+.db-fleet-stats { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.db-fleet-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; white-space: nowrap; }
+.db-fleet-chip.ok   { background: var(--success-bg); color: var(--success); }
+.db-fleet-chip.warn { background: var(--warning-bg); color: var(--warning); }
+.db-fleet-chip.crit { background: var(--danger-bg);  color: var(--danger); }
+.db-health-bar-wrap { flex: 1; height: 4px; background: var(--surface-highest, #32353c); border-radius: 4px; overflow: hidden; min-width: 36px; }
+.db-health-bar-fill { height: 100%; border-radius: 4px; }
+
+/* Hierarchical truck rows */
+.db-truck-row { display: flex; align-items: center; padding: 8px 16px; gap: 10px; border-bottom: 1px solid var(--border); position: relative; transition: background .12s; }
+.db-truck-row:last-child { border-bottom: none; }
+.db-truck-row:hover { background: var(--surface-low, #191c22); }
+.db-truck-row::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; border-radius: 0 2px 2px 0; background: transparent; }
+.db-truck-icon { width: 28px; height: 28px; border-radius: 7px; background: var(--surface-highest, #32353c); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-family: 'Material Symbols Outlined'; font-size: 15px; font-weight: 300; line-height: 1; color: var(--text3); }
+
+/* ── Pulse / glow keyframes ── */
+@keyframes fg-glow-warn {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  50%       { box-shadow: 0 0 10px 3px rgba(245,158,11,.55); }
+}
+@keyframes fg-glow-crit {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,68,68,0); }
+  50%       { box-shadow: 0 0 14px 4px rgba(255,68,68,.7); }
+}
+@keyframes fg-bar-pulse {
+  0%, 100% { opacity: .4; }
+  50%       { opacity: 1; }
+}
+/* Animated fleet chips */
+.db-fleet-chip.warn { animation: fg-glow-warn 2s ease-in-out infinite; }
+.db-fleet-chip.crit { animation: fg-glow-crit 1.4s ease-in-out infinite; }
+/* Animated left accent bar on warning/critical truck rows */
+.db-truck-row.fg-row-warn::before { background: var(--warning); animation: fg-bar-pulse 2s ease-in-out infinite; }
+.db-truck-row.fg-row-crit::before { background: var(--danger);  animation: fg-bar-pulse 1.4s ease-in-out infinite; }
 .flex-between { display: flex; align-items: center; justify-content: space-between; }
 .flex-center { display: flex; align-items: center; gap: 8px; }
 .mt-4 { margin-top: 16px; } .mb-4 { margin-bottom: 16px; }

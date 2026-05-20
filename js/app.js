@@ -351,63 +351,71 @@ function renderDispatcherBoard(){
   if(names.length===0&&unassigned.length===0){
     return`<div class="empty" style="padding:60px;text-align:center">No vehicles with dispatcher assignments yet.<br><span style="font-size:12px;color:var(--text3)">Assign dispatchers to vehicles on the Vehicles page.</span></div>`;
   }
-  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">`;
+  html+=`<div class="db-board">`;
   names.forEach(name=>{
     const trucks=VEHICLES.filter(v=>v.assignedDispatcher===name);
     const statuses=trucks.map(v=>getVehicleStatus(v.id));
     const critCount=statuses.filter(s=>s.critical).length;
     const warnCount=statuses.filter(s=>s.warning&&!s.critical).length;
-    const summary=critCount>0
-      ?`<span class="badge badge-red" style="font-size:10px">${critCount} critical</span>`
-      :warnCount>0
-      ?`<span class="badge badge-yellow" style="font-size:10px">${warnCount} warning</span>`
-      :`<span class="badge badge-green" style="font-size:10px">All OK</span>`;
+    const okCount=trucks.length-critCount-warnCount;
+    const healthPct=Math.round((okCount/trucks.length)*100);
+    const barColor=critCount>0?'var(--danger)':warnCount>0?'var(--warning)':'var(--success)';
     const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const chipHtml=
+      (okCount>0   ?`<span class="db-fleet-chip ok">✅ ${okCount} OK</span>`:'')
+     +(warnCount>0 ?`<span class="db-fleet-chip warn">⚠ ${warnCount} Warn</span>`:'')
+     +(critCount>0 ?`<span class="db-fleet-chip crit">🔴 ${critCount} Critical</span>`:'')
+     +`<div class="db-health-bar-wrap"><div class="db-health-bar-fill" style="width:${healthPct}%;background:${barColor}"></div></div>`;
     const rows=trucks.map((v,i)=>{
       const s=statuses[i];
+      const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
       const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
       const tyreClass=s.tyreOverdue?'badge-yellow':'badge-green';
       const svcClass=s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green';
-      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 4px;border-radius:7px">
-        <div style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text)">
-          <span style="font-family:'Material Symbols Outlined';font-size:14px;font-weight:300;line-height:1;color:var(--text3)">local_shipping</span>#${v.truckNumber}
+      const rowPulse=s.critical?'fg-row-crit':s.warning?'fg-row-warn':'';
+      return`<div class="db-truck-row ${rowPulse}">
+        <div class="db-truck-icon">local_shipping</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;line-height:1.2">#${v.truckNumber}</div>
+          ${driver?`<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${driver.name}</div>`:''}
         </div>
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:4px;flex-shrink:0">
           <span class="status-pill ${brakeClass}" style="font-size:9px">🔧 ${s.brakeDays!==null?s.brakeDays+'d':'—'}</span>
           <span class="status-pill ${tyreClass}" style="font-size:9px">⭕ ${s.tyreDays!==null?s.tyreDays+'d':'—'}</span>
           <span class="status-pill ${svcClass}" style="font-size:9px">🔵 ${s.serviceDays!==null?s.serviceDays+'d':'—'}</span>
         </div>
       </div>`;
     }).join('');
-    html+=`<div class="card" style="cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.boxShadow='';this.style.transform=''" onclick="currentDispatcherFilter='${name.replace(/'/g,"\\'")}';render()">
-      <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
-        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-weight:700;font-size:14px">${name}</div>
-          <div style="font-size:11px;color:var(--text2);margin-top:1px">${trucks.length} truck${trucks.length!==1?'s':''}</div>
+    html+=`<div class="card" style="cursor:pointer;overflow:hidden;transition:border-color .15s,box-shadow .15s,transform .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.boxShadow='';this.style.transform=''" onclick="currentDispatcherFilter='${name.replace(/'/g,"\\'")}';render()">
+      <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
+          <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;box-shadow:0 0 12px var(--primary-glow)">${initials}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:15px;font-weight:800">${name}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:2px">${trucks.length} truck${trucks.length!==1?'s':''} &nbsp;·&nbsp; <span style="color:var(--primary)">View fleet →</span></div>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
-          ${summary}
-          <span style="font-size:10px;color:var(--primary);font-weight:700">View →</span>
-        </div>
+        <div class="db-fleet-stats">${chipHtml}</div>
       </div>
-      <div style="padding:8px 12px 10px">${rows}</div>
+      <div>${rows}</div>
     </div>`;
   });
   if(unassigned.length>0){
-    const rows=unassigned.map(v=>`<div style="display:flex;align-items:center;padding:5px 4px;border-radius:7px">
-      <span style="font-family:'Material Symbols Outlined';font-size:14px;font-weight:300;line-height:1;color:var(--text3);margin-right:6px">local_shipping</span>
-      <span style="font-size:12px;font-weight:700">Truck #${v.truckNumber}</span>
+    const rows=unassigned.map(v=>`<div class="db-truck-row">
+      <div class="db-truck-icon">local_shipping</div>
+      <div style="font-size:13px;font-weight:700">Truck #${v.truckNumber}</div>
     </div>`).join('');
-    html+=`<div class="card" style="opacity:.7">
-      <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
-        <div style="width:38px;height:38px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">?</div>
-        <div style="flex:1">
-          <div style="font-weight:700;font-size:14px;color:var(--text2)">Unassigned</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:1px">${unassigned.length} truck${unassigned.length!==1?'s':''}</div>
+    html+=`<div class="card" style="opacity:.65;overflow:hidden">
+      <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;border-radius:50%;background:var(--surface-highest,#32353c);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">?</div>
+          <div>
+            <div style="font-size:15px;font-weight:800;color:var(--text2)">Unassigned</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:2px">${unassigned.length} truck${unassigned.length!==1?'s':''}</div>
+          </div>
         </div>
       </div>
-      <div style="padding:8px 12px 10px">${rows}</div>
+      <div>${rows}</div>
     </div>`;
   }
   html+=`</div>`;
