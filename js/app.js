@@ -245,12 +245,14 @@ function getVehicleStatus(vid){
 // ROUTING
 // ═══════════════════════════════════════════════════════
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
+let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board'};
 
 function navigate(page,vehicleId){
   if(page==='users'&&!isAdmin()) return;
   if(page==='portal'&&currentRole==='dispatcher') return;
+  if(page!=='dispatcher-board') currentDispatcherFilter=null;
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const navEl=document.getElementById('nav-'+page);
@@ -269,6 +271,7 @@ function render(){
   else if(currentPage==='reports') c.innerHTML=renderReports();
   else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
+  else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
   const usersNav=document.getElementById('nav-users');
   if(usersNav) usersNav.style.display=isAdmin()?'flex':'none';
   const portalNav=document.getElementById('nav-portal');
@@ -277,6 +280,138 @@ function render(){
 
 async function renderUsersAsync(){
   document.getElementById('content').innerHTML=await renderUsers();
+}
+
+// ═══════════════════════════════════════════════════════
+// DISPATCHER BOARD
+// ═══════════════════════════════════════════════════════
+function renderDispatcherBoard(){
+  // Collect unique dispatcher names from vehicle data
+  const names=[...new Set(VEHICLES.map(v=>v.assignedDispatcher).filter(n=>n&&n.trim()!=''))].sort();
+  const unassigned=VEHICLES.filter(v=>!v.assignedDispatcher||v.assignedDispatcher.trim()==='');
+
+  // ── FILTERED VIEW: one dispatcher selected ──────────────
+  if(currentDispatcherFilter!==null){
+    const dispName=currentDispatcherFilter;
+    const fleet=VEHICLES.filter(v=>v.assignedDispatcher===dispName);
+    const initials=dispName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+      <button class="btn btn-ghost btn-sm" onclick="currentDispatcherFilter=null;render()" style="display:flex;align-items:center;gap:5px">
+        <span style="font-family:'Material Symbols Outlined';font-size:16px;font-weight:300;line-height:1">arrow_back</span> All Dispatchers
+      </button>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
+        <div>
+          <div style="font-size:16px;font-weight:700">${dispName}'s Fleet</div>
+          <div style="font-size:12px;color:var(--text2)">${fleet.length} truck${fleet.length!==1?'s':''} assigned</div>
+        </div>
+      </div>
+    </div>`;
+    if(fleet.length===0){
+      html+=`<div class="empty" style="padding:40px">No trucks assigned to ${dispName}</div>`;
+      return html;
+    }
+    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
+    fleet.forEach(v=>{
+      const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
+      const s=getVehicleStatus(v.id);
+      const sb=s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">OK</span>`;
+      const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
+      const tyreClass=s.tyreOverdue?'badge-yellow':'badge-green';
+      const svcClass=s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green';
+      html+=`<div class="card" style="cursor:pointer" onclick="navigate('vehicle','${v.id}')">
+        <div class="card-body" style="padding:16px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+            <div>
+              <div style="font-size:15px;font-weight:700">Truck #${v.truckNumber}</div>
+              <div style="font-size:12px;color:var(--text2)">Trailer #${v.trailerNumber}</div>
+            </div>
+            ${sb}
+          </div>
+          ${driver?`<div style="font-size:12px;color:var(--text2);margin-bottom:3px">👤 ${driver.name}</div>`:''}
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">📡 ${dispName}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px">
+            <span class="status-pill ${brakeClass}">🔧 Brakes ${s.brakeDays!==null?s.brakeDays+'d':'None'}</span>
+            <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
+            <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--primary);font-weight:600;display:flex;align-items:center;gap:4px">
+            <span style="font-family:'Material Symbols Outlined';font-size:13px;font-weight:300;line-height:1">open_in_new</span> Open full detail
+          </div>
+        </div>
+      </div>`;
+    });
+    html+=`</div>`;
+    return html;
+  }
+
+  // ── BOARD VIEW: all dispatchers ─────────────────────────
+  let html='';
+  if(!isAdmin()) html+=dispatcherNotice();
+  if(names.length===0&&unassigned.length===0){
+    return`<div class="empty" style="padding:60px;text-align:center">No vehicles with dispatcher assignments yet.<br><span style="font-size:12px;color:var(--text3)">Assign dispatchers to vehicles on the Vehicles page.</span></div>`;
+  }
+  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">`;
+  names.forEach(name=>{
+    const trucks=VEHICLES.filter(v=>v.assignedDispatcher===name);
+    const statuses=trucks.map(v=>getVehicleStatus(v.id));
+    const critCount=statuses.filter(s=>s.critical).length;
+    const warnCount=statuses.filter(s=>s.warning&&!s.critical).length;
+    const summary=critCount>0
+      ?`<span class="badge badge-red" style="font-size:10px">${critCount} critical</span>`
+      :warnCount>0
+      ?`<span class="badge badge-yellow" style="font-size:10px">${warnCount} warning</span>`
+      :`<span class="badge badge-green" style="font-size:10px">All OK</span>`;
+    const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+    const rows=trucks.map((v,i)=>{
+      const s=statuses[i];
+      const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
+      const tyreClass=s.tyreOverdue?'badge-yellow':'badge-green';
+      const svcClass=s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green';
+      return`<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 4px;border-radius:7px">
+        <div style="font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text)">
+          <span style="font-family:'Material Symbols Outlined';font-size:14px;font-weight:300;line-height:1;color:var(--text3)">local_shipping</span>#${v.truckNumber}
+        </div>
+        <div style="display:flex;gap:4px">
+          <span class="status-pill ${brakeClass}" style="font-size:9px">🔧 ${s.brakeDays!==null?s.brakeDays+'d':'—'}</span>
+          <span class="status-pill ${tyreClass}" style="font-size:9px">⭕ ${s.tyreDays!==null?s.tyreDays+'d':'—'}</span>
+          <span class="status-pill ${svcClass}" style="font-size:9px">🔵 ${s.serviceDays!==null?s.serviceDays+'d':'—'}</span>
+        </div>
+      </div>`;
+    }).join('');
+    html+=`<div class="card" style="cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.boxShadow='';this.style.transform=''" onclick="currentDispatcherFilter='${name.replace(/'/g,"\\'")}';render()">
+      <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+        <div style="width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:700;font-size:14px">${name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px">${trucks.length} truck${trucks.length!==1?'s':''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+          ${summary}
+          <span style="font-size:10px;color:var(--primary);font-weight:700">View →</span>
+        </div>
+      </div>
+      <div style="padding:8px 12px 10px">${rows}</div>
+    </div>`;
+  });
+  if(unassigned.length>0){
+    const rows=unassigned.map(v=>`<div style="display:flex;align-items:center;padding:5px 4px;border-radius:7px">
+      <span style="font-family:'Material Symbols Outlined';font-size:14px;font-weight:300;line-height:1;color:var(--text3);margin-right:6px">local_shipping</span>
+      <span style="font-size:12px;font-weight:700">Truck #${v.truckNumber}</span>
+    </div>`).join('');
+    html+=`<div class="card" style="opacity:.7">
+      <div style="padding:14px 16px 10px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)">
+        <div style="width:38px;height:38px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">?</div>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px;color:var(--text2)">Unassigned</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px">${unassigned.length} truck${unassigned.length!==1?'s':''}</div>
+        </div>
+      </div>
+      <div style="padding:8px 12px 10px">${rows}</div>
+    </div>`;
+  }
+  html+=`</div>`;
+  return html;
 }
 
 // ═══════════════════════════════════════════════════════
