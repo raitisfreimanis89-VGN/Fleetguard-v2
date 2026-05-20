@@ -335,7 +335,7 @@ function renderDispatcherBoard(){
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
             <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
           </div>
-          <div style="margin-top:10px;font-size:11px;color:var(--primary);font-weight:600;display:flex;align-items:center;gap:4px">
+          <div style="display:none">
             <span style="font-family:'Material Symbols Outlined';font-size:13px;font-weight:300;line-height:1">open_in_new</span> Open full detail
           </div>
         </div>
