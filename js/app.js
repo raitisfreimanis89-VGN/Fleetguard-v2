@@ -362,7 +362,7 @@ function renderDispatcherBoard(){
     const barColor=critCount>0?'var(--danger)':warnCount>0?'var(--warning)':'var(--success)';
     const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const chipHtml=
-      (okCount>0   ?`<span class="db-fleet-chip ok">✅ ${okCount} OK</span>`:'')
+      (okCount>0   ?`<span class="db-fleet-chip ok">✅ ${okCount} Good</span>`:'')
      +(warnCount>0 ?`<span class="db-fleet-chip warn">⚠ ${warnCount} Warn</span>`:'')
      +(critCount>0 ?`<span class="db-fleet-chip crit">🔴 ${critCount} Critical</span>`:'')
      +`<div class="db-health-bar-wrap"><div class="db-health-bar-fill" style="width:${healthPct}%;background:${barColor}"></div></div>`;
