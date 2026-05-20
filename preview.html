@@ -347,7 +347,7 @@ function buildBoard(){
 
     /* Aggregated fleet stat chips */
     const statsHtml = [
-      okN   > 0 ? `<div class="fleet-stat ok">  <span class="ms">check_circle</span>${okN} OK</div>`   : '',
+      okN   > 0 ? `<div class="fleet-stat ok">  <span class="ms">check_circle</span>${okN} Good</div>`   : '',
       warnN > 0 ? `<div class="fleet-stat warn"><span class="ms">warning</span>${warnN} Warn</div>` : '',
       critN > 0 ? `<div class="fleet-stat crit"><span class="ms">error</span>${critN} Critical</div>` : '',
       `<div class="health-bar-wrap" title="${healthPct}% fleet healthy">
