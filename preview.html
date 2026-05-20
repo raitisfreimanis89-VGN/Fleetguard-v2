@@ -4,8 +4,6 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>FleetGuard — Dispatcher Board v2 Preview</title>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
 <style>
 /* ── FleetGuard design tokens ── */
 :root{
@@ -117,8 +115,8 @@ nav{padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px}
   padding:3px 8px;border-radius:6px;
 }
 .fleet-stat.ok  {background:var(--success-bg);color:var(--success)}
-.fleet-stat.warn{background:var(--warning-bg);color:var(--warning);animation:glow-warn 2s ease-in-out infinite}
-.fleet-stat.crit{background:var(--danger-bg); color:var(--danger);animation:glow-crit 1.4s ease-in-out infinite}
+.fleet-stat.warn{background:var(--warning-bg);color:var(--warning);animation:glow-warn 2s ease-in-out 3}
+.fleet-stat.crit{background:var(--danger-bg); color:var(--danger);animation:glow-crit 1.4s ease-in-out 3}
 
 /* ── Pulse / glow keyframes ── */
 @keyframes glow-warn{
@@ -169,8 +167,8 @@ nav{padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px}
   transition:background .15s;
 }
 .truck-row:hover::before{background:var(--primary)}
-.truck-row.has-issue::before{background:var(--warning);animation:bar-pulse-warn 2s ease-in-out infinite}
-.truck-row.has-critical::before{background:var(--danger);animation:bar-pulse-crit 1.4s ease-in-out infinite}
+.truck-row.has-issue::before{background:var(--warning);animation:bar-pulse-warn 2s ease-in-out 3}
+.truck-row.has-critical::before{background:var(--danger);animation:bar-pulse-crit 1.4s ease-in-out 3}
 
 .truck-icon{
   width:30px;height:30px;border-radius:8px;
@@ -206,9 +204,10 @@ nav{padding:10px 8px;flex:1;display:flex;flex-direction:column;gap:2px}
 
 <!-- SIDEBAR -->
 <div id="sidebar">
-  <div class="logo">
-    <div class="logo-icon">🛡️</div>
-    <div><div class="logo-text">FleetGuard</div><div class="logo-sub">Safety &amp; Compliance</div></div>
+  <div class="logo" style="justify-content:center;padding:14px 12px">
+    <img src="img/vgn-logo.png" alt="VGN Trucking"
+         style="height:36px;width:auto;max-width:158px;object-fit:contain;
+                background:#ffffff;border-radius:8px;padding:4px 8px;display:block;"/>
   </div>
   <nav>
     <button class="nav-item"><span class="ms">dashboard</span>Dashboard</button>
