@@ -846,7 +846,7 @@ function renderReports(){
         <div style="flex:1">
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
             <div style="background:var(--success-bg);border:1px solid rgba(120,220,119,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--success);line-height:1">${_cDot.clean}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">✅ Clean (Pass)</div></div>
-            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--danger);line-height:1">${_cDot.issues}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">⚠ Issues (Viol+OOS)</div></div>
+            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--danger);line-height:1">${_cDot.issues}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">⚠ Violation (Viol+OOS)</div></div>
             <div style="background:var(--surface3,#252c3d);border:1px solid var(--border);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;line-height:1">${_cDot.total}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">📋 Total</div></div>
           </div>
           <div style="height:8px;background:var(--surface3,#252c3d);border-radius:4px;overflow:hidden">${_cDot.total>0?`<div style="height:100%;width:${_cDot.pct}%;background:${_cCol};border-radius:4px"></div>`:''}</div>
@@ -857,7 +857,7 @@ function renderReports(){
     </div>
     <div>
       <div style="padding:14px 20px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3)">📊 Last 12 Months</div>
-      <div class="table-wrap"><table><thead><tr><th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">✅ Clean</th><th style="text-align:center">⚠ Issues</th><th style="text-align:right">% Clean</th></tr></thead><tbody>${_dotRowsHtml||`<tr><td colspan="5" class="empty">No DOT inspection data yet</td></tr>`}</tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">✅ Clean</th><th style="text-align:center">⚠ Violation</th><th style="text-align:right">% Clean</th></tr></thead><tbody>${_dotRowsHtml||`<tr><td colspan="5" class="empty">No DOT inspection data yet</td></tr>`}</tbody></table></div>
     </div>
   </div>`;
   let html=`<div class="stats-grid" style="margin-bottom:24px">
