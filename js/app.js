@@ -829,9 +829,9 @@ function renderReports(){
   const _pBg=p=>p>70?'var(--success-bg)':p>50?'var(--warning-bg)':'var(--danger-bg)';
   const _dotRowsHtml=_dotHist.map((r,i)=>{
     const pc=r.pct,pcc=pc!==null?_pCol(pc):'var(--text3)',pcb=pc!==null?_pBg(pc):'transparent';
-    const stripe=i%2===1?'background:rgba(255,255,255,.025)':'';
+    const stripe=i%2===1?'background:var(--row-stripe)':'';
     const issuesTd=r.issues>0?`<span style="font-size:13px;font-weight:700;color:var(--danger)">${r.issues}</span>`:`<span style="color:var(--text3);font-size:13px">—</span>`;
-    const pctTd=pc!==null?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px"><div style="width:56px;height:5px;background:var(--surface3,#252c3d);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${pc}%;background:${pcc};border-radius:3px"></div></div><span style="display:inline-block;min-width:44px;text-align:center;background:${pcb};color:${pcc};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${pc}%</span></div>`:`<span style="color:var(--text3)">—</span>`;
+    const pctTd=pc!==null?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px"><div style="width:56px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${pc}%;background:${pcc};border-radius:3px"></div></div><span style="display:inline-block;min-width:44px;text-align:center;background:${pcb};color:${pcc};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${pc}%</span></div>`:`<span style="color:var(--text3)">—</span>`;
     return `<tr style="${stripe}"><td style="padding:10px 16px;font-size:13px;font-weight:600">${_MO[r.month]} ${r.year}</td><td style="padding:10px 16px;text-align:center;font-size:13px;color:var(--text2)">${r.total}</td><td style="padding:10px 16px;text-align:center"><span style="font-size:13px;font-weight:700;color:var(--success)">${r.clean}</span></td><td style="padding:10px 16px;text-align:center">${issuesTd}</td><td style="padding:10px 16px;text-align:right">${pctTd}</td></tr>`;
   }).join('');
   const _dotCardHtml=`<div class="card" style="grid-column:1/-1">
@@ -847,9 +847,9 @@ function renderReports(){
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
             <div style="background:var(--success-bg);border:1px solid rgba(120,220,119,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--success);line-height:1">${_cDot.clean}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">✅ Clean (Pass)</div></div>
             <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--danger);line-height:1">${_cDot.issues}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">⚠ Violation (Viol+OOS)</div></div>
-            <div style="background:var(--surface3,#252c3d);border:1px solid var(--border);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;line-height:1">${_cDot.total}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">📋 Total</div></div>
+            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;line-height:1">${_cDot.total}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">📋 Total</div></div>
           </div>
-          <div style="height:8px;background:var(--surface3,#252c3d);border-radius:4px;overflow:hidden">${_cDot.total>0?`<div style="height:100%;width:${_cDot.pct}%;background:${_cCol};border-radius:4px"></div>`:''}</div>
+          <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden">${_cDot.total>0?`<div style="height:100%;width:${_cDot.pct}%;background:${_cCol};border-radius:4px"></div>`:''}</div>
           <div style="display:flex;justify-content:space-between;margin-top:5px"><div style="font-size:10px;color:var(--text3)">${_cDot.clean} clean passes</div><div style="font-size:10px;color:var(--text3)">${_cDot.issues} violations / OOS</div></div>
         </div>
       </div>
