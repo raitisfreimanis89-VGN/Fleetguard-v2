@@ -341,6 +341,7 @@ function renderDispatcherBoard(){
         </div>
       </div>`;
     });
+    if(isAdmin()) html+=`<div class="card" style="cursor:pointer;min-height:160px;border:2px dashed var(--border);background:transparent;display:flex;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''" onclick="openAddVehicleModal('${dispName.replace(/'/g,"\\'")}')"><div style="text-align:center;color:var(--text3);pointer-events:none"><div style="font-size:48px;font-weight:200;line-height:1">+</div><div style="font-size:12px;font-weight:600;margin-top:8px">Add New</div></div></div>`;
     html+=`</div>`;
     return html;
   }
@@ -537,6 +538,45 @@ async function doAddVehicle(){
   const truck=document.getElementById('v-truck').value.trim(),trailer=document.getElementById('v-trailer').value.trim(),driver=document.getElementById('v-driver').value,dispatcher=document.getElementById('v-dispatcher').value.trim();
   if(!truck||!trailer){showToast('Enter truck and trailer numbers','danger');return;}
   await addVehicle(truck,trailer,driver||null,dispatcher||''); showToast('Vehicle added!','success'); render();
+}
+let _avmDispatcher='';
+function openAddVehicleModal(dispatcherName){
+  if(!isAdmin()) return;
+  _avmDispatcher=dispatcherName;
+  const driverOptions=DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  document.getElementById('avm-body').innerHTML=`
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">👤 New Driver <span style="font-weight:400;opacity:.6">(optional — will be assigned to this truck)</span></div>
+      <input type="text" id="avm-driver-name" placeholder="Full name — leave blank to use existing" style="width:100%;box-sizing:border-box"/>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🚛 Vehicle Details</div>
+      <div class="form-grid form-grid-3" style="margin-bottom:10px">
+        <div><label>Truck Number</label><input type="text" id="avm-truck" placeholder="e.g. T001"/></div>
+        <div><label>Trailer Number</label><input type="text" id="avm-trailer" placeholder="e.g. TR001"/></div>
+        <div><label>Assign Driver</label><select id="avm-driver"><option value="">— optional —</option>${driverOptions}</select></div>
+        <div><label>Dispatcher</label><input type="text" id="avm-dispatcher" value="${dispatcherName.replace(/"/g,'&quot;')}"/></div>
+      </div>
+    </div>`;
+  document.getElementById('add-vehicle-modal').style.display='flex';
+  setTimeout(()=>{const t=document.getElementById('avm-truck');if(t)t.focus();},50);
+}
+function closeAddVehicleModal(){
+  document.getElementById('add-vehicle-modal').style.display='none';
+}
+async function doAddFromModal(){
+  if(!isAdmin()) return;
+  const driverName=document.getElementById('avm-driver-name').value.trim();
+  let driverId=document.getElementById('avm-driver').value;
+  const truck=document.getElementById('avm-truck').value.trim();
+  const trailer=document.getElementById('avm-trailer').value.trim();
+  const dispatcher=document.getElementById('avm-dispatcher').value.trim();
+  if(!truck||!trailer){showToast('Enter truck and trailer numbers','danger');return;}
+  if(driverName){const nd=await addDriver(driverName);driverId=nd.id;}
+  await addVehicle(truck,trailer,driverId||null,dispatcher||_avmDispatcher);
+  closeAddVehicleModal();
+  showToast('Added to fleet!','success');
+  render();
 }
 function startEditVehicle(id){
   document.getElementById('vview-'+id).style.display='none';

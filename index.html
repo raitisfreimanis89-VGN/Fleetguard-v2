@@ -154,6 +154,20 @@
   </div>
 </div>
 
+<div id="add-vehicle-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAddVehicleModal()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-header" style="display:flex;justify-content:space-between;align-items:center">
+      <span>🚛 Add to Fleet</span>
+      <button class="btn btn-ghost btn-sm" onclick="closeAddVehicleModal()" style="font-size:18px;line-height:1;padding:2px 8px">×</button>
+    </div>
+    <div class="modal-body" id="avm-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeAddVehicleModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="doAddFromModal()">+ Add to Fleet</button>
+    </div>
+  </div>
+</div>
+
 <script>
   (function() {
     var saved = localStorage.getItem('fg_theme') || 'dark';
