@@ -817,6 +817,49 @@ function renderReports(){
   const brakePass=BRAKE_TESTS.filter(b=>b.result==='pass').length,brakeFail=BRAKE_TESTS.filter(b=>b.result==='fail').length;
   const dotPass=DOT_INSPECTIONS.filter(d=>d.result==='pass').length,dotViol=DOT_INSPECTIONS.filter(d=>d.result==='violation').length,dotOOS=DOT_INSPECTIONS.filter(d=>d.result==='oos').length;
   const maxBar=Math.max(brakePass,brakeFail,1);
+  // ── DOT monthly stats ──────────────────────────────────
+  const _rNow=new Date();
+  const _MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const _MOF=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const _dotMS=(y,m)=>{const pfx=`${y}-${String(m+1).padStart(2,'0')}`;const inM=DOT_INSPECTIONS.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
+  const _cDot=_dotMS(_rNow.getFullYear(),_rNow.getMonth());
+  const _cCol=_cDot.pct===null?'var(--text3)':_cDot.pct>=90?'var(--success)':_cDot.pct>=75?'var(--warning)':'var(--danger)';
+  const _dotHist=[];for(let _i=1;_i<=12;_i++){let _y=_rNow.getFullYear(),_m=_rNow.getMonth()-_i;while(_m<0){_m+=12;_y--;}_dotHist.push({year:_y,month:_m,..._dotMS(_y,_m)});}
+  const _pCol=p=>p>=90?'var(--success)':p>=75?'var(--warning)':'var(--danger)';
+  const _pBg=p=>p>=90?'var(--success-bg)':p>=75?'var(--warning-bg)':'var(--danger-bg)';
+  const _dotRowsHtml=_dotHist.map((r,i)=>{
+    const pc=r.pct,pcc=pc!==null?_pCol(pc):'var(--text3)',pcb=pc!==null?_pBg(pc):'transparent';
+    const stripe=i%2===1?'background:rgba(255,255,255,.025)':'';
+    const issuesTd=r.issues>0?`<span style="font-size:13px;font-weight:700;color:var(--danger)">${r.issues}</span>`:`<span style="color:var(--text3);font-size:13px">—</span>`;
+    const pctTd=pc!==null?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px"><div style="width:56px;height:5px;background:var(--surface3,#252c3d);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${pc}%;background:${pcc};border-radius:3px"></div></div><span style="display:inline-block;min-width:44px;text-align:center;background:${pcb};color:${pcc};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${pc}%</span></div>`:`<span style="color:var(--text3)">—</span>`;
+    return `<tr style="${stripe}"><td style="padding:10px 16px;font-size:13px;font-weight:600">${_MO[r.month]} ${r.year}</td><td style="padding:10px 16px;text-align:center;font-size:13px;color:var(--text2)">${r.total}</td><td style="padding:10px 16px;text-align:center"><span style="font-size:13px;font-weight:700;color:var(--success)">${r.clean}</span></td><td style="padding:10px 16px;text-align:center">${issuesTd}</td><td style="padding:10px 16px;text-align:right">${pctTd}</td></tr>`;
+  }).join('');
+  const _dotCardHtml=`<div class="card" style="grid-column:1/-1">
+    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:8px;background:rgba(147,51,234,.15);display:flex;align-items:center;justify-content:center;font-size:15px">📋</div><div><div style="font-size:13px;font-weight:700">DOT Inspection Results</div><div style="font-size:11px;color:var(--text3);font-weight:400;margin-top:1px">Clean vs Issues · Monthly breakdown</div></div></div><span style="background:rgba(147,51,234,.12);color:#a855f7;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">${DOT_INSPECTIONS.length} total</span></div>
+    <div style="padding:20px;border-bottom:1px solid var(--border)">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin-bottom:16px">📅 ${_MOF[_rNow.getMonth()]} ${_rNow.getFullYear()} — Current Month</div>
+      <div style="display:flex;align-items:center;gap:28px">
+        <div style="text-align:center;flex-shrink:0;min-width:90px">
+          <div style="font-size:52px;font-weight:800;line-height:1;color:${_cCol};letter-spacing:-2px">${_cDot.pct!==null?_cDot.pct+'%':'—'}</div>
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:5px">Clean Rate</div>
+        </div>
+        <div style="flex:1">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+            <div style="background:var(--success-bg);border:1px solid rgba(120,220,119,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--success);line-height:1">${_cDot.clean}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">✅ Clean (Pass)</div></div>
+            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--danger);line-height:1">${_cDot.issues}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">⚠ Issues (Viol+OOS)</div></div>
+            <div style="background:var(--surface3,#252c3d);border:1px solid var(--border);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;line-height:1">${_cDot.total}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">📋 Total</div></div>
+          </div>
+          <div style="height:8px;background:var(--surface3,#252c3d);border-radius:4px;overflow:hidden">${_cDot.total>0?`<div style="height:100%;width:${_cDot.pct}%;background:${_cCol};border-radius:4px"></div>`:''}</div>
+          <div style="display:flex;justify-content:space-between;margin-top:5px"><div style="font-size:10px;color:var(--text3)">${_cDot.clean} clean passes</div><div style="font-size:10px;color:var(--text3)">${_cDot.issues} violations / OOS</div></div>
+        </div>
+      </div>
+      ${_cDot.total===0?'<div style="font-size:12px;color:var(--text3);margin-top:12px;text-align:center">No inspections recorded this month yet</div>':''}
+    </div>
+    <div>
+      <div style="padding:14px 20px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3)">📊 Last 12 Months</div>
+      <div class="table-wrap"><table><thead><tr><th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">✅ Clean</th><th style="text-align:center">⚠ Issues</th><th style="text-align:right">% Clean</th></tr></thead><tbody>${_dotRowsHtml||`<tr><td colspan="5" class="empty">No DOT inspection data yet</td></tr>`}</tbody></table></div>
+    </div>
+  </div>`;
   let html=`<div class="stats-grid" style="margin-bottom:24px">
     <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">🚛</div><div><div class="stat-num">${VEHICLES.length}</div><div class="stat-label">Vehicles</div></div></div>
     <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">🔧</div><div><div class="stat-num">${MAINTENANCE.length}</div><div class="stat-label">Service records</div></div></div>
@@ -831,10 +874,8 @@ function renderReports(){
     <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--success)">${brakePass}</div><div class="chart-bar" style="background:var(--success);height:${Math.round(brakePass/maxBar*100)}%"></div><div class="chart-bar-label">Pass</div></div>
     <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--danger)">${brakeFail}</div><div class="chart-bar" style="background:var(--danger);height:${Math.round(brakeFail/maxBar*100)}%"></div><div class="chart-bar-label">Fail</div></div>
   </div><div class="text-sm" style="margin-top:8px">Pass rate: <strong>${BRAKE_TESTS.length?Math.round(brakePass/BRAKE_TESTS.length*100):0}%</strong></div></div></div>
-  <div class="card"><div class="card-header">DOT Inspection Results</div><div class="card-body"><div class="chart-bar-wrap">
-    ${[{l:'Pass',v:dotPass,c:'var(--success)'},{l:'Violation',v:dotViol,c:'var(--warning)'},{l:'OOS',v:dotOOS,c:'var(--danger)'}].map(b=>{const m=Math.max(dotPass,dotViol,dotOOS,1);return`<div class="chart-bar-col"><div class="chart-bar-val" style="color:${b.c}">${b.v}</div><div class="chart-bar" style="background:${b.c};height:${Math.round(b.v/m*100)}%"></div><div class="chart-bar-label">${b.l}</div></div>`;}).join('')}
-  </div></div></div>
-  <div class="card"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
+  ${_dotCardHtml}
+  <div class="card" style="grid-column:1/-1"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
     <thead><tr><th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th></tr></thead>
     <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${v.truckNumber}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
   </table></div></div></div>
