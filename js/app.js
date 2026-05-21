@@ -823,10 +823,10 @@ function renderReports(){
   const _MOF=['January','February','March','April','May','June','July','August','September','October','November','December'];
   const _dotMS=(y,m)=>{const pfx=`${y}-${String(m+1).padStart(2,'0')}`;const inM=DOT_INSPECTIONS.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
   const _cDot=_dotMS(_rNow.getFullYear(),_rNow.getMonth());
-  const _cCol=_cDot.pct===null?'var(--text3)':_cDot.pct>=90?'var(--success)':_cDot.pct>=75?'var(--warning)':'var(--danger)';
+  const _cCol=_cDot.pct===null?'var(--text3)':_cDot.pct>70?'var(--success)':_cDot.pct>50?'var(--warning)':'var(--danger)';
   const _dotHist=[];for(let _i=1;_i<=12;_i++){let _y=_rNow.getFullYear(),_m=_rNow.getMonth()-_i;while(_m<0){_m+=12;_y--;}_dotHist.push({year:_y,month:_m,..._dotMS(_y,_m)});}
-  const _pCol=p=>p>=90?'var(--success)':p>=75?'var(--warning)':'var(--danger)';
-  const _pBg=p=>p>=90?'var(--success-bg)':p>=75?'var(--warning-bg)':'var(--danger-bg)';
+  const _pCol=p=>p>70?'var(--success)':p>50?'var(--warning)':'var(--danger)';
+  const _pBg=p=>p>70?'var(--success-bg)':p>50?'var(--warning-bg)':'var(--danger-bg)';
   const _dotRowsHtml=_dotHist.map((r,i)=>{
     const pc=r.pct,pcc=pc!==null?_pCol(pc):'var(--text3)',pcb=pc!==null?_pBg(pc):'transparent';
     const stripe=i%2===1?'background:rgba(255,255,255,.025)':'';
