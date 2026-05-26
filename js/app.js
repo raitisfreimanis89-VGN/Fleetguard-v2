@@ -196,8 +196,18 @@ async function addMileage(vehicleId,driverId,mileage) {
 }
 async function loadAllUsers() {
   if(!sb||!isAdmin()) return [];
-  const {data}=await sb.from('profiles').select('*').order('created_at');
+  const {data}=await sb.from('user_activity').select('*');
   return data||[];
+}
+function fmtCSTDate(iso){
+  if(!iso) return {date:'—',time:'—',status:'none'};
+  const d=new Date(iso);
+  const now=new Date();
+  const diffDays=Math.floor((now-d)/(1000*60*60*24));
+  const date=d.toLocaleDateString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',year:'numeric'});
+  const time=d.toLocaleTimeString('en-US',{timeZone:'America/Chicago',hour:'numeric',minute:'2-digit',hour12:true});
+  const status=diffDays===0?'today':diffDays<=7?'week':'old';
+  return{date,time,status};
 }
 async function updateUserRole(userId,role) { await sb.from('profiles').update({role}).eq('id',userId); }
 
@@ -928,22 +938,42 @@ async function doSubmitPortal(){
 async function renderUsers(){
   if(!isAdmin()) return`<div class="alert alert-danger">Access denied.</div>`;
   const users=await loadAllUsers();
-  let html=`<div class="card" style="max-width:640px"><div class="card-header">👥 User Management</div><div class="card-body" style="padding:0">
-    <div class="table-wrap"><table><thead><tr><th>Email</th><th>Role</th><th>Joined</th><th>Action</th></tr></thead><tbody>`;
-  if(users.length===0) html+=`<tr><td colspan="4" class="empty" style="padding:20px">No users yet</td></tr>`;
-  users.forEach(u=>{
+  const palette=['#da6536','#6366f1','#0ea5e9','#16a34a','#d97706','#8b5cf6','#ec4899','#14b8a6'];
+  const avatarColor=e=>palette[e.charCodeAt(0)%palette.length];
+  const initials=e=>e.substring(0,2).toUpperCase();
+  const admins=users.filter(u=>u.role==='admin').length;
+  const dispatchers=users.filter(u=>u.role==='dispatcher').length;
+  const activeToday=users.filter(u=>u.last_sign_in_at&&Math.floor((Date.now()-new Date(u.last_sign_in_at))/86400000)===0).length;
+  const relLabel=iso=>{
+    if(!iso)return{label:'Never',bg:'var(--surface-high)',fg:'var(--text3)'};
+    const d=Math.floor((Date.now()-new Date(iso))/86400000);
+    if(d===0)return{label:'Today',bg:'var(--success-bg)',fg:'var(--success)'};
+    if(d===1)return{label:'Yesterday',bg:'var(--warning-bg)',fg:'var(--warning)'};
+    if(d<=7)return{label:d+'d ago',bg:'var(--warning-bg)',fg:'var(--warning)'};
+    return{label:d+'d ago',bg:'var(--surface-high)',fg:'var(--text3)'};
+  };
+  let html=`<div class="card" style="max-width:920px"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><span>👥 User Management</span><span class="badge badge-blue">${admins} admin${admins!==1?'s':''}</span><span class="badge badge-gray">${dispatchers} dispatcher${dispatchers!==1?'s':''}</span>${activeToday>0?`<span class="badge badge-green">● ${activeToday} active today</span>`:''}</div><span style="font-size:11px;color:var(--text3);font-weight:400">Times shown in CST</span></div><div class="card-body" style="padding:0">
+    <div class="table-wrap"><table><thead><tr><th style="padding-left:18px">User</th><th>Role</th><th>Last Day</th><th>Last Activity (CST)</th><th>Action</th></tr></thead><tbody>`;
+  if(users.length===0) html+=`<tr><td colspan="5" class="empty" style="padding:20px">No users yet</td></tr>`;
+  users.forEach((u,i)=>{
     const isSelf=u.id===currentUser?.id;
-    html+=`<tr>
-      <td>${u.email}${isSelf?' <span class="badge badge-blue" style="font-size:10px">You</span>':''}</td>
-      <td>${isSelf?`<span class="badge ${u.role==='admin'?'badge-blue':'badge-gray'}">${u.role}</span>`:`<select onchange="doChangeRole('${u.id}',this.value)" style="padding:4px 8px;border-radius:6px;font-size:12px;border:1px solid var(--border)"><option value="admin" ${u.role==='admin'?'selected':''}>👑 Admin</option><option value="dispatcher" ${u.role==='dispatcher'?'selected':''}>👁 Dispatcher</option></select>`}</td>
-      <td class="text-sm">${fmtDate(u.created_at)}</td>
-      <td>${isSelf?'—':`<button class="btn btn-ghost btn-sm" onclick="doDeleteUser('${u.id}','${u.email}')">Remove</button>`}</td>
+    const act=fmtCSTDate(u.last_sign_in_at);
+    const rel=relLabel(u.last_sign_in_at);
+    const isNew=!u.last_sign_in_at;
+    const color=avatarColor(u.email);
+    const rowBg=isSelf?'background:var(--primary-dim)':i%2===1?'background:var(--row-stripe)':'';
+    html+=`<tr style="${rowBg}" onmouseover="this.style.background='var(--surface-high)'" onmouseout="this.style.background='${isSelf?'var(--primary-dim)':i%2===1?'var(--row-stripe)':''}'">
+      <td style="padding:11px 14px 11px 18px"><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;flex-shrink:0;opacity:${isNew?'0.45':'1'}">${initials(u.email)}</div><div><div style="font-size:13px;font-weight:600;color:${isNew?'var(--text3)':'var(--text)'}">${u.email}${isSelf?' <span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>${isNew?'<div style="font-size:10.5px;color:var(--text3);margin-top:2px">Never logged in</div>':''}</div></div></td>
+      <td style="padding:11px 14px">${isSelf?`<span class="badge ${u.role==='admin'?'badge-blue':'badge-gray'}">${u.role==='admin'?'👑 Admin':'👁 Dispatcher'}</span>`:`<select onchange="doChangeRole('${u.id}',this.value)" style="padding:4px 8px;border-radius:6px;font-size:12px;border:1px solid var(--border);background:var(--surface-high);color:var(--text)"><option value="admin" ${u.role==='admin'?'selected':''}>👑 Admin</option><option value="dispatcher" ${u.role==='dispatcher'?'selected':''}>👁 Dispatcher</option></select>`}</td>
+      <td style="padding:11px 14px;white-space:nowrap"><div style="display:flex;align-items:center;gap:7px"><span style="background:${rel.bg};color:${rel.fg};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.04em;white-space:nowrap">${rel.label}</span><span style="font-size:12px;color:var(--text3)">${act.date}</span></div></td>
+      <td style="padding:11px 14px;font-size:13px;font-weight:600;color:${isNew?'var(--text3)':'var(--text2)'};white-space:nowrap">${act.time}</td>
+      <td style="padding:11px 14px">${isSelf?'<span style="color:var(--text3);font-size:12px">—</span>':`<button class="btn btn-sm" onclick="doDeleteUser('${u.id}','${u.email}')" style="background:transparent;border:1px solid var(--danger-bg);color:var(--danger);font-weight:700" onmouseover="this.style.background='var(--danger-bg)'" onmouseout="this.style.background='transparent'">✕ Remove</button>`}</td>
     </tr>`;
   });
   html+=`</tbody></table></div></div></div>
-  <div class="card" style="max-width:640px;margin-top:20px"><div class="card-header">➕ Invite New User</div><div class="card-body">
+  <div class="card" style="max-width:920px;margin-top:20px"><div class="card-header">➕ Invite New User</div><div class="card-body">
     <p class="text-sm" style="margin-bottom:12px;line-height:1.6">Invite users via Supabase dashboard, then assign their role here.</p>
-    <div style="background:var(--surface2);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)">Supabase Dashboard → Authentication → Users → Invite user</div>
+    <div style="background:var(--surface-low);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)">Supabase Dashboard → Authentication → Users → Invite user</div>
   </div></div>`;
   return html;
 }
