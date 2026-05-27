@@ -322,9 +322,27 @@ function renderDispatcherBoard(){
       html+=`<div class="empty" style="padding:40px">No trucks assigned to ${dispName}</div>`;
       return html;
     }
+    const _fvVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
     html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
     fleet.forEach(v=>{
       const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
+      const isVac=_fvVacSet.has(v.assignedDriverId);
+      if(isVac){
+        html+=`<div class="card" style="cursor:pointer;opacity:.55" onclick="navigate('vehicle','${v.id}')">
+          <div class="card-body" style="padding:16px">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+              <div>
+                <div style="font-size:15px;font-weight:700;color:var(--text2)">Truck #${v.truckNumber}</div>
+                <div style="font-size:12px;color:var(--text3)">Trailer #${v.trailerNumber}</div>
+              </div>
+              <span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px">🏖️ Vacation</span>
+            </div>
+            ${driver?`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">👤 ${driver.name}</div>`:''}
+            <div style="font-size:11px;color:var(--text3)">Frozen — no alerts while on vacation</div>
+          </div>
+        </div>`;
+        return;
+      }
       const s=getVehicleStatus(v.id);
       const sb=s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">OK</span>`;
       const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
@@ -346,9 +364,6 @@ function renderDispatcherBoard(){
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
             <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
           </div>
-          <div style="display:none">
-            <span style="font-family:'Material Symbols Outlined';font-size:13px;font-weight:300;line-height:1">open_in_new</span> Open full detail
-          </div>
         </div>
       </div>`;
     });
@@ -358,6 +373,7 @@ function renderDispatcherBoard(){
   }
 
   // ── BOARD VIEW: all dispatchers ─────────────────────────
+  const _dbVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
   let html='';
   if(!isAdmin()) html+=dispatcherNotice();
   if(names.length===0&&unassigned.length===0){
@@ -366,19 +382,22 @@ function renderDispatcherBoard(){
   html+=`<div class="db-board">`;
   names.forEach(name=>{
     const trucks=VEHICLES.filter(v=>v.assignedDispatcher===name);
-    const statuses=trucks.map(v=>getVehicleStatus(v.id));
+    const activeTrucks=trucks.filter(v=>!_dbVacSet.has(v.assignedDriverId));
+    const vacTrucks=trucks.filter(v=>_dbVacSet.has(v.assignedDriverId));
+    const statuses=activeTrucks.map(v=>getVehicleStatus(v.id));
     const critCount=statuses.filter(s=>s.critical).length;
     const warnCount=statuses.filter(s=>s.warning&&!s.critical).length;
-    const okCount=trucks.length-critCount-warnCount;
-    const healthPct=Math.round((okCount/trucks.length)*100);
+    const okCount=activeTrucks.length-critCount-warnCount;
+    const healthPct=activeTrucks.length?Math.round((okCount/activeTrucks.length)*100):100;
     const barColor=critCount>0?'var(--danger)':warnCount>0?'var(--warning)':'var(--success)';
     const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
     const chipHtml=
       (okCount>0   ?`<span class="db-fleet-chip ok">✅ ${okCount} Good</span>`:'')
      +(warnCount>0 ?`<span class="db-fleet-chip warn">⚠ ${warnCount} Warn</span>`:'')
      +(critCount>0 ?`<span class="db-fleet-chip crit">🔴 ${critCount} Critical</span>`:'')
+     +(vacTrucks.length>0?`<span class="db-fleet-chip" style="background:rgba(245,158,11,.12);color:var(--warning)">🏖️ ${vacTrucks.length} Vacation</span>`:'')
      +`<div class="db-health-bar-wrap"><div class="db-health-bar-fill" style="width:${healthPct}%;background:${barColor}"></div></div>`;
-    const rows=trucks.map((v,i)=>{
+    const activeRows=activeTrucks.map((v,i)=>{
       const s=statuses[i];
       const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
       const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
@@ -397,7 +416,19 @@ function renderDispatcherBoard(){
           <span class="status-pill ${svcClass}" style="font-size:9px">🔵 ${s.serviceDays!==null?s.serviceDays+'d':'—'}</span>
         </div>
       </div>`;
-    }).join('');
+    });
+    const vacRows=vacTrucks.map(v=>{
+      const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
+      return`<div class="db-truck-row" style="opacity:.5">
+        <div class="db-truck-icon">local_shipping</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;line-height:1.2;color:var(--text3)">#${v.truckNumber}</div>
+          ${driver?`<div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${driver.name}</div>`:''}
+        </div>
+        <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--warning);padding:2px 7px;border-radius:20px;font-weight:700;flex-shrink:0">🏖️ Vacation</span>
+      </div>`;
+    });
+    const rows=[...activeRows,...vacRows].join('');
     html+=`<div class="card" style="cursor:pointer;overflow:hidden;transition:border-color .15s,box-shadow .15s,transform .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.boxShadow='';this.style.transform=''" onclick="currentDispatcherFilter='${name.replace(/'/g,"\\'")}';render()">
       <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border)">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
