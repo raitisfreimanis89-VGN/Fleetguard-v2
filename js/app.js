@@ -147,6 +147,7 @@ async function addDriver(name) {
   DRIVERS.push(rec); await sb.from('drivers').insert({id:rec.id,name,created_at:rec.created_at}); return rec;
 }
 async function updateDriver(id,name) { DRIVERS=DRIVERS.map(d=>d.id===id?{...d,name}:d); await sb.from('drivers').update({name}).eq('id',id); }
+async function toggleDriverVacation(id,onVacation){ DRIVERS=DRIVERS.map(d=>d.id===id?{...d,on_vacation:onVacation}:d); await sb.from('drivers').update({on_vacation:onVacation}).eq('id',id); render(); }
 async function deleteDriver(id) {
   DRIVERS=DRIVERS.filter(d=>d.id!==id); DOT_INSPECTIONS=DOT_INSPECTIONS.map(r=>r.driverId===id?{...r,driverId:null}:r); MILEAGE=MILEAGE.filter(r=>r.driverId!==id);
   await sb.from('drivers').delete().eq('id',id);
@@ -438,14 +439,16 @@ function renderDispatcherBoard(){
 // ═══════════════════════════════════════════════════════
 function renderDashboard(){
   const statuses=VEHICLES.map(v=>({v,s:getVehicleStatus(v.id)}));
-  const roadworthy=statuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length;
-  const critical=statuses.filter(x=>x.s.critical).length;
-  const oos=statuses.filter(x=>x.s.hasOOS);
-  const brakeOverdue=statuses.filter(x=>x.s.brakeOverdue);
-  const brakeDueSoon=statuses.filter(x=>x.s.brakeDueSoon);
-  const tyreOverdue=statuses.filter(x=>x.s.tyreOverdue);
-  const serviceOverdue=statuses.filter(x=>x.s.serviceOverdue);
-  const vicious=statuses.filter(x=>x.s.viciousCircle);
+  const _vacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
+  const activeStatuses=statuses.filter(x=>!_vacSet.has(x.v.assignedDriverId));
+  const roadworthy=activeStatuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length;
+  const critical=activeStatuses.filter(x=>x.s.critical).length;
+  const oos=activeStatuses.filter(x=>x.s.hasOOS);
+  const brakeOverdue=activeStatuses.filter(x=>x.s.brakeOverdue);
+  const brakeDueSoon=activeStatuses.filter(x=>x.s.brakeDueSoon);
+  const tyreOverdue=activeStatuses.filter(x=>x.s.tyreOverdue);
+  const serviceOverdue=activeStatuses.filter(x=>x.s.serviceOverdue);
+  const vicious=activeStatuses.filter(x=>x.s.viciousCircle);
   let html=`<div class="stats-grid">
     <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">🚛</div><div><div class="stat-num">${VEHICLES.length}</div><div class="stat-label">Total vehicles</div></div></div>
     <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">✅</div><div><div class="stat-num" style="color:var(--success)">${roadworthy}</div><div class="stat-label">Roadworthy</div></div></div>
@@ -757,10 +760,12 @@ function renderDrivers(){
     const assignedVehicles=VEHICLES.filter(v=>v.assignedDriverId===d.id);
     const truckNames=assignedVehicles.map(v=>`Truck #${v.truckNumber}`).join(', ')||'—';
     const dispatchers=[...new Set(assignedVehicles.map(v=>v.assignedDispatcher).filter(Boolean))].join(', ')||'—';
-    html+=`<tr id="driver-row-${d.id}">
+    const isVac=!!d.on_vacation;
+    html+=`<tr id="driver-row-${d.id}" style="${isVac?'opacity:.6;background:rgba(245,158,11,.04)':''}">
       <td>
         <div id="driver-view-${d.id}" style="display:flex;align-items:center;gap:8px">
-          <span class="fw-600">${d.name}</span>
+          <span class="fw-600" style="color:${isVac?'var(--text3)':''}">${d.name}</span>
+          ${isVac?'<span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">🏖️ Vacation</span>':''}
         </div>
         <div id="driver-edit-${d.id}" style="display:none;gap:8px;align-items:center">
           <input type="text" value="${d.name}" id="dedit-${d.id}" style="flex:1;min-width:120px"/>
@@ -770,7 +775,10 @@ function renderDrivers(){
       </td>
       <td class="text-sm">${truckNames}</td>
       <td class="text-sm">${dispatchers}</td>
-      ${isAdmin()?`<td><div style="display:flex;gap:6px" id="driver-btns-${d.id}"><button class="btn btn-ghost btn-sm" onclick="startEditDriver('${d.id}')">✏ Edit</button><button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDriver('${d.id}','${d.name.replace(/'/g,"\\'")}')">🗑</button></div></td>`:''}
+      ${isAdmin()?`<td><div style="display:flex;gap:6px" id="driver-btns-${d.id}">${isVac
+        ?`<button class="btn btn-sm" onclick="toggleDriverVacation('${d.id}',false)" style="background:rgba(120,220,119,.1);border:1px solid rgba(120,220,119,.4);color:var(--success);font-size:11.5px">↩ Return</button>`
+        :`<button class="btn btn-ghost btn-sm" onclick="startEditDriver('${d.id}')">✏ Edit</button><button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDriver('${d.id}','${d.name.replace(/'/g,"\\'")}')">🗑</button><button class="btn btn-sm" onclick="toggleDriverVacation('${d.id}',true)" style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.35);color:var(--warning);font-size:11px;font-weight:700" title="Set on vacation">🏖️</button>`
+      }</div></td>`:''}
     </tr>`;
   });
   html+=`</tbody></table></div></div></div>`;
@@ -789,7 +797,9 @@ function renderCalendar(){
   const year=calendarMonth.getFullYear(),month=calendarMonth.getMonth();
   const firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate();
   const todayStr=today(),events=[];
+  const _calVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
   VEHICLES.forEach(v=>{
+    if(_calVacSet.has(v.assignedDriverId)) return;
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
