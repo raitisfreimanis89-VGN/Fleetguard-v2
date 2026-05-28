@@ -34,7 +34,8 @@ async function initAuth() {
 async function setUserFromSession(session) {
   currentUser = session.user;
   try {
-    const { data } = await sb.from('profiles').select('role').eq('id', currentUser.id).single();
+    const { data } = await sb.from('profiles').select('role, banned_at').eq('id', currentUser.id).single();
+    if (data?.banned_at) { await sb.auth.signOut(); showLoginScreen(); return; }
     currentRole = data?.role || 'dispatcher';
   } catch(e) { currentRole = 'dispatcher'; }
   hideLoginScreen();
@@ -1023,8 +1024,10 @@ async function renderUsers(){
 }
 async function doChangeRole(userId,role){await updateUserRole(userId,role);showToast('Role updated!','success');}
 async function doDeleteUser(userId,email){
-  const ok=await confirm2(`Remove user "${email}"?`,'They will lose access to FleetGuard.');
-  if(!ok) return; await sb.from('profiles').delete().eq('id',userId); showToast('User removed','warning'); navigate('users');
+  const ok=await confirm2(`Remove user "${email}"?`,'They will be immediately signed out and blocked from FleetGuard.');
+  if(!ok) return;
+  await sb.from('profiles').update({banned_at: new Date().toISOString()}).eq('id',userId);
+  showToast('User removed','warning'); navigate('users');
 }
 
 // ═══════════════════════════════════════════════════════
