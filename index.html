@@ -42,19 +42,6 @@
         </div>
       </div>
     </div>
-    <div id="login-db-setup">
-      <div class="login-divider">Connect your Supabase database first</div>
-      <div id="ls-db-error" class="login-error"></div>
-      <div class="login-field">
-        <label>Supabase Project URL</label>
-        <input type="text" id="ls-sb-url" placeholder="https://xxxx.supabase.co"/>
-      </div>
-      <div class="login-field">
-        <label>Supabase Anon Key</label>
-        <input type="text" id="ls-sb-key" placeholder="eyJhbGciOiJIUzI1..."/>
-      </div>
-      <button id="ls-connect-btn" class="btn btn-primary login-btn-full" onclick="connectDbFromLogin()">Connect &amp; Continue</button>
-    </div>
     <div id="login-form-section">
       <div class="ts-form-heading">
         <div class="ts-form-title">Welcome back</div>
@@ -70,9 +57,6 @@
         <input type="password" id="login-password" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;" onkeydown="if(event.key==='Enter')signIn()"/>
       </div>
       <button id="login-btn" class="btn btn-primary login-btn-full" onclick="signIn()">Sign In</button>
-      <div class="login-divider" style="margin-top:16px">
-        <a href="#" onclick="localStorage.removeItem('sb_url');localStorage.removeItem('sb_key');location.reload();return false" style="font-size:12px;color:var(--text3)">Change database</a>
-      </div>
     </div>
   </div>
 </div>

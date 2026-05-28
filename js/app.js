@@ -53,7 +53,7 @@ async function signIn() {
   btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Signing in...';
   errEl.style.display = 'none';
   const { error } = await sb.auth.signInWithPassword({ email, password });
-  if (error) { errEl.textContent=error.message; errEl.style.display='block'; btn.disabled=false; btn.innerHTML='Sign In'; }
+  if (error) { errEl.textContent='Invalid email or password.'; errEl.style.display='block'; btn.disabled=false; btn.innerHTML='Sign In'; }
 }
 
 async function signOut() {
@@ -95,27 +95,6 @@ function isAdmin() { return currentRole === 'admin'; }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
 
-async function connectDbFromLogin() {
-  const url = document.getElementById('ls-sb-url').value.trim().replace(/\/$/, '');
-  const key = document.getElementById('ls-sb-key').value.trim();
-  const errEl = document.getElementById('ls-db-error');
-  const btn = document.getElementById('ls-connect-btn');
-  if (!url || !key) { errEl.textContent='Enter both URL and key.'; errEl.style.display='block'; return; }
-  if (!url.startsWith('https://')) { errEl.textContent='URL must start with https://'; errEl.style.display='block'; return; }
-  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Testing...'; errEl.style.display='none';
-  try {
-    const fn = getCreateClient();
-    const client = fn(url, key);
-    const { error } = await client.from('profiles').select('id').limit(1);
-    if (error && error.code !== 'PGRST116') throw new Error(error.message);
-    localStorage.setItem('sb_url', url); localStorage.setItem('sb_key', key);
-    sb = client;
-    document.getElementById('login-db-setup').style.display = 'none';
-    document.getElementById('login-form-section').style.display = 'block';
-    showToast('Database connected!', 'success');
-  } catch(e) { errEl.textContent='Connection failed: '+e.message; errEl.style.display='block'; }
-  finally { btn.disabled=false; btn.innerHTML='Connect & Continue'; }
-}
 
 // ═══════════════════════════════════════════════════════
 // DATA LAYER
@@ -494,7 +473,7 @@ function renderDashboard(){
     <div class="stat-card"><div class="stat-icon" style="background:#f3e8ff">👤</div><div><div class="stat-num">${DRIVERS.length}</div><div class="stat-label">Drivers</div></div></div>
   </div>`;
   if(serviceOverdue.length>0) html+=`<div class="alert-urgent"><div style="flex:1"><div class="au-title">🚨 Service Overdue — YARD VISIT ASAP</div>${serviceOverdue.map(x=>{const dr=DRIVERS.find(d=>d.id===x.v.assignedDriverId);const drName=dr?esc(dr.name):'Unassigned Driver';const disp=esc(x.v.assignedDispatcher||'Unassigned');return`<div class="au-row"><div><div class="au-truck">Truck #${esc(x.v.truckNumber)}</div><div class="au-detail">${drName} &nbsp;·&nbsp; ${disp}</div></div><a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="au-badge">OVERDUE</span></a></div>`;}).join('')}</div></div>`;
-  if(vicious.length>0) html+=`<div class="alert alert-warning"><div><div class="alert-title">🔄 Vicious Circle Alert</div>${vicious.map(x=>`<a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="badge badge-yellow" style="margin-right:6px">Truck #${x.v.truckNumber}</span></a>`).join('')}</div></div>`;
+  if(vicious.length>0) html+=`<div class="alert alert-warning"><div><div class="alert-title">🔄 Vicious Circle Alert</div>${vicious.map(x=>`<a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="badge badge-yellow" style="margin-right:6px">Truck #${esc(x.v.truckNumber)}</span></a>`).join('')}</div></div>`;
   html+=`<div class="two-col">`;
   html+=`<div class="card"><div class="card-header">🔴 Brake Inspection Overdue</div><div class="card-body">`;
   if(brakeOverdue.length===0) html+=`<div class="empty">All vehicles within 42-day schedule</div>`;
@@ -557,7 +536,7 @@ function renderVehicles(){
           </div>
         </div>
         ${driver?`<div class="text-sm">👤 ${esc(driver.name)}</div>`:''}
-        ${v.assignedDispatcher?`<div class="text-sm">📡 ${v.assignedDispatcher}</div>`:''}
+        ${v.assignedDispatcher?`<div class="text-sm">📡 ${esc(v.assignedDispatcher)}</div>`:''}
         <div class="status-row" style="margin-top:10px">
           <span class="status-pill ${s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green'}">🔧 Brakes ${s.lastBrake?s.brakeDays+'d':'None'}</span>
           <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
@@ -568,10 +547,10 @@ function renderVehicles(){
       <div id="vedit-${v.id}" style="display:none" class="card-body" style="padding:16px">
         <div style="font-size:13px;font-weight:600;margin-bottom:10px">✏️ Edit Vehicle</div>
         <div class="form-grid" style="margin-bottom:10px">
-          <div><label>Truck #</label><input type="text" id="ve-truck-${v.id}" value="${v.truckNumber}"/></div>
-          <div><label>Trailer #</label><input type="text" id="ve-trailer-${v.id}" value="${v.trailerNumber}"/></div>
-          <div><label>Driver</label><select id="ve-driver-${v.id}"><option value="">— none —</option>${DRIVERS.map(d=>`<option value="${d.id}"${v.assignedDriverId===d.id?' selected':''}>${d.name}</option>`).join('')}</select></div>
-          <div><label>Dispatcher</label><input type="text" id="ve-dispatcher-${v.id}" value="${v.assignedDispatcher||''}"/></div>
+          <div><label>Truck #</label><input type="text" id="ve-truck-${v.id}" value="${esc(v.truckNumber)}"/></div>
+          <div><label>Trailer #</label><input type="text" id="ve-trailer-${v.id}" value="${esc(v.trailerNumber)}"/></div>
+          <div><label>Driver</label><select id="ve-driver-${v.id}"><option value="">— none —</option>${DRIVERS.map(d=>`<option value="${d.id}"${v.assignedDriverId===d.id?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
+          <div><label>Dispatcher</label><input type="text" id="ve-dispatcher-${v.id}" value="${esc(v.assignedDispatcher||'')}"/></div>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary btn-sm" onclick="doSaveVehicle('${v.id}')">Save</button>
@@ -796,8 +775,8 @@ function renderDrivers(){
   if(DRIVERS.length===0) html+=`<tr><td colspan="${isAdmin()?4:3}" class="empty" style="padding:20px;text-align:center">No drivers added yet</td></tr>`;
   DRIVERS.forEach(d=>{
     const assignedVehicles=VEHICLES.filter(v=>v.assignedDriverId===d.id);
-    const truckNames=assignedVehicles.map(v=>`Truck #${v.truckNumber}`).join(', ')||'—';
-    const dispatchers=[...new Set(assignedVehicles.map(v=>v.assignedDispatcher).filter(Boolean))].join(', ')||'—';
+    const truckNames=assignedVehicles.map(v=>`Truck #${esc(v.truckNumber)}`).join(', ')||'—';
+    const dispatchers=[...new Set(assignedVehicles.map(v=>v.assignedDispatcher).filter(Boolean))].map(esc).join(', ')||'—';
     const isVac=!!d.on_vacation;
     html+=`<tr id="driver-row-${d.id}" style="${isVac?'opacity:.6;background:rgba(245,158,11,.04)':''}">
       <td>
@@ -1025,7 +1004,7 @@ async function renderUsers(){
   </div></div>`;
   return html;
 }
-async function doChangeRole(userId,role){await updateUserRole(userId,role);showToast('Role updated!','success');}
+async function doChangeRole(userId,role){if(!['admin','dispatcher'].includes(role))return;await updateUserRole(userId,role);showToast('Role updated!','success');}
 async function doDeleteUser(userId,email){
   const ok=await confirm2(`Remove user "${email}"?`,'They will be immediately signed out and blocked from FleetGuard.');
   if(!ok) return;
@@ -1059,6 +1038,12 @@ function confirmResolve(val){document.getElementById('confirm-modal').style.disp
 async function init(){
   document.getElementById('loading-overlay').style.display='flex';
   await initAuth();
-  setInterval(async()=>{if(sb&&currentUser){await loadAll();render();}},30000);
+  setInterval(async()=>{
+    if(sb&&currentUser){
+      const {data:p}=await sb.from('profiles').select('banned_at').eq('id',currentUser.id).single();
+      if(p?.banned_at){await sb.auth.signOut();localStorage.removeItem('sb_key');localStorage.removeItem('sb_url');showLoginScreen();return;}
+      await loadAll();render();
+    }
+  },30000);
 }
 init();
