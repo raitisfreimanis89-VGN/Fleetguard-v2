@@ -37,7 +37,7 @@ async function setUserFromSession(session) {
     const { data } = await sb.from('profiles').select('role, banned_at').eq('id', currentUser.id).single();
     if (data?.banned_at) { await sb.auth.signOut(); showLoginScreen(); return; }
     currentRole = data?.role || 'dispatcher';
-  } catch(e) { currentRole = 'dispatcher'; }
+  } catch(e) { await sb.auth.signOut(); showLoginScreen(); return; }
   hideLoginScreen();
   await loadAll();
   render();
@@ -295,6 +295,9 @@ function render(){
 
 async function renderUsersAsync(){
   document.getElementById('content').innerHTML=await renderUsers();
+  document.querySelectorAll('.del-user-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>doDeleteUser(btn.dataset.uid, btn.dataset.email));
+  });
 }
 
 // ═══════════════════════════════════════════════════════
@@ -317,13 +320,13 @@ function renderDispatcherBoard(){
       <div style="display:flex;align-items:center;gap:10px">
         <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
         <div>
-          <div style="font-size:16px;font-weight:700">${dispName}'s Fleet</div>
+          <div style="font-size:16px;font-weight:700">${esc(dispName)}'s Fleet</div>
           <div style="font-size:12px;color:var(--text2)">${fleet.length} truck${fleet.length!==1?'s':''} assigned</div>
         </div>
       </div>
     </div>`;
     if(fleet.length===0){
-      html+=`<div class="empty" style="padding:40px">No trucks assigned to ${dispName}</div>`;
+      html+=`<div class="empty" style="padding:40px">No trucks assigned to ${esc(dispName)}</div>`;
       return html;
     }
     const _fvVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
@@ -336,12 +339,12 @@ function renderDispatcherBoard(){
           <div class="card-body" style="padding:16px">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
               <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text2)">Truck #${v.truckNumber}</div>
-                <div style="font-size:12px;color:var(--text3)">Trailer #${v.trailerNumber}</div>
+                <div style="font-size:15px;font-weight:700;color:var(--text2)">Truck #${esc(v.truckNumber)}</div>
+                <div style="font-size:12px;color:var(--text3)">Trailer #${esc(v.trailerNumber)}</div>
               </div>
               <span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px">🏖️ Vacation</span>
             </div>
-            ${driver?`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">👤 ${driver.name}</div>`:''}
+            ${driver?`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">👤 ${esc(driver.name)}</div>`:''}
             <div style="font-size:11px;color:var(--text3)">Frozen — no alerts while on vacation</div>
           </div>
         </div>`;
@@ -356,13 +359,13 @@ function renderDispatcherBoard(){
         <div class="card-body" style="padding:16px">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
             <div>
-              <div style="font-size:15px;font-weight:700">Truck #${v.truckNumber}</div>
-              <div style="font-size:12px;color:var(--text2)">Trailer #${v.trailerNumber}</div>
+              <div style="font-size:15px;font-weight:700">Truck #${esc(v.truckNumber)}</div>
+              <div style="font-size:12px;color:var(--text2)">Trailer #${esc(v.trailerNumber)}</div>
             </div>
             ${sb}
           </div>
-          ${driver?`<div style="font-size:12px;color:var(--text2);margin-bottom:3px">👤 ${driver.name}</div>`:''}
-          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">📡 ${dispName}</div>
+          ${driver?`<div style="font-size:12px;color:var(--text2);margin-bottom:3px">👤 ${esc(driver.name)}</div>`:''}
+          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">📡 ${esc(dispName)}</div>
           <div style="display:flex;flex-wrap:wrap;gap:5px">
             <span class="status-pill ${brakeClass}">🔧 Brakes ${s.brakeDays!==null?s.brakeDays+'d':'None'}</span>
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
@@ -411,8 +414,8 @@ function renderDispatcherBoard(){
       return`<div class="db-truck-row ${rowPulse}">
         <div class="db-truck-icon">local_shipping</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;line-height:1.2">#${v.truckNumber}</div>
-          ${driver?`<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${driver.name}</div>`:''}
+          <div style="font-size:13px;font-weight:700;line-height:1.2">#${esc(v.truckNumber)}</div>
+          ${driver?`<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${esc(driver.name)}</div>`:''}
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
           <span class="status-pill ${brakeClass}" style="font-size:9px">🔧 ${s.brakeDays!==null?s.brakeDays+'d':'—'}</span>
@@ -426,8 +429,8 @@ function renderDispatcherBoard(){
       return`<div class="db-truck-row" style="opacity:.5">
         <div class="db-truck-icon">local_shipping</div>
         <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;line-height:1.2;color:var(--text3)">#${v.truckNumber}</div>
-          ${driver?`<div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${driver.name}</div>`:''}
+          <div style="font-size:13px;font-weight:700;line-height:1.2;color:var(--text3)">#${esc(v.truckNumber)}</div>
+          ${driver?`<div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${esc(driver.name)}</div>`:''}
         </div>
         <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--warning);padding:2px 7px;border-radius:20px;font-weight:700;flex-shrink:0">🏖️ Vacation</span>
       </div>`;
@@ -438,7 +441,7 @@ function renderDispatcherBoard(){
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
           <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;box-shadow:0 0 12px var(--primary-glow)">${initials}</div>
           <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:800">${name}</div>
+            <div style="font-size:15px;font-weight:800">${esc(name)}</div>
             <div style="font-size:11px;color:var(--text2);margin-top:2px">${trucks.length} truck${trucks.length!==1?'s':''} &nbsp;·&nbsp; <span style="color:var(--primary)">View fleet →</span></div>
           </div>
         </div>
@@ -490,24 +493,24 @@ function renderDashboard(){
     <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div><div class="stat-num" style="color:var(--danger)">${critical}</div><div class="stat-label">Critical issues</div></div></div>
     <div class="stat-card"><div class="stat-icon" style="background:#f3e8ff">👤</div><div><div class="stat-num">${DRIVERS.length}</div><div class="stat-label">Drivers</div></div></div>
   </div>`;
-  if(serviceOverdue.length>0) html+=`<div class="alert-urgent"><div style="flex:1"><div class="au-title">🚨 Service Overdue — YARD VISIT ASAP</div>${serviceOverdue.map(x=>{const dr=DRIVERS.find(d=>d.id===x.v.assignedDriverId);const drName=dr?dr.name:'Unassigned Driver';const disp=x.v.assignedDispatcher||'Unassigned';return`<div class="au-row"><div><div class="au-truck">Truck #${x.v.truckNumber}</div><div class="au-detail">${drName} &nbsp;·&nbsp; ${disp}</div></div><a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="au-badge">OVERDUE</span></a></div>`;}).join('')}</div></div>`;
+  if(serviceOverdue.length>0) html+=`<div class="alert-urgent"><div style="flex:1"><div class="au-title">🚨 Service Overdue — YARD VISIT ASAP</div>${serviceOverdue.map(x=>{const dr=DRIVERS.find(d=>d.id===x.v.assignedDriverId);const drName=dr?esc(dr.name):'Unassigned Driver';const disp=esc(x.v.assignedDispatcher||'Unassigned');return`<div class="au-row"><div><div class="au-truck">Truck #${esc(x.v.truckNumber)}</div><div class="au-detail">${drName} &nbsp;·&nbsp; ${disp}</div></div><a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="au-badge">OVERDUE</span></a></div>`;}).join('')}</div></div>`;
   if(vicious.length>0) html+=`<div class="alert alert-warning"><div><div class="alert-title">🔄 Vicious Circle Alert</div>${vicious.map(x=>`<a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="badge badge-yellow" style="margin-right:6px">Truck #${x.v.truckNumber}</span></a>`).join('')}</div></div>`;
   html+=`<div class="two-col">`;
   html+=`<div class="card"><div class="card-header">🔴 Brake Inspection Overdue</div><div class="card-body">`;
   if(brakeOverdue.length===0) html+=`<div class="empty">All vehicles within 42-day schedule</div>`;
-  brakeOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--danger);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastBrake?x.s.brakeDays+' days since last test':'No test on record'}</div></div><span class="badge badge-red">OVERDUE</span></div>`;});
+  brakeOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--danger);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastBrake?x.s.brakeDays+' days since last test':'No test on record'}</div></div><span class="badge badge-red">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟡 Brake Test Due Soon</div><div class="card-body">`;
   if(brakeDueSoon.length===0) html+=`<div class="empty">No vehicles due in next 7 days</div>`;
-  brakeDueSoon.forEach(x=>{const d=42-x.s.brakeDays;html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">Due in ${d} day${d===1?'':'s'}</div></div><span class="badge badge-yellow">DUE SOON</span></div>`;});
+  brakeDueSoon.forEach(x=>{const d=42-x.s.brakeDays;html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">Due in ${d} day${d===1?'':'s'}</div></div><span class="badge badge-yellow">DUE SOON</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟠 Tyre Check Overdue</div><div class="card-body">`;
   if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
-  tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
+  tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🔵 Service Overdue (60-day)</div><div class="card-body">`;
   if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 60-day service schedule</div>`;
-  serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${x.v.truckNumber}</div><div class="text-sm">${x.s.serviceDays+' days since last service'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
+  serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.serviceDays+' days since last service'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:`Service – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:`Brake ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:`Vehicle Service ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
   html+=`<div class="card"><div class="card-header">📋 Recent Activity</div><div class="card-body">`;
@@ -838,11 +841,11 @@ function renderCalendar(){
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-    if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+42);events.push({date:d.toISOString().split('T')[0],label:`Truck #${v.truckNumber} brake due`,type:'brake'});}
-    if(maint[0]) events.push({date:maint[0].nextInspectionDate,label:`Truck #${v.truckNumber} inspection`,type:'maint'});
+    if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+42);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} brake due`,type:'brake'});}
+    if(maint[0]) events.push({date:maint[0].nextInspectionDate,label:`Truck #${esc(v.truckNumber)} inspection`,type:'maint'});
     // FIX: use 60-day interval and fall back to maintenance date if no service_records
     const svcRefDate=svcs[0]?.serviceDate||maint[0]?.serviceDate||null;
-    if(svcRefDate){const d=new Date(svcRefDate);d.setDate(d.getDate()+60);events.push({date:d.toISOString().split('T')[0],label:`Truck #${v.truckNumber} service due`,type:'svc'});}
+    if(svcRefDate){const d=new Date(svcRefDate);d.setDate(d.getDate()+60);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} service due`,type:'svc'});}
   });
   const monthName=calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   let html=`<div class="card" style="margin-bottom:20px"><div class="card-body">
@@ -932,7 +935,7 @@ function renderReports(){
   ${_dotCardHtml}
   <div class="card" style="grid-column:1/-1"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
     <thead><tr><th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th></tr></thead>
-    <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${v.truckNumber}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
+    <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${esc(v.truckNumber)}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
   </table></div></div></div>
   </div>`;
   return html;
@@ -1008,11 +1011,11 @@ async function renderUsers(){
     const color=avatarColor(u.email);
     const rowBg=isSelf?'background:var(--primary-dim)':i%2===1?'background:var(--row-stripe)':'';
     html+=`<tr style="${rowBg}" onmouseover="this.style.background='var(--surface-high)'" onmouseout="this.style.background='${isSelf?'var(--primary-dim)':i%2===1?'var(--row-stripe)':''}'">
-      <td style="padding:11px 14px 11px 18px"><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;flex-shrink:0;opacity:${isNew?'0.45':'1'}">${initials(u.email)}</div><div><div style="font-size:13px;font-weight:600;color:${isNew?'var(--text3)':'var(--text)'}">${u.email}${isSelf?' <span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>${isNew?'<div style="font-size:10.5px;color:var(--text3);margin-top:2px">Never logged in</div>':''}</div></div></td>
+      <td style="padding:11px 14px 11px 18px"><div style="display:flex;align-items:center;gap:10px"><div style="width:34px;height:34px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;color:#fff;flex-shrink:0;opacity:${isNew?'0.45':'1'}">${initials(u.email)}</div><div><div style="font-size:13px;font-weight:600;color:${isNew?'var(--text3)':'var(--text)'}">${esc(u.email)}${isSelf?' <span class="badge badge-blue" style="font-size:10px">You</span>':''}</div>${isNew?'<div style="font-size:10.5px;color:var(--text3);margin-top:2px">Never logged in</div>':''}</div></div></td>
       <td style="padding:11px 14px">${isSelf?`<span class="badge ${u.role==='admin'?'badge-blue':'badge-gray'}">${u.role==='admin'?'👑 Admin':'👁 Dispatcher'}</span>`:`<select onchange="doChangeRole('${u.id}',this.value)" style="padding:4px 8px;border-radius:6px;font-size:12px;border:1px solid var(--border);background:var(--surface-high);color:var(--text)"><option value="admin" ${u.role==='admin'?'selected':''}>👑 Admin</option><option value="dispatcher" ${u.role==='dispatcher'?'selected':''}>👁 Dispatcher</option></select>`}</td>
       <td style="padding:11px 14px;white-space:nowrap"><div style="display:flex;align-items:center;gap:7px"><span style="background:${rel.bg};color:${rel.fg};font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:0.04em;white-space:nowrap">${rel.label}</span><span style="font-size:12px;color:var(--text3)">${act.date}</span></div></td>
       <td style="padding:11px 14px;font-size:13px;font-weight:600;color:${isNew?'var(--text3)':'var(--text2)'};white-space:nowrap">${act.time}</td>
-      <td style="padding:11px 14px">${isSelf?'<span style="color:var(--text3);font-size:12px">—</span>':`<button class="btn btn-sm" onclick="doDeleteUser('${u.id}','${u.email}')" style="background:transparent;border:1px solid var(--danger-bg);color:var(--danger);font-weight:700" onmouseover="this.style.background='var(--danger-bg)'" onmouseout="this.style.background='transparent'">✕ Remove</button>`}</td>
+      <td style="padding:11px 14px">${isSelf?'<span style="color:var(--text3);font-size:12px">—</span>':`<button class="btn btn-sm del-user-btn" data-uid="${esc(u.id)}" data-email="${esc(u.email)}" style="background:transparent;border:1px solid var(--danger-bg);color:var(--danger);font-weight:700" onmouseover="this.style.background='var(--danger-bg)'" onmouseout="this.style.background='transparent'">✕ Remove</button>`}</td>
     </tr>`;
   });
   html+=`</tbody></table></div></div></div>
