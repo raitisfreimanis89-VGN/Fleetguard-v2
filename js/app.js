@@ -92,6 +92,8 @@ function updateUserBar() {
 
 function isAdmin() { return currentRole === 'admin'; }
 
+function esc(s) { const d = document.createElement('div'); d.textContent = s ?? ''; return d.innerHTML; }
+
 async function connectDbFromLogin() {
   const url = document.getElementById('ls-sb-url').value.trim().replace(/\/$/, '');
   const key = document.getElementById('ls-sb-key').value.trim();
@@ -542,15 +544,15 @@ function renderVehicles(){
       <div id="vview-${v.id}" class="card-body" style="padding:16px">
         <div class="flex-between mb-4" style="margin-bottom:10px">
           <div onclick="navigate('vehicle','${v.id}')" style="cursor:pointer;flex:1">
-            <div class="fw-600" style="font-size:15px">Truck #${v.truckNumber}</div>
-            <div class="text-sm">Trailer #${v.trailerNumber}</div>
+            <div class="fw-600" style="font-size:15px">Truck #${esc(v.truckNumber)}</div>
+            <div class="text-sm">Trailer #${esc(v.trailerNumber)}</div>
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             ${sb2}
             ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="startEditVehicle('${v.id}')" title="Edit">✏️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="event.stopPropagation();doDeleteVehicle('${v.id}','${v.truckNumber}')" title="Delete">🗑</button>`:''}
           </div>
         </div>
-        ${driver?`<div class="text-sm">👤 ${driver.name}</div>`:''}
+        ${driver?`<div class="text-sm">👤 ${esc(driver.name)}</div>`:''}
         ${v.assignedDispatcher?`<div class="text-sm">📡 ${v.assignedDispatcher}</div>`:''}
         <div class="status-row" style="margin-top:10px">
           <span class="status-pill ${s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green'}">🔧 Brakes ${s.lastBrake?s.brakeDays+'d':'None'}</span>
@@ -664,8 +666,8 @@ function renderVehicleDetail(){
   let html=`<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
     <button class="btn btn-ghost btn-sm" onclick="navigate('vehicles')">← Back</button>
     <div>
-      <div style="font-size:20px;font-weight:700">Truck #${v.truckNumber}</div>
-      <div class="text-sm">Trailer #${v.trailerNumber}${driver?' · Driver: '+driver.name:''}${v.assignedDispatcher?' · Dispatcher: '+v.assignedDispatcher:''}</div>
+      <div style="font-size:20px;font-weight:700">Truck #${esc(v.truckNumber)}</div>
+      <div class="text-sm">Trailer #${esc(v.trailerNumber)}${driver?' · Driver: '+esc(driver.name):''}${v.assignedDispatcher?' · Dispatcher: '+esc(v.assignedDispatcher):''}</div>
     </div>
     <div style="margin-left:auto;display:flex;gap:8px">${s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">Roadworthy</span>`}</div>
   </div>
@@ -696,9 +698,9 @@ function renderVehicleDetail(){
     if(allSvcRecords.length===0) html+=`<div class="empty">No records yet</div>`;
     allSvcRecords.forEach(r=>{
       if(r._type==='maint'){
-        html+=`<div class="history-item"><div><div class="fw-600">Service: ${fmtDate(r.serviceDate)}</div><div class="text-sm">Next due: ${fmtDate(r.nextInspectionDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge badge-blue">LOGGED</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteMaintenance('${r.id}')">🗑</button>`:''}</div></div>`;
+        html+=`<div class="history-item"><div><div class="fw-600">Service: ${fmtDate(r.serviceDate)}</div><div class="text-sm">Next due: ${fmtDate(r.nextInspectionDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge badge-blue">LOGGED</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteMaintenance('${r.id}')">🗑</button>`:''}</div></div>`;
       } else {
-        html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.serviceDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteService('${r.id}')">🗑</button>`:''}</div></div>`;
+        html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.serviceDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteService('${r.id}')">🗑</button>`:''}</div></div>`;
       }
     });
     html+=`</div></div></div>`;
@@ -715,7 +717,7 @@ function renderVehicleDetail(){
     </div></div>`;
     html+=`<div class="card"><div class="card-header">Brake History (${brakes.length})</div><div class="card-body">`;
     if(brakes.length===0) html+=`<div class="empty">No tests yet</div>`;
-    brakes.forEach(r=>{html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.testDate)}</div>${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteBrake('${r.id}')">🗑</button>`:''}</div></div>`;});
+    brakes.forEach(r=>{html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.testDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteBrake('${r.id}')">🗑</button>`:''}</div></div>`;});
     html+=`</div></div></div>`;
   }
   if(currentVehicleTab==='tyres'){
@@ -749,7 +751,7 @@ function renderVehicleDetail(){
     </div></div>`;
     html+=`<div class="card"><div class="card-header">DOT History (${dots.length})</div><div class="card-body">`;
     if(dots.length===0) html+=`<div class="empty">No DOT inspections recorded</div>`;
-    dots.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.inspectionDate)}</div>${dName?`<div class="text-sm">👤 ${dName}</div>`:''}${r.notes?`<div class="text-sm">${r.notes}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':r.result==='violation'?'badge-yellow':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDOT('${r.id}')">🗑</button>`:''}</div></div>`;});
+    dots.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.inspectionDate)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':r.result==='violation'?'badge-yellow':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDOT('${r.id}')">🗑</button>`:''}</div></div>`;});
     html+=`</div></div></div>`;
   }
   return html;
@@ -796,7 +798,7 @@ function renderDrivers(){
     html+=`<tr id="driver-row-${d.id}" style="${isVac?'opacity:.6;background:rgba(245,158,11,.04)':''}">
       <td>
         <div id="driver-view-${d.id}" style="display:flex;align-items:center;gap:8px">
-          <span class="fw-600" style="color:${isVac?'var(--text3)':''}">${d.name}</span>
+          <span class="fw-600" style="color:${isVac?'var(--text3)':''}">${esc(d.name)}</span>
           ${isVac?'<span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">🏖️ Vacation</span>':''}
         </div>
         <div id="driver-edit-${d.id}" style="display:none;gap:8px;align-items:center">
