@@ -104,14 +104,14 @@ let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DO
 async function loadAll() {
   if (!sb) return;
   const [d,v,m,b,t,dot,mil,svc] = await Promise.all([
-    sb.from('drivers').select('*').order('created_at'),
-    sb.from('vehicles').select('*').order('created_at'),
-    sb.from('maintenance_records').select('*').order('created_at'),
-    sb.from('brake_tests').select('*').order('created_at'),
-    sb.from('tyre_records').select('*').order('created_at'),
-    sb.from('dot_inspections').select('*').order('created_at'),
-    sb.from('mileage_records').select('*').order('created_at'),
-    sb.from('service_records').select('*').order('created_at'),
+    sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
+    sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
+    sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
+    sb.from('brake_tests').select('id,vehicle_id,test_date,result,notes').order('created_at'),
+    sb.from('tyre_records').select('id,vehicle_id,photo_date,readings').order('created_at'),
+    sb.from('dot_inspections').select('id,vehicle_id,driver_id,inspection_date,result,notes').order('created_at'),
+    sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
+    sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -180,7 +180,7 @@ async function addMileage(vehicleId,driverId,mileage) {
 }
 async function loadAllUsers() {
   if(!sb||!isAdmin()) return [];
-  const {data}=await sb.from('user_activity').select('*');
+  const {data}=await sb.from('user_activity').select('id,email,role,last_sign_in_at,banned_at');
   return data||[];
 }
 function fmtCSTDate(iso){
@@ -933,7 +933,7 @@ function renderPortal(){
         <div><label>Vehicle</label><select id="p-vehicle"><option value="">— select —</option>${VEHICLES.map(v=>`<option value="${v.id}">Truck #${v.truckNumber}</option>`).join('')}</select></div>
       </div>
     </div></div>
-    <div class="card" style="margin-bottom:14px"><div class="card-header">📍 Current Mileage</div><div class="card-body"><input type="number" id="p-mileage" placeholder="e.g. 125000" min="0"/></div></div>
+    <div class="card" style="margin-bottom:14px"><div class="card-header">📍 Current Mileage</div><div class="card-body"><input type="number" id="p-mileage" placeholder="e.g. 125000" min="0" max="9999999"/></div></div>
     <div class="card" style="margin-bottom:14px"><div class="card-header">⭕ Tyre Check</div><div class="card-body">
       <div style="margin-bottom:12px"><label>Photo Date</label><input type="date" id="p-tyredate" value="${today()}" max="${today()}"/></div>
       <div class="tyre-grid">`;
@@ -951,7 +951,8 @@ async function doSubmitPortal(){
   const driverId=document.getElementById('p-driver').value,vehicleId=document.getElementById('p-vehicle').value;
   if(!driverId||!vehicleId){showToast('Select your name and vehicle','danger');return;}
   const mileage=parseInt(document.getElementById('p-mileage').value),tyreDate=document.getElementById('p-tyredate').value;
-  if(mileage>0) await addMileage(vehicleId,driverId,mileage);
+  if(mileage>0&&mileage<=9999999) await addMileage(vehicleId,driverId,mileage);
+  else if(mileage>9999999){showToast('Mileage value is too high','danger');return;}
   if(tyreDate){const readings=[];AXLES.forEach((axle,ai)=>{axle.sides.forEach(pos=>{const el=document.getElementById(`p-t-${ai}-${pos}`);if(el)readings.push({axleIndex:ai,position:pos,status:el.value});});});await addTyreRecord(vehicleId,tyreDate,readings);}
   document.getElementById('p-mileage').value='';document.getElementById('p-driver').value='';document.getElementById('p-vehicle').value='';document.getElementById('p-tyredate').value=today();
   AXLES.forEach((axle,ai)=>{axle.sides.forEach(pos=>{const el=document.getElementById(`p-t-${ai}-${pos}`);if(el)el.value='good';});});
