@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>FleetGuard — Reminders System Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<style>
+/* ── FleetGuard design tokens (exact match from styles.css) ── */
+:root {
+  --bg:#10131a; --surface:#10131a; --surface-low:#191c22;
+  --surface-container:#1d2026; --surface-high:#272a31; --surface-highest:#32353c;
+  --border:rgba(50,53,60,0.6); --border-strong:rgba(50,53,60,1);
+  --primary:#da6536; --primary-glow:rgba(218,101,54,0.25);
+  --primary-text:#ffb5a0; --primary-dim:rgba(218,101,54,0.12);
+  --success:#78dc77; --success-bg:rgba(120,220,119,0.12);
+  --warning:#f59e0b; --warning-bg:rgba(245,158,11,0.12);
+  --danger:#ff4444; --danger-bg:rgba(255,68,68,0.12); --danger-text:#ffb4ab;
+  --text:#e1e2eb; --text2:#9aa3b8; --text3:#5b6478;
+  --sidebar-bg:#0f1117; --sidebar-border:rgba(255,255,255,0.04);
+  --sidebar-text:#7a8599;
+  --topbar-bg:#10131a; --topbar-border:rgba(50,53,60,0.5);
+  --input-bg:rgba(50,53,60,0.3); --input-border:#32353c;
+  --surface3:#252c3d;
+  --radius:10px; --radius-lg:14px; --radius-xl:18px;
+  --shadow:0 1px 3px rgba(0,0,0,.3); --shadow-lg:0 8px 32px rgba(0,0,0,.4);
+  --shadow-card:0 2px 8px rgba(0,0,0,.25);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;display:flex;height:100vh;overflow:hidden}
+
+/* ── Sidebar ── */
+#sidebar{width:230px;min-width:230px;background:var(--sidebar-bg);border-right:1px solid var(--sidebar-border);display:flex;flex-direction:column;z-index:10}
+.sidebar-logo{display:flex;align-items:center;gap:12px;padding:22px 18px 20px;border-bottom:1px solid var(--sidebar-border)}
+.logo-icon{width:36px;height:36px;background:var(--primary);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 0 12px var(--primary-glow)}
+.logo-title{color:#fff;font-family:'Manrope',sans-serif;font-weight:800;font-size:16px;letter-spacing:-0.02em}
+.logo-sub{color:var(--sidebar-text);font-size:10px;font-weight:500;margin-top:1px}
+nav{padding:14px 10px;flex:1;display:flex;flex-direction:column;gap:2px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 13px;border-radius:var(--radius);cursor:pointer;color:var(--sidebar-text);font-size:12.5px;font-weight:600;font-family:'Inter',sans-serif;letter-spacing:.04em;text-transform:uppercase;transition:all .2s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(50,53,60,0.5);color:#e2e8f0}
+.nav-item.active{background:var(--primary);color:#fff;box-shadow:0 0 16px var(--primary-glow)}
+.ms{font-family:'Material Symbols Outlined';font-size:18px;font-style:normal;font-weight:300;line-height:1;flex-shrink:0}
+.sidebar-footer{padding:12px 10px;border-top:1px solid var(--sidebar-border)}
+.nav-signout{color:#f87171!important}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#topbar{background:var(--topbar-bg);border-bottom:1px solid var(--topbar-border);padding:0 28px;height:60px;display:flex;align-items:center;flex-shrink:0;position:relative}
+#page-title{font-family:'Manrope',sans-serif;font-size:17px;font-weight:700;flex:1;letter-spacing:-0.01em}
+.topbar-logo{position:absolute;left:50%;transform:translateX(-50%);height:44px;object-fit:contain;pointer-events:none;background:#fff;border-radius:6px;padding:3px 8px}
+.user-bar{display:flex;align-items:center;gap:12px}
+.role-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;background:var(--primary-dim);color:var(--primary-text)}
+.user-pill{font-size:12px;color:var(--text2);background:var(--surface-high);padding:5px 12px;border-radius:20px}
+#content{flex:1;overflow-y:auto;padding:26px 28px}
+
+/* ── Shared atoms ── */
+.badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap}
+.badge-green{background:var(--success-bg);color:var(--success)}
+.badge-red{background:var(--danger-bg);color:var(--danger-text)}
+.badge-yellow{background:var(--warning-bg);color:var(--warning)}
+.badge-blue{background:var(--primary-dim);color:var(--primary-text)}
+.badge-gray{background:var(--surface-highest);color:var(--text2)}
+.card{background:var(--surface-container);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-card)}
+.card-header{padding:16px 20px 13px;border-bottom:1px solid var(--border);font-family:'Manrope',sans-serif;font-weight:700;font-size:14px;display:flex;align-items:center;gap:8px;color:var(--text)}
+.card-header-accent{width:3px;height:16px;background:var(--primary);border-radius:2px;flex-shrink:0}
+.card-body{padding:16px 20px}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;transition:all .2s;white-space:nowrap;font-family:inherit}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{filter:brightness(1.1);box-shadow:0 4px 16px var(--primary-glow)}
+.btn-ghost{background:transparent;color:var(--text2);border:1.5px solid var(--border-strong)}
+.btn-ghost:hover{background:var(--surface-high);color:var(--text)}
+.btn-sm{padding:5px 11px;font-size:12px}
+.empty{color:var(--text3);font-size:13px;padding:24px;text-align:center}
+table{width:100%;border-collapse:collapse}
+th{padding:10px 14px;text-align:left;font-size:10.5px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);background:var(--surface-low)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;color:var(--text)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface-high)}
+input[type=number],select{padding:8px 10px;border:1.5px solid var(--input-border);border-radius:8px;font-size:13px;font-family:inherit;background:var(--input-bg);color:var(--text);outline:none;transition:border-color .2s,box-shadow .2s;-webkit-appearance:none}
+input[type=number]:focus,select:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-glow)}
+input[type=checkbox]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer}
+.spinner-sm{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Page tabs ── */
+.page-tabs{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+.tab-btn{padding:8px 16px;border-radius:var(--radius);font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--border-strong);background:var(--surface-container);color:var(--text2);transition:all .15s;font-family:inherit;display:flex;align-items:center;gap:6px}
+.tab-btn .ms{font-size:15px}
+.tab-btn:hover{background:var(--surface-high);color:var(--text)}
+.tab-btn.active{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 0 12px var(--primary-glow)}
+
+/* ── Stats row ── */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+.stat-card{background:var(--surface-container);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:var(--shadow-card);transition:transform .2s,box-shadow .2s}
+.stat-card:hover{transform:translateY(-1px);box-shadow:var(--shadow-lg)}
+.stat-icon{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.stat-icon .ms{font-size:22px}
+.stat-num{font-family:'Manrope',sans-serif;font-size:26px;font-weight:800;line-height:1;letter-spacing:-0.02em}
+.stat-label{font-size:11px;font-weight:600;color:var(--text2);margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
+
+/* ── Overdue alert pulse ── */
+@keyframes urgentPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,68,68,0);border-color:rgba(255,68,68,.4)}
+  50%{box-shadow:0 0 0 6px rgba(255,68,68,.12);border-color:rgba(255,68,68,.9)}
+}
+@keyframes warnPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0);border-color:rgba(245,158,11,.4)}
+  50%{box-shadow:0 0 0 5px rgba(245,158,11,.1);border-color:rgba(245,158,11,.85)}
+}
+@keyframes dotBlink{
+  0%,100%{opacity:1}50%{opacity:.3}
+}
+.alert-overdue{
+  background:var(--danger-bg);border:1.5px solid var(--danger);border-left:5px solid var(--danger);
+  border-radius:10px;padding:14px 16px;margin-bottom:10px;
+  animation:urgentPulse 2s ease-in-out infinite;
+  display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:transform .12s
+}
+.alert-overdue:hover{transform:translateX(2px)}
+.alert-warning{
+  background:var(--warning-bg);border:1.5px solid var(--warning);border-left:5px solid var(--warning);
+  border-radius:10px;padding:14px 16px;margin-bottom:10px;
+  animation:warnPulse 2.5s ease-in-out infinite;
+  display:flex;align-items:flex-start;gap:12px;cursor:pointer;transition:transform .12s
+}
+.alert-warning:hover{transform:translateX(2px)}
+.alert-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.alert-icon-danger{background:var(--danger-bg)}
+.alert-icon-warn{background:var(--warning-bg)}
+.alert-icon .ms{font-size:20px}
+.alert-meta{flex:1;min-width:0}
+.alert-truck{font-family:'Manrope',sans-serif;font-weight:800;font-size:14px;color:var(--text)}
+.alert-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.alert-days{font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;flex-shrink:0;padding:4px 10px;border-radius:8px}
+.alert-days-danger{background:var(--danger);color:#fff}
+.alert-days-warn{background:var(--warning);color:#1a1a1a}
+
+/* ── SMS bubble rows ── */
+.sms-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--border)}
+.sms-row:last-child{border-bottom:none}
+.sms-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.sms-body{flex:1;min-width:0}
+.sms-name{font-weight:700;font-size:13px;margin-bottom:1px}
+.sms-msg{font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sms-time{font-size:11px;color:var(--text3);flex-shrink:0}
+.sms-status{flex-shrink:0}
+
+/* ── Reply bubbles ── */
+.reply-bubble{background:var(--success-bg);border:1px solid rgba(120,220,119,.25);border-radius:10px;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px}
+.reply-bubble:last-child{margin-bottom:0}
+.reply-from{font-weight:700;font-size:13px;color:var(--success);flex-shrink:0;min-width:110px}
+.reply-text{flex:1;font-size:12px;color:var(--text2)}
+.reply-time{font-size:11px;color:var(--text3);flex-shrink:0}
+.reply-ack{font-size:11px;font-weight:700;color:var(--success);display:flex;align-items:center;gap:3px;flex-shrink:0}
+.reply-ack .ms{font-size:14px}
+
+/* ── Live dot ── */
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--success);display:inline-block;animation:dotBlink 1.8s ease-in-out infinite;box-shadow:0 0 6px var(--success)}
+
+/* ── Schedule table ── */
+.sched-table input[type=number]{width:68px;text-align:center}
+.sched-table select{width:90px}
+.type-chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px}
+.type-dot{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.type-dot .ms{font-size:18px}
+
+/* ── Send SMS modal simulation ── */
+.sms-compose{background:var(--surface-low);border:1px solid var(--border);border-radius:12px;padding:16px;margin-top:12px}
+.sms-preview-msg{background:var(--primary-dim);border:1px solid rgba(218,101,54,.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--primary-text);line-height:1.6;margin-bottom:10px}
+
+/* ── Two-col layout ── */
+.two-col-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.three-col-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+
+/* ── Notification toast ── */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--surface-highest);border:1px solid var(--border);border-left:4px solid var(--success);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow-lg);z-index:200;transform:translateY(80px);opacity:0;transition:all .35s cubic-bezier(.2,1,.3,1);font-size:13px;min-width:280px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast .ms{font-size:20px;color:var(--success)}
+
+/* ── Section header ── */
+.section-title{font-family:'Manrope',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.section-title .ms{font-size:15px}
+
+/* ── Progress ring used in stat ── */
+.progress-ring-wrap{position:relative;width:44px;height:44px;flex-shrink:0}
+.progress-ring-svg{transform:rotate(-90deg)}
+.progress-ring-track{fill:none;stroke:var(--surface-highest);stroke-width:4}
+.progress-ring-fill{fill:none;stroke-width:4;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+
+/* ── Mobile ── */
+@media(max-width:860px){
+  #sidebar{display:none}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .two-col-grid,.three-col-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     SIDEBAR
+═══════════════════════════════════════════ -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">🚛</div>
+    <div>
+      <div class="logo-title">FleetGuard</div>
+      <div class="logo-sub">Safety &amp; Compliance</div>
+    </div>
+  </div>
+  <nav>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">dashboard</span>Dashboard</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">local_shipping</span>Vehicles</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">person</span>Drivers</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">calendar_today</span>Calendar</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">analytics</span>Reports</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">grid_view</span>Dispatch Board</button>
+    <button class="nav-item active" id="nav-reminders" onclick="switchPage('reminders',this)"><span class="ms">notifications_active</span>Reminders <span style="font-size:9px;font-weight:800;background:rgba(218,101,54,.25);color:var(--primary-text);padding:1px 5px;border-radius:4px;margin-left:2px;letter-spacing:.04em">ADMIN</span></button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">minor_crash</span>Driver Portal</button>
+    <button class="nav-item" onclick="switchPage('dashboard',this)"><span class="ms">group</span>Users <span style="font-size:9px;font-weight:800;background:rgba(218,101,54,.25);color:var(--primary-text);padding:1px 5px;border-radius:4px;margin-left:2px;letter-spacing:.04em">ADMIN</span></span></button>
+  </nav>
+  <div class="sidebar-footer">
+    <button class="nav-item nav-signout"><span class="ms">logout</span>Sign Out</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════ -->
+<div id="main">
+  <div id="topbar">
+    <div id="page-title">Reminders</div>
+    <div class="user-bar">
+      <span class="role-badge">👑 Admin</span>
+      <span class="user-pill">raitis.freimanis89@gmail...</span>
+    </div>
+  </div>
+  <div id="content">
+
+    <!-- ── Page-level tabs ── -->
+    <div class="page-tabs">
+      <button class="tab-btn active" id="tab-overview"  onclick="showTab('overview',this)">
+        <span class="ms">dashboard</span> Overview
+      </button>
+      <button class="tab-btn" id="tab-history"  onclick="showTab('history',this)">
+        <span class="ms">history</span> SMS History
+      </button>
+      <button class="tab-btn" id="tab-replies"  onclick="showTab('replies',this)">
+        <span class="ms">mark_chat_read</span> Driver Replies <span class="badge badge-green" style="margin-left:2px">3</span>
+      </button>
+      <button class="tab-btn" id="tab-schedule" onclick="showTab('schedule',this)">
+        <span class="ms">tune</span> Schedule Config
+      </button>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: OVERVIEW
+    ════════════════════════════════════════ -->
+    <div id="view-overview">
+
+      <!-- Stat cards -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--danger-bg)">
+            <span class="ms" style="color:var(--danger)">error</span>
+          </div>
+          <div>
+            <div class="stat-num" style="color:var(--danger)">4</div>
+            <div class="stat-label">Overdue Now</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--warning-bg)">
+            <span class="ms" style="color:var(--warning)">warning</span>
+          </div>
+          <div>
+            <div class="stat-num" style="color:var(--warning)">7</div>
+            <div class="stat-label">Due This Week</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--success-bg)">
+            <span class="ms" style="color:var(--success)">mark_chat_read</span>
+          </div>
+          <div>
+            <div class="stat-num" style="color:var(--success)">3</div>
+            <div class="stat-label">Driver Replies</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:var(--primary-dim)">
+            <span class="ms" style="color:var(--primary-text)">sms</span>
+          </div>
+          <div>
+            <div class="stat-num">28</div>
+            <div class="stat-label">SMS Sent (30d)</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="two-col-grid">
+
+        <!-- Overdue / Warning alerts -->
+        <div>
+          <div class="section-title"><span class="ms" style="color:var(--danger)">error</span> Overdue — Action Required</div>
+
+          <div class="alert-overdue" onclick="showSendModal('25086','Clarence Strickland Jr','brake_service','+5 days overdue')">
+            <div class="alert-icon alert-icon-danger"><span class="ms" style="color:var(--danger)">construction</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #25086 — Brake Service</div>
+              <div class="alert-sub">👤 Clarence Strickland Jr &nbsp;·&nbsp; 📱 +1 (262) 555-0192</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Last service: Apr 17 · Dispatcher: Ray · <span style="color:var(--danger);font-weight:700">No reply to SMS</span></div>
+            </div>
+            <div class="alert-days alert-days-danger">+5d OD</div>
+          </div>
+
+          <div class="alert-overdue" onclick="showSendModal('7662b','Henry Mitchell','brake_service','+85 days overdue')">
+            <div class="alert-icon alert-icon-danger"><span class="ms" style="color:var(--danger)">construction</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #7662b — Brake Service</div>
+              <div class="alert-sub">👤 Henry Mitchell &nbsp;·&nbsp; 📱 +1 (414) 555-0187</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Last service: Feb 23 · Dispatcher: Mario · <span style="color:var(--danger);font-weight:700">ESCALATED to admin</span></div>
+            </div>
+            <div class="alert-days alert-days-danger">+85d OD</div>
+          </div>
+
+          <div class="alert-overdue" onclick="showSendModal('23009','Carl J','dot_inspection','+2 days overdue')">
+            <div class="alert-icon alert-icon-danger"><span class="ms" style="color:var(--danger)">fact_check</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #23009 — DOT Inspection</div>
+              <div class="alert-sub">👤 Carl J &nbsp;·&nbsp; 📱 +1 (414) 555-0204</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Last inspection: Feb 27 · Dispatcher: Max</div>
+            </div>
+            <div class="alert-days alert-days-danger">+2d OD</div>
+          </div>
+
+          <div class="alert-overdue" onclick="showSendModal('24148','James Thornton','brake_service','+19 days overdue')">
+            <div class="alert-icon alert-icon-danger"><span class="ms" style="color:var(--danger)">construction</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #24148 — Brake Service</div>
+              <div class="alert-sub">👤 James Thornton &nbsp;·&nbsp; 📱 +1 (262) 555-0158</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Last service: Mar 31 · Dispatcher: Carl J</div>
+            </div>
+            <div class="alert-days alert-days-danger">+19d OD</div>
+          </div>
+
+          <div class="section-title" style="margin-top:18px"><span class="ms" style="color:var(--warning)">warning</span> Due Soon</div>
+
+          <div class="alert-warning" onclick="showSendModal('25086b','Michael Cooper Jr','pm_service','due in 4 days')">
+            <div class="alert-icon alert-icon-warn"><span class="ms" style="color:var(--warning)">build_circle</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #26039 — PM Service</div>
+              <div class="alert-sub">👤 Michael Cooper Jr &nbsp;·&nbsp; 📱 +1 (414) 555-0131</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Due May 29 · Dispatcher: Ray</div>
+            </div>
+            <div class="alert-days alert-days-warn">4d left</div>
+          </div>
+
+          <div class="alert-warning" onclick="showSendModal('7662','Henry Mitchell','brake_service','due in 2 days')">
+            <div class="alert-icon alert-icon-warn"><span class="ms" style="color:var(--warning)">construction</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #7662 — Brake Service</div>
+              <div class="alert-sub">👤 Henry Mitchell &nbsp;·&nbsp; 📱 +1 (414) 555-0187</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Due May 31 · Dispatcher: Andy</div>
+            </div>
+            <div class="alert-days alert-days-warn">2d left</div>
+          </div>
+
+          <div class="alert-warning">
+            <div class="alert-icon alert-icon-warn"><span class="ms" style="color:var(--warning)">build_circle</span></div>
+            <div class="alert-meta">
+              <div class="alert-truck">Truck #25014 — PM Service</div>
+              <div class="alert-sub">👤 Montrell Martin &nbsp;·&nbsp; 📱 +1 (414) 555-0173</div>
+              <div class="alert-sub" style="margin-top:4px;font-size:11px;color:var(--text3)">Due Jun 2 · Dispatcher: Max</div>
+            </div>
+            <div class="alert-days alert-days-warn">6d left</div>
+          </div>
+        </div>
+
+        <!-- Right column: recent SMS + quick send -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+
+          <!-- Recent SMS activity -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-accent"></div>
+              Recent SMS Activity
+              <span style="margin-left:auto;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px">
+                <span class="live-dot"></span> Live
+              </span>
+            </div>
+            <div class="card-body" style="padding:8px 16px">
+              <div class="sms-row">
+                <div class="sms-avatar">CJ</div>
+                <div class="sms-body">
+                  <div class="sms-name">Carl J <span style="font-size:10px;font-weight:400;color:var(--text3)">#23009</span></div>
+                  <div class="sms-msg">DOT Inspection due in 2 days. Reply OK to confirm.</div>
+                </div>
+                <div class="sms-time">2m ago</div>
+                <div class="sms-status"><span class="badge badge-blue">Sent</span></div>
+              </div>
+              <div class="sms-row">
+                <div class="sms-avatar" style="background:linear-gradient(135deg,var(--success),#2e7d32)">NG</div>
+                <div class="sms-body">
+                  <div class="sms-name">Ngawang Dorjee <span style="font-size:10px;font-weight:400;color:var(--text3)">#25124</span></div>
+                  <div class="sms-msg">Reply received: "OK will schedule Tuesday"</div>
+                </div>
+                <div class="sms-time">14m ago</div>
+                <div class="sms-status"><span class="badge badge-green">Acked</span></div>
+              </div>
+              <div class="sms-row">
+                <div class="sms-avatar" style="background:linear-gradient(135deg,#7b1fa2,#ba68c8)">HM</div>
+                <div class="sms-body">
+                  <div class="sms-name">Henry Mitchell <span style="font-size:10px;font-weight:400;color:var(--text3)">#7662b</span></div>
+                  <div class="sms-msg">Brake Service OVERDUE 85 days — ESCALATED</div>
+                </div>
+                <div class="sms-time">1h ago</div>
+                <div class="sms-status"><span class="badge badge-red">Escalated</span></div>
+              </div>
+              <div class="sms-row">
+                <div class="sms-avatar" style="background:linear-gradient(135deg,#1976d2,#64b5f6)">CS</div>
+                <div class="sms-body">
+                  <div class="sms-name">Clarence Strickland <span style="font-size:10px;font-weight:400;color:var(--text3)">#25086</span></div>
+                  <div class="sms-msg">Brake Service overdue 5 days. Reply OK to confirm.</div>
+                </div>
+                <div class="sms-time">3h ago</div>
+                <div class="sms-status"><span class="badge badge-yellow">No Reply</span></div>
+              </div>
+              <div class="sms-row">
+                <div class="sms-avatar" style="background:linear-gradient(135deg,#00838f,#4dd0e1)">RG</div>
+                <div class="sms-body">
+                  <div class="sms-name">Roderick Gaillard <span style="font-size:10px;font-weight:400;color:var(--text3)">#7650</span></div>
+                  <div class="sms-msg">PM Service due in 12 days. Reply OK to confirm.</div>
+                </div>
+                <div class="sms-time">8h ago</div>
+                <div class="sms-status"><span class="badge badge-green">Acked</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Trigger panel -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-header-accent"></div>
+              Manual Trigger
+            </div>
+            <div class="card-body">
+              <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Force run the reminder scan for all vehicles right now. Normally runs daily at 08:00 UTC via pg_cron.</p>
+              <div style="display:flex;gap:8px">
+                <button class="btn btn-primary btn-sm" onclick="simulateTrigger(this)">
+                  <span class="ms" style="font-size:15px">send</span> Run Scan Now
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick="showTab('history',document.getElementById('tab-history'))">
+                  <span class="ms" style="font-size:15px">history</span> View Log
+                </button>
+              </div>
+              <div id="trigger-result" style="display:none;margin-top:12px" class="sms-compose">
+                <div style="font-size:12px;color:var(--text2)">
+                  <div style="font-weight:700;color:var(--success);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                    <span class="ms" style="font-size:16px">check_circle</span> Scan complete — 3:47am CST
+                  </div>
+                  Checked 31 vehicles · <strong style="color:var(--danger)">4 overdue</strong> · <strong style="color:var(--warning)">7 due soon</strong> · 11 SMS sent
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div><!-- /view-overview -->
+
+    <!-- ════════════════════════════════════════
+         TAB: SMS HISTORY
+    ════════════════════════════════════════ -->
+    <div id="view-history" style="display:none">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-accent"></div>
+          SMS Notification Log
+          <span style="margin-left:auto;display:flex;gap:8px;align-items:center">
+            <select style="width:160px;padding:5px 10px;font-size:12px" onchange="filterHistory(this.value)">
+              <option value="all">All statuses</option>
+              <option value="sent">Sent</option>
+              <option value="acknowledged">Acknowledged</option>
+              <option value="failed">Failed</option>
+              <option value="escalated">Escalated</option>
+            </select>
+            <button class="btn btn-ghost btn-sm"><span class="ms" style="font-size:14px">download</span> Export CSV</button>
+          </span>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="history-table">
+            <thead><tr>
+              <th>Date / Time</th>
+              <th>Truck</th>
+              <th>Driver</th>
+              <th>Type</th>
+              <th>Phone</th>
+              <th>Status</th>
+              <th>Replied</th>
+              <th></th>
+            </tr></thead>
+            <tbody id="history-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: DRIVER REPLIES
+    ════════════════════════════════════════ -->
+    <div id="view-replies" style="display:none">
+      <div class="two-col-grid">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-accent"></div>
+            <span class="ms" style="color:var(--success)">mark_chat_read</span>
+            Inbound Replies
+            <span class="badge badge-green" style="margin-left:4px">3 new</span>
+          </div>
+          <div class="card-body">
+            <div class="reply-bubble">
+              <div class="sms-avatar" style="background:linear-gradient(135deg,var(--success),#2e7d32);width:30px;height:30px;font-size:10px;flex-shrink:0">ND</div>
+              <div style="flex:1;min-width:0">
+                <div class="reply-from">Ngawang Dorjee</div>
+                <div class="reply-text">"OK will schedule Tuesday"</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">Truck #25124 · Brake service</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div class="reply-ack"><span class="ms">check_circle</span> ACK</div>
+                <div class="reply-time">14m ago</div>
+              </div>
+            </div>
+            <div class="reply-bubble">
+              <div class="sms-avatar" style="background:linear-gradient(135deg,#00838f,#4dd0e1);width:30px;height:30px;font-size:10px;flex-shrink:0">RG</div>
+              <div style="flex:1;min-width:0">
+                <div class="reply-from">Roderick Gaillard</div>
+                <div class="reply-text">"Yes confirmed, booking for tomorrow"</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">Truck #7650 · PM service</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div class="reply-ack"><span class="ms">check_circle</span> ACK</div>
+                <div class="reply-time">8h ago</div>
+              </div>
+            </div>
+            <div class="reply-bubble" style="background:var(--warning-bg);border-color:rgba(245,158,11,.25)">
+              <div class="sms-avatar" style="background:linear-gradient(135deg,#f59e0b,#fbbf24);width:30px;height:30px;font-size:10px;flex-shrink:0">JT</div>
+              <div style="flex:1;min-width:0">
+                <div class="reply-from" style="color:var(--warning)">James Thornton</div>
+                <div class="reply-text">"Not sure about the schedule this week"</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:2px">Truck #24148 · Brake service OVERDUE</div>
+              </div>
+              <div style="text-align:right;flex-shrink:0">
+                <div style="font-size:11px;font-weight:700;color:var(--warning)">Not acked</div>
+                <div class="reply-time">Yesterday</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-accent"></div>
+            <span class="ms" style="color:var(--danger)">escalator_warning</span>
+            Escalation Log
+          </div>
+          <div class="card-body">
+            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.2);border-radius:10px;padding:12px 14px;margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:var(--danger)">Truck #7662b — Henry Mitchell</div>
+                  <div style="font-size:12px;color:var(--text2);margin-top:2px">Brake service 85d overdue — no driver reply in 48h</div>
+                </div>
+                <span class="badge badge-red">Escalated</span>
+              </div>
+              <div style="font-size:11px;color:var(--text3)">
+                Admin SMS sent to: <strong style="color:var(--text2)">+1 (262) 555-0100</strong><br/>
+                Escalated: May 28 · 09:15 CST
+              </div>
+            </div>
+            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.2);border-radius:10px;padding:12px 14px">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+                <div>
+                  <div style="font-weight:700;font-size:13px;color:var(--danger)">Truck #24148 — James Thornton</div>
+                  <div style="font-size:12px;color:var(--text2);margin-top:2px">Brake service 19d overdue — reply not acknowledged</div>
+                </div>
+                <span class="badge badge-red">Escalated</span>
+              </div>
+              <div style="font-size:11px;color:var(--text3)">
+                Admin SMS sent to: <strong style="color:var(--text2)">+1 (262) 555-0100</strong><br/>
+                Escalated: May 27 · 14:30 CST
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════
+         TAB: SCHEDULE CONFIG
+    ════════════════════════════════════════ -->
+    <div id="view-schedule" style="display:none">
+
+      <div class="two-col-grid">
+        <!-- Global defaults -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-accent"></div>
+            <span class="ms" style="font-size:16px;color:var(--primary-text)">tune</span>
+            Global Defaults
+            <span class="badge badge-gray" style="margin-left:auto">Applies to all vehicles</span>
+          </div>
+          <div class="card-body">
+            <table class="sched-table" style="width:100%">
+              <thead><tr>
+                <th>Service Type</th>
+                <th>Interval</th>
+                <th>Warn Before</th>
+                <th>Escalate After</th>
+                <th>On</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="type-dot" style="background:var(--primary-dim)"><span class="ms" style="font-size:16px;color:var(--primary-text)">fact_check</span></div>
+                      <div>
+                        <div style="font-weight:700;font-size:13px">DOT Inspection</div>
+                        <div style="font-size:10px;color:var(--text3)">Federal mandate</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><input type="number" value="90" min="1" max="365" onchange="saveChange(this,'dot','interval')" style="width:65px"/> d</td>
+                  <td><input type="number" value="14" min="1" max="30" onchange="saveChange(this,'dot','warn')" style="width:55px"/> d</td>
+                  <td><input type="number" value="48" min="1" max="168" onchange="saveChange(this,'dot','escalate')" style="width:55px"/> h</td>
+                  <td><input type="checkbox" checked onchange="saveChange(this,'dot','enabled')"/></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="type-dot" style="background:var(--danger-bg)"><span class="ms" style="font-size:16px;color:var(--danger)">construction</span></div>
+                      <div>
+                        <div style="font-weight:700;font-size:13px">Brake Service</div>
+                        <div style="font-size:10px;color:var(--text3)">Safety critical</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><input type="number" value="42" min="1" max="365" onchange="saveChange(this,'brake','interval')" style="width:65px"/> d</td>
+                  <td><input type="number" value="7" min="1" max="30" onchange="saveChange(this,'brake','warn')" style="width:55px"/> d</td>
+                  <td><input type="number" value="24" min="1" max="168" onchange="saveChange(this,'brake','escalate')" style="width:55px"/> h</td>
+                  <td><input type="checkbox" checked onchange="saveChange(this,'brake','enabled')"/></td>
+                </tr>
+                <tr>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <div class="type-dot" style="background:var(--success-bg)"><span class="ms" style="font-size:16px;color:var(--success)">build_circle</span></div>
+                      <div>
+                        <div style="font-weight:700;font-size:13px">PM Service</div>
+                        <div style="font-size:10px;color:var(--text3)">Preventive maintenance</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><input type="number" value="60" min="1" max="365" onchange="saveChange(this,'pm','interval')" style="width:65px"/> d</td>
+                  <td><input type="number" value="7" min="1" max="30" onchange="saveChange(this,'pm','warn')" style="width:55px"/> d</td>
+                  <td><input type="number" value="48" min="1" max="168" onchange="saveChange(this,'pm','escalate')" style="width:55px"/> h</td>
+                  <td><input type="checkbox" checked onchange="saveChange(this,'pm','enabled')"/></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="margin-top:12px;display:flex;justify-content:flex-end">
+              <button class="btn btn-primary btn-sm" onclick="showToast('Global schedule saved')">
+                <span class="ms" style="font-size:14px">save</span> Save Defaults
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Driver phone numbers -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-header-accent"></div>
+            <span class="ms" style="font-size:16px;color:var(--primary-text)">contacts</span>
+            Driver Phone Numbers
+          </div>
+          <div class="card-body" style="padding:0">
+            <table>
+              <thead><tr>
+                <th>Driver</th>
+                <th>Phone</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody>
+                <tr>
+                  <td><div style="font-weight:600">Ngawang Dorjee</div><div style="font-size:11px;color:var(--text3)">Truck #25124</div></td>
+                  <td><div style="font-size:13px;font-family:monospace">+1 (262) 555-0177</div></td>
+                  <td><span class="badge badge-green"><span class="live-dot" style="width:5px;height:5px;animation-delay:.2s"></span> Verified</span></td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600">Roderick Gaillard</div><div style="font-size:11px;color:var(--text3)">Truck #7650</div></td>
+                  <td><div style="font-size:13px;font-family:monospace">+1 (414) 555-0192</div></td>
+                  <td><span class="badge badge-green"><span class="live-dot" style="width:5px;height:5px;animation-delay:.4s"></span> Verified</span></td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600">Clarence Strickland Jr</div><div style="font-size:11px;color:var(--text3)">Truck #25086</div></td>
+                  <td><div style="font-size:13px;font-family:monospace">+1 (262) 555-0138</div></td>
+                  <td><span class="badge badge-green"><span class="live-dot" style="width:5px;height:5px;animation-delay:.6s"></span> Verified</span></td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600">Henry Mitchell</div><div style="font-size:11px;color:var(--text3)">Truck #7662b</div></td>
+                  <td><div style="font-size:13px;font-family:monospace">+1 (414) 555-0187</div></td>
+                  <td><span class="badge badge-yellow">Active</span></td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600">James Thornton</div><div style="font-size:11px;color:var(--text3)">Truck #24148</div></td>
+                  <td style="color:var(--text3);font-style:italic;font-size:12px">Not set</td>
+                  <td><span class="badge badge-red">Missing</span></td>
+                </tr>
+                <tr>
+                  <td><div style="font-weight:600">Joshua Gary</div><div style="font-size:11px;color:var(--text3)">Truck #7702</div></td>
+                  <td><div style="font-size:13px;font-family:monospace">+1 (262) 555-0205</div></td>
+                  <td><span class="badge badge-green"><span class="live-dot" style="width:5px;height:5px"></span> Verified</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vehicle overrides -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-header-accent"></div>
+          Per-Vehicle Overrides
+          <span class="badge badge-gray" style="margin-left:6px">Overrides global defaults for specific trucks</span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="showToast('Override added')">
+            <span class="ms" style="font-size:14px">add</span> Add Override
+          </button>
+        </div>
+        <div class="card-body">
+          <div style="background:var(--surface-low);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;margin-bottom:10px">
+            <div style="flex:1">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+                <span style="font-weight:700">Truck #25086</span>
+                <span class="badge badge-red">Brake Service</span>
+                <span class="badge badge-gray">Custom</span>
+              </div>
+              <div style="font-size:12px;color:var(--text2)">Interval: <strong>35d</strong> · Warn before: <strong>10d</strong> · Escalate: <strong>12h</strong> — older truck, needs more frequent checks</div>
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="showToast('Override deleted')"><span class="ms" style="font-size:14px;color:var(--danger)">delete</span></button>
+          </div>
+          <div style="color:var(--text3);font-size:12px;padding:8px 0">No other overrides — all vehicles using global defaults.</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#content -->
+</div>
+
+<!-- ═══════════════════════════════════════════
+     SEND SMS MODAL
+═══════════════════════════════════════════ -->
+<div id="sms-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px)">
+  <div style="background:var(--surface-container);border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);width:100%;max-width:460px">
+    <div style="padding:20px 22px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+      <div style="font-family:'Manrope',sans-serif;font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px">
+        <span class="ms" style="font-size:20px;color:var(--primary-text)">sms</span>
+        Send SMS Reminder
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeSendModal()" style="padding:4px 8px;font-size:18px;line-height:1">×</button>
+    </div>
+    <div style="padding:20px 22px">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div style="flex:1;background:var(--surface-low);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Truck</div>
+          <div id="modal-truck" style="font-weight:800;font-size:15px;font-family:'Manrope',sans-serif">—</div>
+        </div>
+        <div style="flex:1;background:var(--surface-low);border:1px solid var(--border);border-radius:10px;padding:12px 14px">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:4px">Driver</div>
+          <div id="modal-driver" style="font-weight:600;font-size:13px">—</div>
+        </div>
+      </div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">Message Preview</div>
+      <div id="modal-msg" class="sms-preview-msg">—</div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">Send via</div>
+      <div style="background:var(--surface-low);border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <div style="width:32px;height:32px;background:var(--success-bg);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px">📱</div>
+        <div>
+          <div style="font-weight:700;font-size:13px">Google Voice Bot</div>
+          <div style="font-size:11px;color:var(--text2)">Playwright automation · auto-retries on fail</div>
+        </div>
+        <span class="badge badge-green" style="margin-left:auto"><span class="live-dot" style="width:5px;height:5px"></span> Online</span>
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeSendModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="simulateSend(this)">
+        <span class="ms" style="font-size:15px">send</span> Send SMS
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ── -->
+<div class="toast" id="toast">
+  <span class="ms">check_circle</span>
+  <span id="toast-msg">Saved</span>
+</div>
+
+<script>
+/* ── SMS History mock data ── */
+const HISTORY = [
+  {date:'May 29 · 08:02',truck:'#23009', driver:'Carl J',         type:'DOT Inspection', phone:'+1(414)555-0204', status:'sent',         replied:false},
+  {date:'May 29 · 08:01',truck:'#25086', driver:'Clarence S.',    type:'Brake Service',  phone:'+1(262)555-0138', status:'no-reply',     replied:false},
+  {date:'May 29 · 07:58',truck:'#26039', driver:'Michael C.',     type:'PM Service',     phone:'+1(414)555-0131', status:'sent',         replied:false},
+  {date:'May 28 · 09:15',truck:'#7662b', driver:'Henry Mitchell', type:'Brake Service',  phone:'+1(414)555-0187', status:'escalated',    replied:false},
+  {date:'May 28 · 08:03',truck:'#25124', driver:'Ngawang D.',     type:'Brake Service',  phone:'+1(262)555-0177', status:'acknowledged', replied:true },
+  {date:'May 28 · 08:01',truck:'#7650',  driver:'Roderick G.',    type:'PM Service',     phone:'+1(414)555-0192', status:'acknowledged', replied:true },
+  {date:'May 27 · 14:30',truck:'#24148', driver:'James Thornton', type:'Brake Service',  phone:'+1(262)555-0158', status:'escalated',    replied:true },
+  {date:'May 27 · 08:05',truck:'#7702',  driver:'Joshua Gary',    type:'PM Service',     phone:'+1(262)555-0205', status:'acknowledged', replied:true },
+  {date:'May 26 · 08:02',truck:'#25021', driver:'Benjamin S.',    type:'Brake Service',  phone:'+1(414)555-0166', status:'sent',         replied:false},
+  {date:'May 26 · 08:01',truck:'#7867',  driver:'Leon Parkinson', type:'PM Service',     phone:'+1(262)555-0149', status:'failed',       replied:false},
+];
+
+function statusBadgeHtml(s){
+  const map={sent:'badge-blue',acknowledged:'badge-green','no-reply':'badge-yellow',escalated:'badge-red',failed:'badge-red'};
+  const labels={sent:'Sent',acknowledged:'Acked','no-reply':'No Reply',escalated:'Escalated',failed:'Failed'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${labels[s]||s}</span>`;
+}
+
+function buildHistory(filter='all'){
+  const rows = HISTORY
+    .filter(r => filter==='all' || r.status===filter || (filter==='escalated'&&r.status==='escalated'))
+    .map(r => `<tr>
+      <td style="color:var(--text3);font-size:12px;white-space:nowrap">${r.date}</td>
+      <td><strong>${r.truck}</strong></td>
+      <td>${r.driver}</td>
+      <td><span class="badge badge-gray">${r.type}</span></td>
+      <td style="font-family:monospace;font-size:12px;color:var(--text3)">${r.phone}</td>
+      <td>${statusBadgeHtml(r.status)}</td>
+      <td>${r.replied
+        ? '<span style="color:var(--success);font-size:12px;display:flex;align-items:center;gap:3px"><span class="ms" style="font-size:14px">check</span> Yes</span>'
+        : '<span style="color:var(--text3);font-size:12px">—</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" style="padding:3px 8px"><span class="ms" style="font-size:13px">visibility</span></button></td>
+    </tr>`).join('');
+  document.getElementById('history-tbody').innerHTML = rows || '<tr><td colspan="8" class="empty">No records match</td></tr>';
+}
+function filterHistory(v){ buildHistory(v); }
+
+/* ── Tab switching ── */
+const TABS = ['overview','history','replies','schedule'];
+function showTab(name, btn){
+  TABS.forEach(t=>{
+    document.getElementById('view-'+t).style.display = t===name ? '' : 'none';
+    const b = document.getElementById('tab-'+t);
+    if(b) b.classList.toggle('active', t===name);
+  });
+  if(name==='history') buildHistory();
+}
+
+/* ── Page switch (nav items) ── */
+function switchPage(page, el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('page-title').textContent =
+    page==='reminders' ? 'Reminders' : el.textContent.trim();
+}
+
+/* ── Simulate trigger ── */
+function simulateTrigger(btn){
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Scanning...';
+  setTimeout(()=>{
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    document.getElementById('trigger-result').style.display = '';
+    showToast('Scan complete — 11 SMS sent');
+  }, 2200);
+}
+
+/* ── Send SMS modal ── */
+const typeLabels = {
+  brake_service: 'Brake Service',
+  dot_inspection: 'DOT Inspection',
+  pm_service: 'PM Service',
+};
+function showSendModal(truck, driver, type, when){
+  const label = typeLabels[type]||type;
+  const msg = when.startsWith('+')
+    ? `FleetGuard ALERT: Truck #${truck} ${label} is ${when.replace('+','')} OVERDUE. Reply OK to confirm you are scheduling it.`
+    : `FleetGuard: Truck #${truck} ${label} is ${when}. Reply OK to confirm scheduling.`;
+  document.getElementById('modal-truck').textContent = 'Truck #' + truck;
+  document.getElementById('modal-driver').textContent = driver;
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('sms-modal').style.display = 'flex';
+}
+function closeSendModal(){
+  document.getElementById('sms-modal').style.display = 'none';
+}
+function simulateSend(btn){
+  const orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-sm"></span> Sending...';
+  setTimeout(()=>{
+    closeSendModal();
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    showToast('SMS sent via Google Voice');
+  }, 1800);
+}
+
+/* ── Schedule save ── */
+function saveChange(el, type, field){
+  showToast(`${type.toUpperCase()} ${field} updated`);
+}
+
+/* ── Toast ── */
+let toastTimer;
+function showToast(msg){
+  clearTimeout(toastTimer);
+  document.getElementById('toast-msg').textContent = msg;
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2800);
+}
+
+/* ── Click outside modal to close ── */
+document.getElementById('sms-modal').addEventListener('click', function(e){
+  if(e.target===this) closeSendModal();
+});
+
+/* ── Init ── */
+buildHistory();
+</script>
+</body>
+</html>

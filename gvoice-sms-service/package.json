@@ -1,0 +1,17 @@
+{
+  "name": "fleetguard-gvoice-sms",
+  "version": "1.0.0",
+  "description": "Google Voice SMS bot for FleetGuard reminders",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "install-browsers": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "^1.44.0",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "node-fetch": "^2.7.0"
+  }
+}
