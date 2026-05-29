@@ -1,0 +1,212 @@
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// ── Environment ───────────────────────────────────────────────
+const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;   // http://your-pc:3000
+const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
+
+const sb = createClient(SUPABASE_URL, SERVICE_KEY);
+
+// ── Table → last-service-date lookup ─────────────────────────
+const SERVICE_SOURCES: Record<string, { table: string; dateCol: string }> = {
+  dot_inspection: { table: "dot_inspections",   dateCol: "inspection_date" },
+  brake_service:  { table: "brake_tests",        dateCol: "test_date"       },
+  pm_service:     { table: "service_records",    dateCol: "service_date"    },
+};
+
+// Fallback: pm_service also checks maintenance_records if service_records is empty
+async function getLastDate(vehicleId: string, type: string): Promise<string | null> {
+  const src = SERVICE_SOURCES[type];
+  const { data } = await sb
+    .from(src.table)
+    .select(src.dateCol)
+    .eq("vehicle_id", vehicleId)
+    .order(src.dateCol, { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (data?.[src.dateCol]) return data[src.dateCol];
+
+  // pm_service fallback: use maintenance_records.service_date
+  if (type === "pm_service") {
+    const { data: m } = await sb
+      .from("maintenance_records")
+      .select("service_date")
+      .eq("vehicle_id", vehicleId)
+      .order("service_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return m?.service_date ?? null;
+  }
+  return null;
+}
+
+// ── Get effective schedule for a vehicle + type ───────────────
+// Vehicle-specific row wins over global default (vehicle_id = null)
+async function getSchedule(vehicleId: string, type: string) {
+  const { data: specific } = await sb
+    .from("reminder_schedules")
+    .select("*")
+    .eq("vehicle_id", vehicleId)
+    .eq("reminder_type", type)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  if (specific) return specific;
+
+  const { data: global } = await sb
+    .from("reminder_schedules")
+    .select("*")
+    .is("vehicle_id", null)
+    .eq("reminder_type", type)
+    .eq("enabled", true)
+    .maybeSingle();
+
+  return global ?? null;
+}
+
+// ── Build human-readable message ──────────────────────────────
+const TYPE_LABEL: Record<string, string> = {
+  dot_inspection: "DOT inspection",
+  brake_service:  "brake service",
+  pm_service:     "PM service",
+};
+
+function buildMessage(truckNum: string, type: string, daysUntilDue: number): string {
+  const label = TYPE_LABEL[type] ?? type;
+  const abs   = Math.abs(daysUntilDue);
+  if (daysUntilDue <= 0) {
+    return `FleetGuard ALERT: Truck ${truckNum} ${label} is ${abs} day${abs !== 1 ? "s" : ""} OVERDUE. Reply OK to confirm you are scheduling it.`;
+  }
+  return `FleetGuard: Truck ${truckNum} ${label} is due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}. Reply OK to confirm you are scheduling.`;
+}
+
+// ── Main handler ──────────────────────────────────────────────
+serve(async (req) => {
+  // Auth: called by GV service (Bearer) or pg_cron (same secret)
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (authHeader !== `Bearer ${GV_SECRET}`) {
+    return new Response("Unauthorized", { status: 401 });
+  }
+
+  const today    = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  let   sent     = 0;
+  let   skipped  = 0;
+  const errors: string[] = [];
+
+  // Load all vehicles with their assigned driver
+  const { data: vehicles, error: vErr } = await sb
+    .from("vehicles")
+    .select("id, truck_number, assigned_driver_id");
+
+  if (vErr || !vehicles) {
+    return new Response(JSON.stringify({ error: "Failed to load vehicles" }), { status: 500 });
+  }
+
+  for (const v of vehicles) {
+    if (!v.assigned_driver_id) { skipped++; continue; }
+
+    // Look up phone — only exists in driver_phones (admin/service_role only)
+    const { data: phoneRow } = await sb
+      .from("driver_phones")
+      .select("phone_number")
+      .eq("driver_id", v.assigned_driver_id)
+      .maybeSingle();
+
+    if (!phoneRow?.phone_number) { skipped++; continue; }
+
+    for (const type of ["dot_inspection", "brake_service", "pm_service"]) {
+      try {
+        const sched = await getSchedule(v.id, type);
+        if (!sched) continue;
+
+        const lastDate = await getLastDate(v.id, type);
+        if (!lastDate) continue;
+
+        const daysSince   = Math.floor((today.getTime() - new Date(lastDate).getTime()) / 86_400_000);
+        const daysUntilDue = sched.interval_days - daysSince;
+
+        // Only send if overdue OR within warning window
+        const shouldSend = daysUntilDue <= sched.warning_days_before;
+        if (!shouldSend) continue;
+
+        // Avoid duplicate: skip if we already sent this type today
+        const { data: existing } = await sb
+          .from("sms_notifications")
+          .select("id")
+          .eq("vehicle_id", v.id)
+          .eq("reminder_type", type)
+          .gte("created_at", `${todayStr}T00:00:00Z`)
+          .in("status", ["sent", "acknowledged"])
+          .limit(1)
+          .maybeSingle();
+
+        if (existing) { skipped++; continue; }
+
+        const msg = buildMessage(v.truck_number, type, daysUntilDue);
+
+        // Log notification row first (status = pending)
+        const { data: notif, error: nErr } = await sb
+          .from("sms_notifications")
+          .insert({
+            vehicle_id:    v.id,
+            driver_id:     v.assigned_driver_id,
+            reminder_type: type,
+            phone_number:  phoneRow.phone_number,
+            message_body:  msg,
+            status:        "pending",
+          })
+          .select("id")
+          .single();
+
+        if (nErr || !notif) {
+          errors.push(`Insert notif failed for ${v.truck_number}/${type}: ${nErr?.message}`);
+          continue;
+        }
+
+        // Call Google Voice service
+        const gvRes = await fetch(`${GV_SERVICE_URL}/send`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
+          body:    JSON.stringify({ to: phoneRow.phone_number, body: msg, notificationId: notif.id }),
+          signal:  AbortSignal.timeout(30_000),
+        }).catch((e) => ({ ok: false, statusText: e.message } as Response));
+
+        const newStatus = gvRes.ok ? "sent" : "failed";
+        const errMsg    = gvRes.ok ? null : `HTTP ${(gvRes as Response).status ?? "network error"}`;
+
+        await sb.from("sms_notifications").update({
+          status:        newStatus,
+          sent_at:       new Date().toISOString(),
+          error_message: errMsg,
+        }).eq("id", notif.id);
+
+        if (gvRes.ok) {
+          sent++;
+          // Schedule escalation check: insert a pending escalation_log row
+          if (sched.escalation_hours > 0) {
+            const escalateAfter = new Date(Date.now() + sched.escalation_hours * 3_600_000).toISOString();
+            await sb.from("escalation_log").insert({
+              notification_id: notif.id,
+              escalated_to:    "pending",
+              escalation_type: "sms",
+              notes:           `escalate_after:${escalateAfter}`,
+            });
+          }
+        } else {
+          errors.push(`GV send failed for ${v.truck_number}: ${errMsg}`);
+        }
+      } catch (e) {
+        errors.push(`${v.truck_number}/${type}: ${(e as Error).message}`);
+      }
+    }
+  }
+
+  return new Response(
+    JSON.stringify({ ok: true, sent, skipped, errors }),
+    { headers: { "Content-Type": "application/json" } }
+  );
+});

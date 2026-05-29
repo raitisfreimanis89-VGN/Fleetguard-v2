@@ -241,10 +241,11 @@ function getVehicleStatus(vid){
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
 
 function navigate(page,vehicleId){
   if(page==='users'&&!isAdmin()) return;
+  if(page==='reminders'&&!isAdmin()) return;
   if(page==='portal'&&currentRole==='dispatcher') return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
   currentPage=page; currentVehicleId=vehicleId||null;
@@ -266,8 +267,11 @@ function render(){
   else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
+  else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
   const usersNav=document.getElementById('nav-users');
   if(usersNav) usersNav.style.display=isAdmin()?'flex':'none';
+  const remindersNav=document.getElementById('nav-reminders');
+  if(remindersNav) remindersNav.style.display=isAdmin()?'flex':'none';
   const portalNav=document.getElementById('nav-portal');
   if(portalNav) portalNav.style.display=currentRole==='dispatcher'?'none':'';
 }
