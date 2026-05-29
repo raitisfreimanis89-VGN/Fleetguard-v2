@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SERVICE_KEY  = Deno.env.get("SERVICE_ROLE_KEY")!;
 const GV_SECRET    = Deno.env.get("GV_SERVICE_SECRET")!;
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);

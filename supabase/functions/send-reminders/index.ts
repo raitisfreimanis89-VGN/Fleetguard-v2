@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // ── Environment ───────────────────────────────────────────────
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY    = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
 const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;   // http://your-pc:3000
 const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
 
@@ -86,9 +86,18 @@ function buildMessage(truckNum: string, type: string, daysUntilDue: number): str
 // ── Main handler ──────────────────────────────────────────────
 serve(async (req) => {
   // Auth: called by GV service (Bearer) or pg_cron (same secret)
-  const authHeader = req.headers.get("Authorization") ?? "";
-  if (authHeader !== `Bearer ${GV_SECRET}`) {
-    return new Response("Unauthorized", { status: 401 });
+  // Auth: accept x-api-key or Bearer token matching GV_SECRET
+  // If GV_SECRET is not set yet, skip check (debug mode)
+  if (GV_SECRET) {
+    const apiKey     = req.headers.get("x-api-key") ?? "";
+    const authHeader = req.headers.get("Authorization") ?? "";
+    const bearer     = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    if (apiKey !== GV_SECRET && bearer !== GV_SECRET) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized", received_key_length: apiKey.length, expected_key_length: GV_SECRET.length }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 
   const today    = new Date();
@@ -172,7 +181,7 @@ serve(async (req) => {
           method:  "POST",
           headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
           body:    JSON.stringify({ to: phoneRow.phone_number, body: msg, notificationId: notif.id }),
-          signal:  AbortSignal.timeout(30_000),
+          signal:  AbortSignal.timeout(60_000),
         }).catch((e) => ({ ok: false, statusText: e.message } as Response));
 
         const newStatus = gvRes.ok ? "sent" : "failed";

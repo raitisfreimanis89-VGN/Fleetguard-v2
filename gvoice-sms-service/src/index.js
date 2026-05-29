@@ -76,7 +76,7 @@ process.on('unhandledRejection', (e) => log.error(`Unhandled: ${e}`));
   }
 
   // 2. Start Express server
-  app.listen(PORT, () => log.info(`HTTP server listening on port ${PORT}`));
+  app.listen(PORT, '0.0.0.0', () => log.info(`HTTP server listening on port ${PORT} (all interfaces)`));
 
   // 3. Launch browser
   await initBrowser();

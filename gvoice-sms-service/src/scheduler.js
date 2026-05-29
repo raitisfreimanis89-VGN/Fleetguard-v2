@@ -9,23 +9,27 @@ const POLL_MINUTES  = parseInt(process.env.REPLY_POLL_INTERVAL_MINUTES || '3', 1
 const INBOUND_URL   = process.env.SUPABASE_INBOUND_SMS_URL;
 const REMINDERS_URL = process.env.SUPABASE_SEND_REMINDERS_URL;
 const SECRET        = process.env.GV_SERVICE_SECRET;
+const ANON_KEY      = process.env.SUPABASE_ANON_KEY;
 
 // ── On startup: fire the daily reminder scan immediately ──────
 // No cron timing dependency — scan runs the moment the service starts.
 async function runStartupScan() {
+  log.info(`Secret length from .env: ${SECRET?.length ?? 'undefined'}`);
   log.info('Running startup reminder scan...');
   try {
     const res = await fetch(REMINDERS_URL, {
       method:  'POST',
       headers: {
-        'Authorization':  `Bearer ${SECRET}`,
-        'Content-Type':   'application/json',
+        'Authorization': `Bearer ${ANON_KEY}`,
+        'x-api-key':     SECRET,
+        'Content-Type':  'application/json',
       },
       body: '{}',
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      log.info(`Reminder scan complete — ${data.sent ?? '?'} SMS queued`);
+      log.info(`Reminder scan complete — sent:${data.sent} skipped:${data.skipped}`);
+      if (data.errors?.length) log.warn(`Scan errors: ${JSON.stringify(data.errors)}`);
     } else {
       log.warn(`Reminder scan returned ${res.status}: ${JSON.stringify(data)}`);
     }

@@ -29,18 +29,30 @@ async function initBrowser() {
 // ── Ensure we are logged into Google Voice ────────────────────
 async function ensureLoggedIn() {
   try {
-    await page.goto(GV_HOME, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-    // If redirected to Google sign-in, log in now
-    if (page.url().includes('accounts.google.com')) {
-      log.info('Session expired — logging in...');
-      await googleLogin();
+    // If already on GV, skip navigation (fast path)
+    if (page.url().includes('voice.google.com')) {
+      log.info('Google Voice session already active (fast path)');
+      return;
     }
 
-    // Wait for GV app shell
-    await page.waitForSelector('gv-nav-bar, [data-e2e-nav], nav.md-sidenav-container', {
-      timeout: 20000,
-    });
+    await page.goto(GV_HOME, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    await page.waitForTimeout(2000);
+
+    const url = page.url();
+    log.debug(`Current URL: ${url}`);
+
+    // If redirected to Google sign-in, log in now
+    if (url.includes('accounts.google.com')) {
+      log.info('Session expired — logging in...');
+      await googleLogin();
+      await page.waitForTimeout(2000);
+    }
+
+    // Verify we are on Google Voice
+    const finalUrl = page.url();
+    if (!finalUrl.includes('voice.google.com')) {
+      throw new Error(`Unexpected URL after login: ${finalUrl}`);
+    }
     log.info('Google Voice session active');
   } catch (err) {
     log.error(`ensureLoggedIn failed: ${err.message}`);
@@ -79,61 +91,121 @@ async function sendSMS(to, body) {
 
   // Navigate to messages
   await page.goto(GV_URL, { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await page.waitForTimeout(3000);
+  log.info(`GV page loaded: ${page.url()}`);
+
+  // Take stock of what buttons are visible
+  const btns = await page.$$eval('button', els => els.map(e => e.getAttribute('aria-label') || e.textContent?.trim()).filter(Boolean).slice(0, 20));
+  log.info(`Visible buttons: ${JSON.stringify(btns)}`);
+
+  // Try keyboard shortcut 'C' to open new conversation (works in GV)
+  await page.keyboard.press('c');
   await page.waitForTimeout(1500);
 
-  // Click "New conversation" button — try multiple selector strategies
-  const newConvSelectors = [
-    '[data-e2e-new-conversation]',
-    'button[aria-label="New conversation"]',
-    'gv-icon-button[icon="create"]',
-    '[mattooltip="New conversation"]',
-    'a[href*="/new"]',
-  ];
-  await clickFirst(newConvSelectors, 'New conversation button');
-  await page.waitForTimeout(1000);
+  // Click "Send new message" button if it appears after pressing C
+  const sendNewMsgBtn = await page.$('button:has-text("Send new message"), [aria-label="Send new message"]');
+  if (sendNewMsgBtn) {
+    log.info('Clicking "Send new message" button');
+    await sendNewMsgBtn.click();
+    // Wait up to 15 seconds for "To" field to become active
+    log.info('Waiting for To field to become active...');
+    await page.waitForSelector('input[placeholder="Type a name or phone number"]', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+  } else {
+    // Try other compose selectors
+    const newConvSelectors = [
+      '[data-e2e-new-conversation]',
+      'button[aria-label="New conversation"]',
+      'button[aria-label="New message"]',
+      'button[aria-label="Compose"]',
+      'gv-icon-button[icon="create"]',
+      '[mattooltip="New conversation"]',
+    ];
+    const found = await findFirst(newConvSelectors);
+    if (found) { await found.click(); await page.waitForTimeout(1000); }
+  }
+  await page.waitForTimeout(1500);
+
+  // Debug: log all inputs visible after compose opened
+  const inputs = await page.$$eval('input, textarea', els => els.map(e => ({
+    tag: e.tagName,
+    placeholder: e.getAttribute('placeholder'),
+    ariaLabel: e.getAttribute('aria-label'),
+    type: e.getAttribute('type'),
+    visible: e.offsetParent !== null,
+  }))).catch(() => []);
+  log.info(`Inputs after compose: ${JSON.stringify(inputs)}`);
 
   // Type recipient phone number
   const recipientSelectors = [
+    'input[placeholder="Type a name or phone number"]',
+    'input[placeholder*="name or phone"]',
+    'input[placeholder*="phone number"]',
+    'input[aria-label="Search contacts or type a number"]',
+    'input[aria-label="Search contacts"]',
     'gv-recipient-picker input',
     'input[aria-label="To"]',
     'input[placeholder*="phone"]',
     'input[placeholder*="name"]',
-    '.gv-recipient-picker input',
+    'input[placeholder*="number"]',
   ];
-  await clickFirst(recipientSelectors, 'recipient input');
-  await page.keyboard.type(to, { delay: 60 });
-  await page.waitForTimeout(1200);
+  // Wait for recipient input to be ready then fill it
+  const toInput = await page.waitForSelector(
+    'input[placeholder="Type a name or phone number"]',
+    { timeout: 10000 }
+  ).catch(() => null);
 
-  // Select the first suggestion that appears, or press Enter
-  const suggestionSelectors = [
-    'gv-contact-list-item',
-    '[role="option"]',
-    '.pac-item',
-    'mat-option',
-  ];
-  const suggestion = await findFirst(suggestionSelectors);
-  if (suggestion) {
-    await suggestion.click();
+  if (toInput) {
+    log.info('Found "To" input — typing phone number');
+
+    // Click with force to bypass overlay backdrop (part of GV compose UI)
+    const toLocator = page.locator('input[placeholder="Type a name or phone number"]');
+    await toLocator.click({ force: true });
+    await page.waitForTimeout(1000);
+
+    // Type number character by character
+    await toLocator.pressSequentially(to, { delay: 100 });
+    log.info('Number typed — waiting for suggestion popup...');
+    await page.waitForTimeout(3000);
+
+    // Log what suggestions are visible
+    const allOptions = await page.$$eval('[role="option"], li[role="listitem"], .mat-option, mat-option', els =>
+      els.map(e => e.textContent?.trim()).filter(Boolean)
+    ).catch(() => []);
+    log.info(`Suggestions visible: ${JSON.stringify(allOptions)}`);
+
+    // Select suggestion using keyboard: ArrowDown selects first option, Enter confirms
+    log.info('Selecting suggestion with ArrowDown + Enter');
+    await toLocator.press('ArrowDown');
+    await page.waitForTimeout(500);
+    await toLocator.press('Enter');
+    await page.waitForTimeout(1000);
   } else {
-    await page.keyboard.press('Enter');
+    log.error('Could not find "To" input field');
+    throw new Error('To input not found');
   }
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(2000);
 
-  // Type message
-  const msgSelectors = [
-    'textarea[aria-label="Message"]',
-    'textarea[aria-label="Send a message"]',
-    'gv-message-input textarea',
-    '.gv-message-input textarea',
-    'textarea[placeholder*="message" i]',
-  ];
-  await clickFirst(msgSelectors, 'message textarea');
-  await page.keyboard.type(body, { delay: 40 });
-  await page.waitForTimeout(600);
+  // Wait for message textarea then type
+  const msgInput = await page.waitForSelector(
+    'textarea[placeholder="Type a message"]',
+    { timeout: 10000 }
+  ).catch(() => null);
 
-  // Send — Enter key is most reliable
-  await page.keyboard.press('Enter');
-  await page.waitForTimeout(1500);
+  if (msgInput) {
+    log.info('Found message textarea — typing message');
+    const msgLocator = page.locator('textarea[placeholder="Type a message"]');
+    await msgLocator.click({ force: true });
+    await page.waitForTimeout(500);
+    await msgLocator.pressSequentially(body, { delay: 30 });
+    await page.waitForTimeout(800);
+    await msgLocator.press('Enter');
+    log.info('Enter pressed — message sent');
+    await page.waitForTimeout(2000);
+  } else {
+    log.error('Could not find message textarea');
+    throw new Error('Message textarea not found');
+  }
 
   log.info(`SMS sent → ${to.slice(0, 6)}****`);
 }
