@@ -44,22 +44,47 @@ serve(async (req) => {
     return new Response("Invalid JSON", { status: 400 });
   }
 
-  const { from, body: text, receivedAt } = body;
-  if (!from || !text) {
-    return new Response("Missing from or body", { status: 400 });
+  const { from, name, body: text, receivedAt } = body as
+    { from?: string; name?: string; body?: string; receivedAt?: string };
+  if ((!from && !name) || !text) {
+    return new Response("Missing identifier (from/name) or body", { status: 400 });
   }
 
   const receivedTs = receivedAt ?? new Date().toISOString();
   const trimmed    = text.trim();
 
-  // ── Match phone number → driver ───────────────────────────
-  const { data: phoneRow } = await sb
-    .from("driver_phones")
-    .select("driver_id")
-    .eq("phone_number", from)
-    .maybeSingle();
+  // ── Resolve driver: by phone first, else by contact name ──
+  let driverId: string | null = null;
+  let driverPhone: string | null = from ?? null;
 
-  const driverId = phoneRow?.driver_id ?? null;
+  if (from) {
+    const { data: pr } = await sb
+      .from("driver_phones")
+      .select("driver_id")
+      .eq("phone_number", from)
+      .maybeSingle();
+    driverId = pr?.driver_id ?? null;
+  }
+
+  if (!driverId && name) {
+    // GV shows saved contact names — match against drivers.name (case-insensitive)
+    const { data: dr } = await sb
+      .from("drivers")
+      .select("id")
+      .ilike("name", name.trim())
+      .maybeSingle();
+    driverId = dr?.id ?? null;
+  }
+
+  // Look up phone for the matched driver (needed for the auto-reply)
+  if (driverId && !driverPhone) {
+    const { data: ph } = await sb
+      .from("driver_phones")
+      .select("phone_number")
+      .eq("driver_id", driverId)
+      .maybeSingle();
+    driverPhone = ph?.phone_number ?? null;
+  }
 
   // ── Find most recent active notification for driver ───────
   let notificationId: string | null = null;
@@ -77,7 +102,7 @@ serve(async (req) => {
 
   // ── Log the inbound reply ─────────────────────────────────
   await sb.from("sms_replies").insert({
-    from_number:     from,
+    from_number:     driverPhone ?? name ?? "unknown",
     body:            trimmed,
     driver_id:       driverId,
     notification_id: notificationId,
@@ -116,7 +141,7 @@ serve(async (req) => {
         .eq("escalated_to", "pending");
 
       // Auto-reply asking them to text DONE when finished
-      await sendReply(from, CONFIRM_REPLY);
+      if (driverPhone) await sendReply(driverPhone, CONFIRM_REPLY);
       action = "acknowledged";
     }
   }

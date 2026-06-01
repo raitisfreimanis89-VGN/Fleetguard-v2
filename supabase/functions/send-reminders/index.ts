@@ -80,7 +80,7 @@ function buildMessage(truckNum: string, trailerNum: string, type: string, daysUn
 
   if (type === "brake_service") {
     if (overdue) {
-      return `From Safety & Compliance: Your brake inspection is overdue.\n\nTruck: #${truckNum}\nTrailer: #${trailerNum}\n\nPlease route to a TA or Love's to complete this inspection within the next 5 days. Reply OK to confirm.`;
+      return `From Safety & Compliance: Your brake inspection is overdue for Truck #${truckNum} / Trailer #${trailerNum}. Please route to a TA or Love's to complete this inspection within the next 5 days. Reply OK to confirm.`;
     }
     return `Safety & Compliance: Brake service due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Trk #${truckNum} / Tlr #${trailerNum}. Please visit TA/Loves soon. Confirm by replying OK.`;
   }
@@ -132,6 +132,12 @@ serve(async (req) => {
   let   skipped  = 0;
   const errors: string[] = [];
 
+  // Batch cap: each GV send takes ~25s and the whole call must finish
+  // within the Edge Function time limit (~150s). Send at most this many
+  // per invocation; remaining vehicles are picked up on the next scan.
+  // The dedup guard (already-sent-today) prevents duplicates across runs.
+  const MAX_PER_RUN = 4;
+
   // Load all vehicles with their assigned driver
   const { data: vehicles, error: vErr } = await sb
     .from("vehicles")
@@ -142,6 +148,7 @@ serve(async (req) => {
   }
 
   for (const v of vehicles) {
+    if (sent >= MAX_PER_RUN) break;   // batch limit reached — stop this run
     if (!v.assigned_driver_id) { skipped++; continue; }
 
     // Look up phone — only exists in driver_phones (admin/service_role only)
@@ -154,6 +161,7 @@ serve(async (req) => {
     if (!phoneRow?.phone_number) { skipped++; continue; }
 
     for (const type of ["dot_inspection", "brake_service", "pm_service", "tyre_check"]) {
+      if (sent >= MAX_PER_RUN) break;   // batch limit reached
       try {
         const sched = await getSchedule(v.id, type);
         if (!sched) continue;

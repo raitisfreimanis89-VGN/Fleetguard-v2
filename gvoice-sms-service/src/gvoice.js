@@ -197,10 +197,25 @@ async function sendSMS(to, body) {
     const msgLocator = page.locator('textarea[placeholder="Type a message"]');
     await msgLocator.click({ force: true });
     await page.waitForTimeout(500);
-    await msgLocator.pressSequentially(body, { delay: 30 });
+
+    // Type the message line-by-line. A bare Enter SENDS in Google Voice,
+    // so line breaks within the message must use Shift+Enter (newline,
+    // no send). This keeps the whole thing as ONE SMS.
+    const lines = body.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].length > 0) {
+        await msgLocator.pressSequentially(lines[i], { delay: 25 });
+      }
+      if (i < lines.length - 1) {
+        // Insert a newline without sending
+        await page.keyboard.press('Shift+Enter');
+      }
+    }
     await page.waitForTimeout(800);
+
+    // Final Enter sends the complete message as one SMS
     await msgLocator.press('Enter');
-    log.info('Enter pressed — message sent');
+    log.info('Enter pressed — single message sent');
     await page.waitForTimeout(2000);
   } else {
     log.error('Could not find message textarea');
@@ -219,63 +234,56 @@ async function pollReplies(sinceMinutes = 4) {
   const cutoff = Date.now() - sinceMinutes * 60 * 1000;
   const replies = [];
 
-  // Get all conversation rows
-  const rowSelectors = [
-    'gv-conversation-list-item',
-    '[data-e2e-conversation]',
-    '.gv-thread-item',
-    'mat-list-item.thread',
-  ];
+  // Find UNREAD conversation rows. In GV, read threads have class
+  // "read" on the .container div; unread (new replies) do NOT.
+  const unread = await page.evaluate(() => {
+    const out = [];
+    const containers = document.querySelectorAll('div.container[role="button"], div[role="button"].container');
+    let idx = 0;
+    for (const c of containers) {
+      const isRead = c.classList.contains('read');
+      if (isRead) { idx++; continue; }
+      // Extract: text looks like "check {A}{Name} {Name} . {time} {preview}..."
+      let txt = (c.textContent || '').replace(/^check\s*/i, '').trim();
+      // Split off the " . " separator → [namePart, rest]
+      const dotIdx = txt.indexOf(' . ');
+      const namePart = dotIdx > 0 ? txt.slice(0, dotIdx) : txt;
+      // Name is doubled with an avatar letter prefix; strip first char then halve
+      const stripped = namePart.slice(1).trim();        // remove avatar initial
+      const half = stripped.slice(0, Math.ceil(stripped.length / 2)).trim();
+      out.push({ index: idx, name: half });
+      idx++;
+      if (out.length >= 8) break;
+    }
+    return out;
+  }).catch(() => []);
 
-  let rows = [];
-  for (const sel of rowSelectors) {
-    rows = await page.$$(sel);
-    if (rows.length > 0) break;
-  }
+  log.info(`Unread threads: ${JSON.stringify(unread)}`);
 
-  log.debug(`Found ${rows.length} conversation rows`);
-
-  for (const row of rows.slice(0, 20)) {
+  // Open each unread thread, read the latest inbound message
+  const containerHandles = await page.$$('div.container[role="button"], div[role="button"].container');
+  for (const u of unread) {
     try {
-      // Get timestamp from the row
-      const timeEl = await row.$('[data-e2e-time], .gv-time, time, .time');
-      if (!timeEl) continue;
-
-      const timeAttr = await timeEl.getAttribute('datetime')
-        || await timeEl.getAttribute('data-e2e-time')
-        || await timeEl.innerText();
-
-      const rowTime = parseGVTime(timeAttr);
-      if (!rowTime || rowTime < cutoff) continue;
-
-      // Get the phone number / sender
-      const phoneEl = await row.$('[data-e2e-phone], .phone, gv-participant');
-      const fromRaw = phoneEl ? await phoneEl.innerText() : '';
-      const from    = normalizePhone(fromRaw);
-      if (!from) continue;
-
-      // Get preview text
-      const previewEl = await row.$('[data-e2e-preview], .preview, .snippet, .message-preview');
-      const preview   = previewEl ? (await previewEl.innerText()).trim() : '';
-      if (!preview) continue;
-
-      // Open the conversation to confirm it's an inbound message
-      await row.click();
-      await page.waitForTimeout(1000);
+      const handle = containerHandles[u.index];
+      if (!handle) continue;
+      await handle.click();
+      await page.waitForTimeout(1500);
 
       const inbound = await getLatestInboundMessage();
-      if (!inbound) continue;
+      if (!inbound || !inbound.body) continue;
 
-      // Only return if it looks like a driver reply (not our own sent message)
+      // Prefer the clean name parsed from the message ("Message from X,")
+      const driverName = inbound.name || u.name;
+
       replies.push({
-        from:       from,
+        name:       driverName,       // matched by name in DB (GV hides number for saved contacts)
+        from:       null,
         body:       inbound.body,
-        receivedAt: new Date(rowTime).toISOString(),
+        receivedAt: new Date().toISOString(),
       });
-
-      log.info(`Reply from ${from.slice(0, 6)}****: "${inbound.body.slice(0, 40)}"`);
+      log.info(`Reply from "${driverName}": "${inbound.body.slice(0, 40)}"`);
     } catch (e) {
-      log.debug(`Row parse error: ${e.message}`);
+      log.debug(`Thread open error: ${e.message}`);
     }
   }
 
@@ -284,39 +292,31 @@ async function pollReplies(sinceMinutes = 4) {
 }
 
 // ── Read the latest inbound (received) message in open thread ─
+// Returns { name, body } — name parsed from "Message from {NAME},"
+// Inbound rows are div.message-row WITHOUT the "outgoing" class.
 async function getLatestInboundMessage() {
-  // In GV web UI, received messages have a different class than sent ones.
-  // Sent messages: .gv-message-outgoing / [data-e2e-outgoing] / right-aligned
-  // Received:      .gv-message-incoming / [data-e2e-incoming] / left-aligned
-  const inboundSelectors = [
-    '[data-e2e-incoming]:last-child .gv-message-content',
-    '.gv-message-incoming:last-of-type .content',
-    'gv-message-item:last-child:not(.outgoing) .message-text',
-    '.gv-message:not(.outgoing):last-child',
-  ];
+  const result = await page.evaluate(() => {
+    const items = document.querySelectorAll('gv-message-item');
+    let last = null;
+    for (const it of items) {
+      const row = it.querySelector('div.message-row');
+      if (!row) continue;
+      if (row.classList.contains('outgoing')) continue;   // skip our own sends
 
-  for (const sel of inboundSelectors) {
-    const el = await page.$(sel);
-    if (el) {
-      const body = (await el.innerText()).trim();
-      if (body) return { body };
+      const bubble = it.querySelector('.subject-content-container.bubble, .bubble');
+      const body = bubble ? bubble.textContent.trim() : '';
+      if (!body) continue;
+
+      // Item text: "{NAME} • {time} Message from {NAME}, {body}, {date}"
+      const m = (it.textContent || '').match(/Message from ([^,]+),/);
+      const name = m ? m[1].trim() : null;
+
+      last = { name, body };   // keep overwriting → ends on the LAST inbound
     }
-  }
+    return last;
+  }).catch(() => null);
 
-  // Fallback: read all messages and return last non-sent one
-  const allMsgs = await page.$$eval(
-    'gv-message-item, .gv-message, [data-e2e-message]',
-    (els) => els.map(el => ({
-      text:    el.innerText?.trim() || '',
-      outgoing: el.classList.contains('outgoing')
-              || el.dataset?.e2eOutgoing !== undefined
-              || el.style.alignSelf === 'flex-end',
-    }))
-  ).catch(() => []);
-
-  const inbound = allMsgs.filter(m => m.text && !m.outgoing);
-  if (inbound.length === 0) return null;
-  return { body: inbound[inbound.length - 1].text };
+  return result;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
