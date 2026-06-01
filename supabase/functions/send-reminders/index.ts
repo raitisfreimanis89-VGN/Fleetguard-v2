@@ -14,6 +14,7 @@ const SERVICE_SOURCES: Record<string, { table: string; dateCol: string }> = {
   dot_inspection: { table: "dot_inspections",   dateCol: "inspection_date" },
   brake_service:  { table: "brake_tests",        dateCol: "test_date"       },
   pm_service:     { table: "service_records",    dateCol: "service_date"    },
+  tyre_check:     { table: "tyre_records",       dateCol: "photo_date"      },
 };
 
 // Fallback: pm_service also checks maintenance_records if service_records is empty
@@ -74,13 +75,38 @@ const TYPE_LABEL: Record<string, string> = {
   pm_service:     "PM service",
 };
 
-function buildMessage(truckNum: string, type: string, daysUntilDue: number): string {
-  const label = TYPE_LABEL[type] ?? type;
-  const abs   = Math.abs(daysUntilDue);
-  if (daysUntilDue <= 0) {
-    return `FleetGuard ALERT: Truck ${truckNum} ${label} is ${abs} day${abs !== 1 ? "s" : ""} OVERDUE. Reply OK to confirm you are scheduling it.`;
+function buildMessage(truckNum: string, trailerNum: string, type: string, daysUntilDue: number): string {
+  const overdue = daysUntilDue <= 0;
+
+  if (type === "brake_service") {
+    if (overdue) {
+      return `From Safety & Compliance: Your brake inspection is overdue.\n\nTruck: #${truckNum}\nTrailer: #${trailerNum}\n\nPlease route to a TA or Love's to complete this inspection within the next 5 days. Reply OK to confirm.`;
+    }
+    return `Safety & Compliance: Brake service due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Trk #${truckNum} / Tlr #${trailerNum}. Please visit TA/Loves soon. Confirm by replying OK.`;
   }
-  return `FleetGuard: Truck ${truckNum} ${label} is due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}. Reply OK to confirm you are scheduling.`;
+
+  if (type === "tyre_check") {
+    if (overdue) {
+      return `Safety & Compliance: Tire tread check OVERDUE on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread within 5 days. Confirm by replying OK.`;
+    }
+    return `Safety & Compliance: Tire tread check due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread. Confirm by replying OK.`;
+  }
+
+  if (type === "dot_inspection") {
+    if (overdue) {
+      return `Safety & Compliance Alert: Yard truck inspection is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard to complete this inspection within the next 5 days. Reply OK to confirm receipt.`;
+    }
+    return `Safety & Compliance Notification: Truck inspection at the yard is due soon for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard and ensure this is completed ASAP. Reply OK to confirm receipt.`;
+  }
+
+  if (type === "pm_service") {
+    if (overdue) {
+      return `Safety & Compliance Alert: PM Service is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please visit a TA or Love's to complete this within the next 5 days. Reply OK to confirm receipt.`;
+    }
+    return `Safety & Compliance Notification: PM Service is due soon for Truck #${truckNum} / Trailer #${trailerNum}. Please schedule a visit to a TA or Love's within the next ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}. Reply OK to confirm receipt.`;
+  }
+
+  return `From Safety & Compliance: Truck #${truckNum} has a service due. Reply OK to confirm.`;
 }
 
 // ── Main handler ──────────────────────────────────────────────
@@ -109,7 +135,7 @@ serve(async (req) => {
   // Load all vehicles with their assigned driver
   const { data: vehicles, error: vErr } = await sb
     .from("vehicles")
-    .select("id, truck_number, assigned_driver_id");
+    .select("id, truck_number, trailer_number, assigned_driver_id");
 
   if (vErr || !vehicles) {
     return new Response(JSON.stringify({ error: "Failed to load vehicles" }), { status: 500 });
@@ -127,7 +153,7 @@ serve(async (req) => {
 
     if (!phoneRow?.phone_number) { skipped++; continue; }
 
-    for (const type of ["dot_inspection", "brake_service", "pm_service"]) {
+    for (const type of ["dot_inspection", "brake_service", "pm_service", "tyre_check"]) {
       try {
         const sched = await getSchedule(v.id, type);
         if (!sched) continue;
@@ -155,7 +181,7 @@ serve(async (req) => {
 
         if (existing) { skipped++; continue; }
 
-        const msg = buildMessage(v.truck_number, type, daysUntilDue);
+        const msg = buildMessage(v.truck_number, v.trailer_number ?? "—", type, daysUntilDue);
 
         // Log notification row first (status = pending)
         const { data: notif, error: nErr } = await sb
