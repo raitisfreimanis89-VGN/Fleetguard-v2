@@ -384,6 +384,7 @@ function remRenderSchedule() {
       <span class="badge badge-gray" style="margin-left:auto;font-weight:600">Applies to all vehicles</span>
     </div>
     <div class="card-body" style="padding:0">
+      <div class="table-wrap">
       <table class="rem-sched-table">
         <thead><tr>
           <th>Service Type</th><th>Interval</th><th>Warn Before</th><th>Escalate After</th><th>On</th>
@@ -411,6 +412,7 @@ function remRenderSchedule() {
           }).join('')}
         </tbody>
       </table>
+      </div>
       <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
         <button class="btn btn-primary btn-sm" onclick="remSaveAllSchedules()">
           <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:14px">save</span> Save Defaults

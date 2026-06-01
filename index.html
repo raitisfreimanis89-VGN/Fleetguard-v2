@@ -116,8 +116,13 @@
     </div>
   </div>
 
+  <div id="nav-backdrop" onclick="closeNav()"></div>
+
   <div id="main">
     <div id="topbar">
+      <button id="mobile-menu-btn" onclick="toggleNav()" aria-label="Open menu">
+        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-size:24px;font-weight:300;line-height:1">menu</span>
+      </button>
       <h1 id="page-title">Dashboard</h1>
       <img src="img/vgn-logo-dark.png" alt="VGN Trucking" class="topbar-brand-logo"/>
       <div class="user-bar">
@@ -178,6 +183,15 @@
     var saved = localStorage.getItem('fg_theme') || 'dark';
     var icon = document.getElementById('theme-icon');
     if (icon) icon.textContent = saved === 'light' ? 'dark_mode' : 'light_mode';
+  });
+
+  // ── Mobile nav drawer ──────────────────────────────────────
+  function toggleNav() { document.body.classList.toggle('nav-open'); }
+  function closeNav()  { document.body.classList.remove('nav-open'); }
+  // Close the drawer after tapping any sidebar item (mobile)
+  document.addEventListener('click', function(e) {
+    var item = e.target.closest('#sidebar .nav-item');
+    if (item) closeNav();
   });
 </script>
 
