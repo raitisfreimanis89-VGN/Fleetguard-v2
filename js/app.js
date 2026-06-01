@@ -244,7 +244,8 @@ let calendarMonth=new Date(); calendarMonth.setDate(1);
 const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
 
 function navigate(page,vehicleId){
-  if(page==='users'&&!isAdmin()) return;
+  if(page==='users') return;    // Users page hidden for everyone
+  if(page==='drivers') return;  // Drivers page hidden for everyone
   if(page==='reminders'&&!isAdmin()) return;
   if(page==='portal'&&currentRole==='dispatcher') return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
@@ -258,6 +259,8 @@ function navigate(page,vehicleId){
 
 function render(){
   const c=document.getElementById('content');
+  // Drivers & Users pages are hidden for everyone — redirect to dashboard
+  if(currentPage==='drivers'||currentPage==='users') currentPage='dashboard';
   if(currentPage==='dashboard') c.innerHTML=renderDashboard();
   else if(currentPage==='vehicles') c.innerHTML=renderVehicles();
   else if(currentPage==='vehicle') c.innerHTML=renderVehicleDetail();
@@ -269,7 +272,9 @@ function render(){
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
   else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
   const usersNav=document.getElementById('nav-users');
-  if(usersNav) usersNav.style.display=isAdmin()?'flex':'none';
+  if(usersNav) usersNav.style.display='none';       // hidden for everyone
+  const driversNav=document.getElementById('nav-drivers');
+  if(driversNav) driversNav.style.display='none';   // hidden for everyone
   const remindersNav=document.getElementById('nav-reminders');
   if(remindersNav) remindersNav.style.display=isAdmin()?'flex':'none';
   const portalNav=document.getElementById('nav-portal');
