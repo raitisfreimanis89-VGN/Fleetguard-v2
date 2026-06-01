@@ -73,8 +73,8 @@ function remRenderTab() {
 
 // ── OVERVIEW ──────────────────────────────────────────────────
 function remRenderOverview() {
-  const overdue  = SMS_NOTIFS.filter(n => n.status !== 'acknowledged' && n.status !== 'failed');
-  const acked    = SMS_NOTIFS.filter(n => n.status === 'acknowledged');
+  const overdue  = SMS_NOTIFS.filter(n => !['acknowledged','completed','failed'].includes(n.status));
+  const acked    = SMS_NOTIFS.filter(n => n.status === 'acknowledged' || n.status === 'completed');
   const replies  = SMS_REPLIES.length;
   const sent30d  = SMS_NOTIFS.filter(n => {
     const d = new Date(n.created_at);
@@ -210,8 +210,8 @@ function remSmsRow(n) {
   const v      = VEHICLES.find(x => x.id === n.vehicle_id);
   const driver = DRIVERS.find(d => d.id === n.driver_id);
   const initials = driver ? driver.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '??';
-  const statusMap = { pending:'badge-gray', sent:'badge-blue', failed:'badge-red', acknowledged:'badge-green' };
-  const labelMap  = { pending:'Pending', sent:'Sent', failed:'Failed', acknowledged:'Acked' };
+  const statusMap = { pending:'badge-gray', sent:'badge-blue', failed:'badge-red', acknowledged:'badge-yellow', completed:'badge-green' };
+  const labelMap  = { pending:'Pending', sent:'Sent', failed:'Failed', acknowledged:'Confirmed', completed:'Done ✓' };
   const typeLabel = { dot_inspection:'Periodic', brake_service:'Brakes', pm_service:'PM' };
   const ago = remTimeAgo(n.created_at);
   return `
@@ -231,8 +231,8 @@ function remRenderHistory(filter = 'all') {
   const rows = SMS_NOTIFS.filter(n => filter === 'all' || n.status === filter);
   const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Service', pm_service:'PM Service' };
   const statusBadge = (s) => {
-    const m = { pending:'badge-gray',sent:'badge-blue',failed:'badge-red',acknowledged:'badge-green' };
-    const l = { pending:'Pending',sent:'Sent',failed:'Failed',acknowledged:'Acked' };
+    const m = { pending:'badge-gray',sent:'badge-blue',failed:'badge-red',acknowledged:'badge-yellow',completed:'badge-green' };
+    const l = { pending:'Pending',sent:'Sent',failed:'Failed',acknowledged:'Confirmed',completed:'Done ✓' };
     return `<span class="badge ${m[s]??'badge-gray'}">${l[s]??s}</span>`;
   };
 
@@ -245,7 +245,8 @@ function remRenderHistory(filter = 'all') {
       <select onchange="remFilterHistory(this.value)">
         <option value="all">All statuses</option>
         <option value="sent">Sent</option>
-        <option value="acknowledged">Acknowledged</option>
+        <option value="acknowledged">Confirmed (OK)</option>
+        <option value="completed">Done</option>
         <option value="failed">Failed</option>
         <option value="pending">Pending</option>
       </select>
