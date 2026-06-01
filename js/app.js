@@ -245,8 +245,8 @@ const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',c
 
 function navigate(page,vehicleId){
   if(page==='users') return;    // Users page hidden for everyone
+  if(page==='portal') return;   // Driver Portal hidden for everyone
   if(page==='reminders'&&!isAdmin()) return;
-  if(page==='portal'&&currentRole==='dispatcher') return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -258,8 +258,8 @@ function navigate(page,vehicleId){
 
 function render(){
   const c=document.getElementById('content');
-  // Users page hidden for everyone — redirect to dashboard
-  if(currentPage==='users') currentPage='dashboard';
+  // Users + Driver Portal hidden for everyone — redirect to dashboard
+  if(currentPage==='users'||currentPage==='portal') currentPage='dashboard';
   if(currentPage==='dashboard') c.innerHTML=renderDashboard();
   else if(currentPage==='vehicles') c.innerHTML=renderVehicles();
   else if(currentPage==='vehicle') c.innerHTML=renderVehicleDetail();
@@ -275,7 +275,7 @@ function render(){
   const remindersNav=document.getElementById('nav-reminders');
   if(remindersNav) remindersNav.style.display=isAdmin()?'flex':'none';
   const portalNav=document.getElementById('nav-portal');
-  if(portalNav) portalNav.style.display=currentRole==='dispatcher'?'none':'';
+  if(portalNav) portalNav.style.display='none';     // Driver Portal hidden for everyone
 }
 
 async function renderUsersAsync(){
