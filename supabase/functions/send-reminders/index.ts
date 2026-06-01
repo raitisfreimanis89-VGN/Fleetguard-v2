@@ -71,7 +71,7 @@ async function getSchedule(vehicleId: string, type: string) {
 // ── Build human-readable message ──────────────────────────────
 const TYPE_LABEL: Record<string, string> = {
   dot_inspection: "DOT inspection",
-  brake_service:  "brake service",
+  brake_service:  "brake inspection",
   pm_service:     "PM service",
 };
 
@@ -82,7 +82,7 @@ function buildMessage(truckNum: string, trailerNum: string, type: string, daysUn
     if (overdue) {
       return `From Safety & Compliance: Your brake inspection is overdue for Truck #${truckNum} / Trailer #${trailerNum}. Please route to a TA or Love's to complete this inspection within the next 5 days. Reply OK to confirm.`;
     }
-    return `Safety & Compliance: Brake service due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Trk #${truckNum} / Tlr #${trailerNum}. Please visit TA/Loves soon. Confirm by replying OK.`;
+    return `Safety & Compliance: Brake inspection due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Trk #${truckNum} / Tlr #${trailerNum}. Please visit TA/Loves soon. Confirm by replying OK.`;
   }
 
   if (type === "tyre_check") {

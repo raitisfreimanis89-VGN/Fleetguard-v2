@@ -90,10 +90,10 @@ function remRenderOverview() {
     const phone = DRIVER_PHONES.find(p => p.driver_id === driver.id);
     const phoneStr = phone ? maskPhone(phone.phone_number) : '— no phone';
 
-    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Service',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
+    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
     if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:60, icon:'build_circle',   type:'pm_service'     });
     if (s.hasOOS)         critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.brakeDays,   interval:90, icon:'assignment_turned_in',     type:'dot_inspection' });
-    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Service',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
+    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
     if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:60, icon:'build_circle',   type:'pm_service'     });
   });
 
@@ -229,7 +229,7 @@ function remSmsRow(n) {
 // ── HISTORY ───────────────────────────────────────────────────
 function remRenderHistory(filter = 'all') {
   const rows = SMS_NOTIFS.filter(n => filter === 'all' || n.status === filter);
-  const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Service', pm_service:'PM Service' };
+  const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service' };
   const statusBadge = (s) => {
     const m = { pending:'badge-gray',sent:'badge-blue',failed:'badge-red',acknowledged:'badge-yellow',completed:'badge-green' };
     const l = { pending:'Pending',sent:'Sent',failed:'Failed',acknowledged:'Confirmed',completed:'Done ✓' };
@@ -367,7 +367,7 @@ function remRenderReplies() {
 function remRenderSchedule() {
   const types = ['dot_inspection','brake_service','pm_service','tyre_check'];
   const icons = { dot_inspection:'assignment_turned_in', brake_service:'construction', pm_service:'build_circle', tyre_check:'tire_repair' };
-  const labels = { dot_inspection:'Periodic Inspection', brake_service:'Brake Service', pm_service:'PM Service', tyre_check:'Tyre Check' };
+  const labels = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service', tyre_check:'Tyre Check' };
   const subtitles = { dot_inspection:'Yard inspection', brake_service:'Safety critical', pm_service:'Preventive maint.', tyre_check:'Tread photos' };
   const iconBg = { dot_inspection:'var(--primary-dim)', brake_service:'var(--danger-bg)', pm_service:'var(--success-bg)', tyre_check:'var(--warning-bg)' };
   const iconColor = { dot_inspection:'var(--primary-text)', brake_service:'var(--danger)', pm_service:'var(--success)', tyre_check:'var(--warning)' };
@@ -459,7 +459,7 @@ function remRenderSchedule() {
       ? '<div style="color:var(--text3);font-size:12px">No overrides — all vehicles using global defaults.</div>'
       : overrides.map(o => {
           const v = VEHICLES.find(x => x.id === o.vehicle_id);
-          const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Service', pm_service:'PM Service' };
+          const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service' };
           return `
 <div class="rem-override-row">
   <div style="flex:1">
