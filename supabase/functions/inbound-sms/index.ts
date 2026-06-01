@@ -67,13 +67,34 @@ serve(async (req) => {
   }
 
   if (!driverId && name) {
-    // GV shows saved contact names — match against drivers.name (case-insensitive)
-    const { data: dr } = await sb
+    // GV shows saved contact names which may be SHORTER than the DB name
+    // (e.g. GV "Ewan Francis" vs DB "Ewan Alexander Francis").
+    const clean = name.trim();
+
+    // 1. Exact (case-insensitive) match
+    const { data: exact } = await sb
       .from("drivers")
-      .select("id")
-      .ilike("name", name.trim())
+      .select("id, name")
+      .ilike("name", clean)
       .maybeSingle();
-    driverId = dr?.id ?? null;
+    driverId = exact?.id ?? null;
+
+    // 2. Fuzzy: match on first + last name tokens
+    if (!driverId) {
+      const tokens = clean.split(/\s+/).filter(Boolean);
+      if (tokens.length >= 2) {
+        const first = tokens[0];
+        const last  = tokens[tokens.length - 1];
+        const { data: fuzzy } = await sb
+          .from("drivers")
+          .select("id, name")
+          .ilike("name", `${first}%`)
+          .ilike("name", `%${last}`);
+        if (fuzzy && fuzzy.length === 1) {
+          driverId = fuzzy[0].id;          // unambiguous single match
+        }
+      }
+    }
   }
 
   // Look up phone for the matched driver (needed for the auto-reply)

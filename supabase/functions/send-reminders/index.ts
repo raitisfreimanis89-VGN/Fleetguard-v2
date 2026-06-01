@@ -87,7 +87,7 @@ function buildMessage(truckNum: string, trailerNum: string, type: string, daysUn
 
   if (type === "tyre_check") {
     if (overdue) {
-      return `Safety & Compliance: Tire tread check OVERDUE on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread within 5 days. Confirm by replying OK.`;
+      return `Safety & Compliance: Tire tread check OVERDUE on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread within 2 days. Confirm by replying OK.`;
     }
     return `Safety & Compliance: Tire tread check due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread. Confirm by replying OK.`;
   }
