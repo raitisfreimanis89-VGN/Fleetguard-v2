@@ -151,6 +151,14 @@ serve(async (req) => {
     if (sent >= MAX_PER_RUN) break;   // batch limit reached — stop this run
     if (!v.assigned_driver_id) { skipped++; continue; }
 
+    // Skip drivers currently marked on vacation
+    const { data: driverRow } = await sb
+      .from("drivers")
+      .select("on_vacation")
+      .eq("id", v.assigned_driver_id)
+      .maybeSingle();
+    if (driverRow?.on_vacation) { skipped++; continue; }
+
     // Look up phone — only exists in driver_phones (admin/service_role only)
     const { data: phoneRow } = await sb
       .from("driver_phones")
