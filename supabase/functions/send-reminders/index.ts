@@ -162,11 +162,12 @@ serve(async (req) => {
     // Look up phone — only exists in driver_phones (admin/service_role only)
     const { data: phoneRow } = await sb
       .from("driver_phones")
-      .select("phone_number")
+      .select("phone_number, sms_hold")
       .eq("driver_id", v.assigned_driver_id)
       .maybeSingle();
 
     if (!phoneRow?.phone_number) { skipped++; continue; }
+    if (phoneRow.sms_hold) { skipped++; continue; }   // number on hold — do not send
 
     for (const type of ["dot_inspection", "brake_service", "pm_service", "tyre_check"]) {
       if (sent >= MAX_PER_RUN) break;   // batch limit reached
