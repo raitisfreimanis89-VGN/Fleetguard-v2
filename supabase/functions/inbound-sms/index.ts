@@ -161,9 +161,16 @@ serve(async (req) => {
         .eq("notification_id", notificationId)
         .eq("escalated_to", "pending");
 
-      // Auto-reply asking them to text DONE when finished
-      if (driverPhone) await sendReply(driverPhone, CONFIRM_REPLY);
-      action = "acknowledged";
+      // Auto-reply asking them to text DONE when finished —
+      // but never text a driver who is marked on vacation.
+      let onVacation = false;
+      if (driverId) {
+        const { data: dv } = await sb
+          .from("drivers").select("on_vacation").eq("id", driverId).maybeSingle();
+        onVacation = !!dv?.on_vacation;
+      }
+      if (driverPhone && !onVacation) await sendReply(driverPhone, CONFIRM_REPLY);
+      action = onVacation ? "acknowledged_no_reply_vacation" : "acknowledged";
     }
   }
 
