@@ -128,8 +128,9 @@ serve(async (req) => {
 
   const today    = new Date();
   const todayStr = today.toISOString().split("T")[0];
-  let   sent     = 0;
-  let   skipped  = 0;
+  let   sent            = 0;
+  let   skipped         = 0;
+  let   vacationSkipped = 0;
   const errors: string[] = [];
 
   // Batch cap: each GV send takes ~25s and the whole call must finish
@@ -157,7 +158,7 @@ serve(async (req) => {
       .select("on_vacation")
       .eq("id", v.assigned_driver_id)
       .maybeSingle();
-    if (driverRow?.on_vacation) { skipped++; continue; }
+    if (driverRow?.on_vacation) { skipped++; vacationSkipped++; continue; }
 
     // Look up phone — only exists in driver_phones (admin/service_role only)
     const { data: phoneRow } = await sb
@@ -258,7 +259,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ ok: true, sent, skipped, errors }),
+    JSON.stringify({ ok: true, sent, skipped, vacationSkipped, errors }),
     { headers: { "Content-Type": "application/json" } }
   );
 });

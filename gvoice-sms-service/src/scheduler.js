@@ -35,7 +35,7 @@ async function runStartupScan() {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      log.info(`Reminder scan complete — sent:${data.sent} skipped:${data.skipped}`);
+      log.info(`Reminder scan complete — sent:${data.sent} skipped:${data.skipped} (on vacation:${data.vacationSkipped ?? 0})`);
       if (data.errors?.length) log.warn(`Scan errors: ${JSON.stringify(data.errors)}`);
     } else {
       log.warn(`Reminder scan returned ${res.status}: ${JSON.stringify(data)}`);
