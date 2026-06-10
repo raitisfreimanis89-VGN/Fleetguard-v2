@@ -99,11 +99,11 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s ?? 
 // ═══════════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════════
-let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[];
+let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[];
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -112,6 +112,7 @@ async function loadAll() {
     sb.from('dot_inspections').select('id,vehicle_id,driver_id,inspection_date,result,notes').order('created_at'),
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
+    sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -123,6 +124,8 @@ async function loadAll() {
   if (!dot.error && dot.data) DOT_INSPECTIONS = dot.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,inspectionDate:r.inspection_date}));
   if (!mil.error && mil.data) MILEAGE = mil.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
+  // inspections table may not exist until migration 003 is applied — guarded like the rest
+  if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
 }
 
 async function addDriver(name) {
@@ -216,7 +219,8 @@ function getVehicleStatus(vid){
   const maint=MAINTENANCE.filter(m=>m.vehicleId===vid).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
   const dots=DOT_INSPECTIONS.filter(d=>d.vehicleId===vid).sort((a,b)=>b.inspectionDate.localeCompare(a.inspectionDate));
   const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===vid).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-  const lastBrake=brakes[0],lastTyre=tyres[0],lastDot=dots[0],lastService=svcs[0];
+  const preTrips=INSPECTIONS.filter(i=>i.vehicleId===vid).sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')));
+  const lastBrake=brakes[0],lastTyre=tyres[0],lastDot=dots[0],lastService=svcs[0],lastPreTrip=preTrips[0];
   const now=today();
   const brakeDays=lastBrake?daysBetween(lastBrake.testDate,now):null;
   const tyreDays=lastTyre?daysBetween(lastTyre.photoDate,now):null;
@@ -232,7 +236,81 @@ function getVehicleStatus(vid){
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
   const critical=brakeOverdue||serviceOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue;
-  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning};
+  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now)};
+}
+
+// ═══════════════════════════════════════════════════════
+// PRE-TRIP INSPECTIONS (driver portal results)
+// ═══════════════════════════════════════════════════════
+const DRIVER_FN_BASE='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
+function inspDur(s){ if(s==null) return '—'; const m=Math.floor(s/60),x=s%60; return m+'m '+(x<10?'0':'')+x+'s'; }
+function inspDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
+
+function renderInspections(){
+  const rows=INSPECTIONS.slice().sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')));
+  const todayStr=today();
+  const todayCount=rows.filter(i=>String(i.submittedAt||'').split('T')[0]===todayStr).length;
+  const defectCount=rows.filter(i=>i.overallResult==='defect').length;
+  let html=`<div class="card" style="max-width:1040px;margin-bottom:18px"><div class="card-header"><span class="card-header-accent"></span>📋 Driver Pre-Trip Inspections</div><div class="card-body">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="badge badge-blue">${rows.length} total</span>
+      ${todayCount?`<span class="badge badge-green">● ${todayCount} today</span>`:`<span class="badge badge-gray">none today</span>`}
+      ${defectCount?`<span class="badge badge-red">${defectCount} with defects</span>`:''}
+    </div>`;
+  if(isAdmin()){
+    const opts=VEHICLES.filter(v=>v.assignedDriverId).map(v=>{const d=DRIVERS.find(x=>x.id===v.assignedDriverId);return `<option value="${v.id}">Truck #${esc(v.truckNumber)} · ${esc(d?d.name:'')}</option>`;}).join('');
+    html+=`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+      <div style="flex:1;min-width:220px"><label>Send pre-trip link to a driver</label>
+        <select id="sl-vehicle"><option value="">— select truck —</option>${opts}</select></div>
+      <button class="btn btn-primary" onclick="doSendLinkFromPicker()">📲 Send link</button>
+    </div>
+    <div class="text-sm" style="margin-top:8px;color:var(--text3)">🔒 Links are sent only when you click here — never automatically.</div>`;
+  }
+  html+=`</div></div>`;
+  html+=`<div class="card" style="max-width:1040px"><div class="card-body" style="padding:0"><div class="table-wrap"><table>
+    <thead><tr><th style="padding-left:18px">When</th><th>Truck</th><th>Driver</th><th>Result</th><th>Tyres</th><th>Checks</th><th>Walk-around</th><th>Ref</th></tr></thead><tbody>`;
+  if(rows.length===0){
+    html+=`<tr><td colspan="8" class="empty" style="padding:26px">No inspections yet.${isAdmin()?' Send a driver a link above to get the first one.':''}</td></tr>`;
+  }
+  rows.slice(0,200).forEach(i=>{
+    const d=DRIVERS.find(x=>x.id===i.driverId);
+    const rb=i.overallResult==='defect'?'badge-red':i.overallResult==='minor'?'badge-yellow':'badge-green';
+    const rl=i.overallResult==='defect'?'Defect':i.overallResult==='minor'?'Minor':'Roadworthy';
+    const quick=i.durationSec!=null&&i.durationSec<120;
+    html+=`<tr>
+      <td style="padding-left:18px;white-space:nowrap">${inspDT(i.submittedAt)}</td>
+      <td><strong>#${esc(i.truckNumber||'')}</strong></td>
+      <td>${esc(d?d.name:'—')}</td>
+      <td><span class="badge ${rb}">${rl}</span></td>
+      <td>${i.tyresFlagged?`<span style="color:var(--danger)">${i.tyresFlagged} flagged</span>`:`<span style="color:var(--success)">OK</span>`}</td>
+      <td>${i.checksFailed?`<span style="color:var(--danger)">${i.checksFailed} failed</span>`:`<span style="color:var(--success)">OK</span>`}</td>
+      <td style="white-space:nowrap">${inspDur(i.durationSec)}${quick?` <span title="Completed very quickly" style="color:var(--warning)">⚠</span>`:''}</td>
+      <td class="text-sm">${esc(i.ref||'')}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div></div>`;
+  return html;
+}
+
+async function doSendLink(driverId,vehicleId,truck){
+  if(!isAdmin()){ showToast('Admins only','danger'); return; }
+  if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token=session&&session.access_token;
+    if(!token){ showToast('Session expired — sign in again','danger'); return; }
+    const r=await fetch(DRIVER_FN_BASE+'/driver-send-link',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({driverId,vehicleId:vehicleId||null})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok) showToast('Pre-trip link sent to '+(j.sentTo||'driver')+(truck?(' (Truck #'+truck+')'):''),'success');
+    else showToast(j.error||('Send failed — HTTP '+r.status),'danger');
+  }catch(e){ showToast('Send failed: '+((e&&e.message)||'network'),'danger'); }
+}
+async function doSendLinkFromPicker(){
+  const sel=document.getElementById('sl-vehicle'); const vid=sel?sel.value:'';
+  if(!vid){ showToast('Pick a truck first','danger'); return; }
+  const v=VEHICLES.find(x=>x.id===vid);
+  if(!v||!v.assignedDriverId){ showToast('That truck has no assigned driver','danger'); return; }
+  doSendLink(v.assignedDriverId,vid,v.truckNumber);
 }
 
 // ═══════════════════════════════════════════════════════
@@ -241,7 +319,7 @@ function getVehicleStatus(vid){
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
 
 function navigate(page,vehicleId){
   if(page==='users') return;    // Users page hidden for everyone
@@ -270,6 +348,7 @@ function render(){
   else if(currentPage==='drivers') c.innerHTML=renderDrivers();
   else if(currentPage==='calendar') c.innerHTML=renderCalendar();
   else if(currentPage==='reports') c.innerHTML=renderReports();
+  else if(currentPage==='inspections') c.innerHTML=renderInspections();
   else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
@@ -556,7 +635,9 @@ function renderVehicles(){
           <span class="status-pill ${s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green'}">🔧 Brakes ${s.lastBrake?s.brakeDays+'d':'None'}</span>
           <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
           <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
+          <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 Pre-trip ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
         </div>
+        ${isAdmin()&&v.assignedDriverId?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Send pre-trip link</button>`:''}
       </div>
       <!-- EDIT MODE -->
       <div id="vedit-${v.id}" style="display:none" class="card-body" style="padding:16px">

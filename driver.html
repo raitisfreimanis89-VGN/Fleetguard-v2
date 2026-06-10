@@ -220,12 +220,10 @@ textarea{resize:vertical;min-height:64px}
 </head>
 <body>
 <div id="frame">
-  <div id="demo-ribbon">Preview · Demo mode — nothing is sent or saved to the fleet</div>
-
   <div id="topbar">
     <div class="logo-icon">🚛</div>
     <div class="brand">FleetGuard<small>PRE-TRIP INSPECTION</small></div>
-    <div id="conn" class="online" onclick="toggleConn()" title="Tap to simulate offline/online">
+    <div id="conn" class="online" title="Connection status">
       <span class="dot"></span><span id="conn-label">Online</span>
     </div>
   </div>
@@ -266,7 +264,7 @@ textarea{resize:vertical;min-height:64px}
             <button class="link" id="resend-btn" onclick="sendOtp(true)" disabled style="display:none">Resend code</button>
           </div>
           <div class="spacer"></div>
-          <div class="note" style="margin-top:12px"><span class="i">💡</span><span><b>Demo:</b> the code is <b>123456</b> (any 6 digits also pass in preview).</span></div>
+          <div class="note" style="margin-top:12px"><span class="i">💬</span><span>The code arrives by text in a few seconds. Didn't get it? Tap <b>Resend</b> when the timer ends. Codes expire in 5 min.</span></div>
         </div>
       </div></div>
 
@@ -420,7 +418,7 @@ function blankState(){
     tyres:{},      // key `${ai}:${pos}` -> {rating, tread:'', photo:null, note:''}
     checks:{},     // id -> {result:'pass|fail|na', severity:'', photo:null, note:''}
     odo:'', gps:null, signature:null, finalNotes:'',
-    startTs:null, durationSec:null
+    startTs:null, durationSec:null, inspectionId:null
   };
 }
 function tyreKey(ai,pos){return ai+':'+pos;}
@@ -437,19 +435,34 @@ function loadDraft(){
 }
 
 /* ════════════════════════════════════════════════════════════════
-   MOCK API  — stands in for Supabase Edge Functions + gvoice SMS.
-   In production these become real fetch() calls (see design doc).
+   API  — Supabase Edge Functions. The browser talks ONLY to these
+   (never a DB client), so existing RLS is untouched.
    ════════════════════════════════════════════════════════════════ */
-const MockApi={
-  // POST /driver-otp-request  → gvoice /send
-  requestOtp(phone){ return new Promise(r=>setTimeout(()=>r({ok:true,sentTo:maskPhone(phone)}),650)); },
-  // POST /driver-otp-verify   → returns {token, driver}
-  verifyOtp(phone,code){ return new Promise(r=>setTimeout(()=>{
-    const ok = code==='123456' || /^\d{6}$/.test(code);   // demo: any 6 digits pass
-    r(ok?{ok:true,token:'demo.jwt.token',driver:{id:'demo-driver',name:'Demo Driver'}}:{ok:false});
-  },600)); },
-  // POST /driver-inspection   → inserts inspection + tyre_records, returns ref
-  submit(payload){ return new Promise(r=>setTimeout(()=>r({ok:true,ref:'FG-INSP-'+String(Math.floor(1000+Math.random()*9000))}),900)); }
+const API_BASE='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
+let driverToken=null;
+try{ driverToken=sessionStorage.getItem('fg_driver_token')||null; }catch(e){}
+function setToken(t){ driverToken=t; try{ t?sessionStorage.setItem('fg_driver_token',t):sessionStorage.removeItem('fg_driver_token'); }catch(e){} }
+function toE164(s){ const d=digits(s); if(d.length===10) return '+1'+d; if(d.length===11&&d[0]==='1') return '+'+d; return d?('+'+d):''; }
+function uuid(){ try{ return crypto.randomUUID(); }catch(e){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);}); } }
+
+const Api={
+  // POST /driver-otp-request → texts a code if the number is on file (always generic)
+  async requestOtp(phone){
+    const r=await fetch(API_BASE+'/driver-otp-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone})});
+    return r.json().catch(()=>({ok:true}));
+  },
+  // POST /driver-otp-verify → {ok, token, driver, vehicles}
+  async verifyOtp(phone,code){
+    const r=await fetch(API_BASE+'/driver-otp-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,code})});
+    return r.ok ? r.json().catch(()=>({ok:false})) : {ok:false};
+  },
+  // POST /driver-inspection → {ok, ref}  (Bearer driver token)
+  async submit(payload,token){
+    const r=await fetch(API_BASE+'/driver-inspection',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(token||driverToken||'')},body:JSON.stringify(payload)});
+    const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ok){ const e=new Error(j.error||('HTTP '+r.status)); e.httpStatus=r.status; throw e; }
+    return j;
+  }
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -521,12 +534,12 @@ let rtTimer=null;
 async function sendOtp(isResend){
   if(digits(state.phone).length!==10){ $('phone-err').classList.add('show'); return; }
   const btn=$('send-otp'); btn.disabled=true; btn.textContent=isResend?'Resending…':'Sending…';
-  await MockApi.requestOtp(state.phone);
+  try{ await Api.requestOtp(toE164(state.phone)); }catch(e){}
   btn.textContent='Send code';
   $('otp-block').style.display='block';
   $('masked-phone').textContent=maskPhone(state.phone);
   startResendCountdown();
-  toast('Code sent (demo: 123456)','info');
+  toast('If that number is on file, a code is on its way','info');
   const first=$('otp-row').querySelector('input'); if(first) first.focus();
 }
 function startResendCountdown(){
@@ -545,11 +558,14 @@ function setupOtpBoxes(){
 async function checkOtpComplete(boxes){
   const code=boxes.map(b=>b.value).join('');
   if(code.length!==6) return;
-  const res=await MockApi.verifyOtp(state.phone,code);
-  if(res.ok){
-    authed=true; clearInterval(rtTimer);
+  let res; try{ res=await Api.verifyOtp(toE164(state.phone),code); }catch(e){ res={ok:false}; }
+  if(res.ok && res.token){
+    authed=true; setToken(res.token); clearInterval(rtTimer);
     toast('Signed in ✓','success');
-    if(!state.truck) state.truck=new URLSearchParams(location.search).get('v')||'1024';
+    const vParam=new URLSearchParams(location.search).get('v');
+    const v0=res.vehicles&&res.vehicles[0];
+    if(!state.truck) state.truck = vParam || (v0&&v0.truckNumber) || '';
+    if(!state.trailer && v0) state.trailer=v0.trailerNumber||'';
     $('truck').value=state.truck; $('trailer').value=state.trailer||'';
     show(1); saveDraft();
   }else{
@@ -571,7 +587,7 @@ function validateVehicle(){
   if(!state.truck){ toast('Enter or pick a truck number','danger'); $('truck').focus(); return false; }
   saveDraft(); return true;
 }
-function ensureTimer(){ if(!startTs){ startTs=Date.now(); state.startTs=startTs; } }
+function ensureTimer(){ if(!startTs){ startTs=Date.now(); state.startTs=startTs; } if(!state.inspectionId) state.inspectionId=uuid(); }
 
 /* ════════════════════════════════════════════════════════════════
    2 · TYRES
@@ -824,20 +840,29 @@ function clearSig(){ const c=$('sig-pad'); if(sigCtx)sigCtx.clearRect(0,0,c.widt
    SUBMIT
    ════════════════════════════════════════════════════════════════ */
 function buildPayload(){
-  // tyre_records.readings — same shape the dispatcher app reads, enriched
-  const readings=[];
+  // tyres — same readings shape the dispatcher reads (status good/bad), enriched;
+  // include the photo dataURL so the function can store it.
+  const tyres=[];
   AXLES.forEach((axle,ai)=>axle.sides.forEach(pos=>{
     const t=state.tyres[tyreKey(ai,pos)]||{};
-    readings.push({ axleIndex:ai, position:pos, status:RATING_TO_STATUS[t.rating]||null,
-                    rating:t.rating||null, pressure:t.pressure||null, hasPhoto:!!t.photo });
+    const row={ axleIndex:ai, position:pos, status:RATING_TO_STATUS[t.rating]||null,
+                rating:t.rating||null, pressure:t.pressure||null };
+    if(t.photo) row.photo=t.photo;
+    tyres.push(row);
   }));
+  const checks=CHECK_ITEMS.map(i=>{
+    const c=state.checks[i.id]||{};
+    const o={ id:i.id, label:i.label, result:c.result||null, severity:c.severity||null, note:c.note||null };
+    if(c.photo) o.photo=c.photo;
+    return o;
+  });
   return {
-    driverPhone:state.phone, truckNumber:state.truck, trailerNumber:state.trailer||null,
+    inspectionId:state.inspectionId,
+    truckNumber:state.truck, trailerNumber:state.trailer||null,
     odometer:state.odo?Number(state.odo):null,
-    tyres:readings,
-    checks:CHECK_ITEMS.map(i=>({id:i.id,label:i.label,...(state.checks[i.id]||{result:null})})),
+    tyres, checks,
     gps:state.gps, durationSec:state.durationSec, startedAt:new Date(startTs||Date.now()).toISOString(),
-    finalNotes:state.finalNotes||null, signaturePresent:!!state.signature
+    finalNotes:state.finalNotes||null, signature:state.signature||null
   };
 }
 function validateReview(){
@@ -847,21 +872,30 @@ function validateReview(){
   if(!state.signature){ $('sig-err').classList.add('show'); if(ok)$('sig-pad').scrollIntoView({behavior:'smooth',block:'center'}); ok=false; }
   return ok;
 }
+function localRef(){ return 'FG-INSP-'+(state.inspectionId?state.inspectionId.replace(/-/g,'').slice(0,6).toUpperCase():String(Math.floor(1000+Math.random()*9000))); }
 async function submitInspection(){
   if(!validateReview()){ toast('Add mileage and signature','danger'); return; }
-  state.durationSec=elapsedSec();
-  const dock=$('dock'); const btn=dock.querySelector('.btn-primary'); btn.disabled=true; btn.textContent= online?'Submitting…':'Queuing…';
+  ensureTimer(); state.durationSec=elapsedSec();
+  const dock=$('dock'); const btn=dock.querySelector('.btn-primary'); btn.disabled=true; btn.textContent= (online&&navigator.onLine)?'Submitting…':'Queuing…';
   const payload=buildPayload();
-  if(!online){
-    queuePush(payload); finishDone({queued:true,ref:'FG-INSP-'+String(Math.floor(1000+Math.random()*9000))});
+  if(!online || !navigator.onLine){
+    queuePush(payload,driverToken); finishDone({queued:true,ref:localRef()});
     return;
   }
   try{
-    const res=await MockApi.submit(payload);
-    if(res.ok) finishDone({queued:false,ref:res.ref});
-    else throw new Error('submit failed');
+    const res=await Api.submit(payload,driverToken);
+    finishDone({queued:false,ref:res.ref});
   }catch(e){
-    queuePush(payload); finishDone({queued:true,ref:'FG-INSP-'+String(Math.floor(1000+Math.random()*9000))});
+    if(e&&e.name==='TypeError'){                  // network failure → queue, sync later
+      queuePush(payload,driverToken); finishDone({queued:true,ref:localRef()});
+    }else if(e&&e.httpStatus===401){              // session expired → sign in again
+      setToken(null); authed=false;
+      btn.disabled=false; btn.textContent='Submit inspection';
+      toast('Session expired — please sign in again','danger'); show(0);
+    }else{                                         // server reachable but rejected
+      btn.disabled=false; btn.textContent='Submit inspection';
+      toast('Submit failed: '+((e&&e.message)||'please try again'),'danger');
+    }
   }
 }
 function finishDone({queued,ref}){
@@ -884,12 +918,22 @@ function finishDone({queued,ref}){
 }
 
 /* ── offline queue (simulated sync) ── */
-function queuePush(payload){ try{ const q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); q.push({payload,at:Date.now()}); localStorage.setItem(QUEUE_KEY,JSON.stringify(q)); }catch(e){} }
-function queueFlush(){
+function queuePush(payload,token){ try{ const q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); q.push({payload,token,at:Date.now()}); localStorage.setItem(QUEUE_KEY,JSON.stringify(q)); }catch(e){} }
+let _flushing=false;
+async function queueFlush(){
+  if(_flushing) return;
   let q=[]; try{ q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }catch(e){}
   if(!q.length)return;
+  _flushing=true;
   toast('Back online — syncing '+q.length+' report'+(q.length>1?'s':'')+'…','info');
-  setTimeout(()=>{ localStorage.removeItem(QUEUE_KEY); toast('All reports synced ✓','success'); },1200);
+  const remaining=[];
+  for(const item of q){
+    try{ await Api.submit(item.payload,item.token); }   // idempotent: server upserts by inspectionId
+    catch(e){ remaining.push(item); }
+  }
+  if(remaining.length){ localStorage.setItem(QUEUE_KEY,JSON.stringify(remaining)); toast(remaining.length+' still pending — will retry','warning'); }
+  else{ localStorage.removeItem(QUEUE_KEY); toast('All reports synced ✓','success'); }
+  _flushing=false;
 }
 
 /* ── connection toggle (demo) + real events ── */
@@ -921,7 +965,7 @@ function compress(file,cb){
 /* ════════════════════════════════════════════════════════════════
    BOOT
    ════════════════════════════════════════════════════════════════ */
-function restart(){ localStorage.removeItem(DRAFT_KEY); state=blankState(); authed=false; startTs=null;
+function restart(){ localStorage.removeItem(DRAFT_KEY); setToken(null); state=blankState(); authed=false; startTs=null;
   ['phone','truck','trailer','odo','final-notes'].forEach(id=>{const e=$(id);if(e)e.value='';});
   $('otp-block').style.display='none'; document.querySelectorAll('#otp-row input').forEach(b=>b.value='');
   $('send-otp').disabled=true; show(0); }
@@ -933,11 +977,13 @@ function boot(){
   // prefill truck from ?v=
   const vParam=new URLSearchParams(location.search).get('v');
   if(vParam&&!state.truck) state.truck=vParam;
-  if(hadDraft&&authed&&step>0){
+  // resume only if still signed in (token present); else require OTP again
+  if(hadDraft&&authed&&driverToken&&step>0){
     toast('Resumed your saved draft','info');
     $('phone').value=state.phone||''; $('truck').value=state.truck||''; $('trailer').value=state.trailer||'';
     show(Math.min(step,4));
   }else{
+    authed=false; $('phone').value=state.phone||'';
     show(0);
   }
 }
