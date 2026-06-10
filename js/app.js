@@ -277,7 +277,7 @@ function renderInspections(){
     const rb=i.overallResult==='defect'?'badge-red':i.overallResult==='minor'?'badge-yellow':'badge-green';
     const rl=i.overallResult==='defect'?'Defect':i.overallResult==='minor'?'Minor':'Roadworthy';
     const quick=i.durationSec!=null&&i.durationSec<120;
-    html+=`<tr>
+    html+=`<tr onclick="openInspection('${i.id}')" style="cursor:pointer" title="Open full inspection">
       <td style="padding-left:18px;white-space:nowrap">${inspDT(i.submittedAt)}</td>
       <td><strong>#${esc(i.truckNumber||'')}</strong></td>
       <td>${esc(d?d.name:'—')}</td>
@@ -312,6 +312,87 @@ async function doSendLinkFromPicker(){
   if(!v||!v.assignedDriverId){ showToast('That truck has no assigned driver','danger'); return; }
   doSendLink(v.assignedDriverId,vid,v.truckNumber);
 }
+
+// ── Inspection detail view (click a row to open the full pre-trip) ──
+const TYRE_POS_LABEL={left:'Left',right:'Right','left-outer':'Left Outer','left-inner':'Left Inner','right-inner':'Right Inner','right-outer':'Right Outer'};
+async function openInspection(id){
+  let d=null;
+  try{
+    const res=await sb.from('inspections')
+      .select('id,ref,truck_number,trailer_number,driver_id,vehicle_id,started_at,submitted_at,duration_sec,odometer,gps_lat,gps_lng,gps_accuracy,overall_result,tyres_flagged,checks_failed,signature_url,notes,details')
+      .eq('id',id).maybeSingle();
+    if(res.error||!res.data){ showToast('Could not load inspection','danger'); return; }
+    d=res.data;
+  }catch(e){ showToast('Could not load inspection','danger'); return; }
+  // private photos/signature → short-lived signed URLs
+  const paths=[];
+  if(d.signature_url) paths.push(d.signature_url);
+  ((d.details&&d.details.tyres)||[]).forEach(t=>{ if(t.photoUrl) paths.push(t.photoUrl); });
+  ((d.details&&d.details.checks)||[]).forEach(c=>{ if(c.photoUrl) paths.push(c.photoUrl); });
+  const signed={};
+  if(paths.length){
+    try{
+      const { data:urls }=await sb.storage.from('inspection-photos').createSignedUrls(paths,3600);
+      (urls||[]).forEach(u=>{ if(u&&u.signedUrl&&!u.error) signed[u.path]=u.signedUrl; });
+    }catch(e){ /* photos just won't show */ }
+  }
+  renderInspectionModal(d,signed);
+}
+function inspThumb(path,signed){
+  if(!path||!signed[path]) return '';
+  return `<a href="${signed[path]}" target="_blank" rel="noopener" title="Open full image"><img src="${signed[path]}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);vertical-align:middle"/></a>`;
+}
+function renderInspectionModal(d,signed){
+  const tyres=(d.details&&d.details.tyres)||[];
+  let tyreHtml='';
+  AXLES.forEach((axle,ai)=>{
+    const rows=axle.sides.map(pos=>{
+      const t=tyres.find(x=>x.axleIndex===ai&&x.position===pos)||{};
+      const tread=t.rating==='fail'?'<span style="color:var(--danger);font-weight:700">Fail</span>':t.rating==='pass'?'<span style="color:var(--success)">Pass</span>':'<span class="text-sm">—</span>';
+      const pres=t.pressure==='low'?'<span style="color:var(--warning);font-weight:700">Low</span>':t.pressure==='good'?'<span style="color:var(--success)">Good</span>':'<span class="text-sm">—</span>';
+      return `<tr><td style="padding:3px 8px">${TYRE_POS_LABEL[pos]||esc(pos)}</td><td style="padding:3px 8px">${tread}</td><td style="padding:3px 8px">${pres}</td><td style="padding:3px 8px;text-align:right">${inspThumb(t.photoUrl,signed)}</td></tr>`;
+    }).join('');
+    tyreHtml+=`<div style="font-weight:700;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin:10px 0 2px">${esc(axle.name)}</div><table style="width:100%;border-collapse:collapse"><tbody>${rows}</tbody></table>`;
+  });
+  const checks=(d.details&&d.details.checks)||[];
+  const checkHtml=checks.length?checks.map(c=>{
+    const r=c.result==='fail'?'<span class="badge badge-red">Fail</span>':c.result==='pass'?'<span class="badge badge-green">Pass</span>':c.result==='na'?'<span class="badge badge-gray">N/A</span>':'<span class="text-sm">—</span>';
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--border)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><strong>${esc(c.label||c.id||'')}</strong><span>${r}${c.severity?` <span class="badge badge-yellow">${esc(c.severity)}</span>`:''}</span></div>${c.note?`<div class="text-sm" style="margin-top:4px">${esc(c.note)}</div>`:''}${inspThumb(c.photoUrl,signed)?`<div style="margin-top:6px">${inspThumb(c.photoUrl,signed)}</div>`:''}</div>`;
+  }).join(''):'<div class="text-sm">No checks recorded</div>';
+  const sig=d.signature_url&&signed[d.signature_url]?`<img src="${signed[d.signature_url]}" style="max-width:280px;width:100%;background:#fff;border-radius:8px;border:1px solid var(--border)"/>`:'<span class="text-sm">— not captured —</span>';
+  const gps=(d.gps_lat&&d.gps_lng)?`<a href="https://maps.google.com/?q=${d.gps_lat},${d.gps_lng}" target="_blank" rel="noopener" style="color:var(--primary);text-decoration:none">📍 ${(+d.gps_lat).toFixed(5)}, ${(+d.gps_lng).toFixed(5)}</a>`:'—';
+  const drv=DRIVERS.find(x=>x.id===d.driver_id);
+  const rb=d.overall_result==='defect'?'badge-red':d.overall_result==='minor'?'badge-yellow':'badge-green';
+  const dur=d.duration_sec!=null?(Math.floor(d.duration_sec/60)+'m '+String(d.duration_sec%60).padStart(2,'0')+'s'):'—';
+  const quick=d.duration_sec!=null&&d.duration_sec<120;
+  const hdr=(t)=>`<div class="card-header" style="padding:14px 0 6px"><span class="card-header-accent"></span>${t}</div>`;
+  const html=`<div class="modal-overlay" id="insp-modal" onclick="if(event.target===this)closeInspectionModal()">
+    <div class="modal" style="max-width:680px">
+      <div class="modal-header"><span>📋 Pre-Trip · ${esc(d.ref||'')}</span><button class="btn btn-ghost btn-sm" onclick="closeInspectionModal()" style="font-size:18px;line-height:1;padding:2px 9px">×</button></div>
+      <div class="modal-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 16px;font-size:13px;margin-bottom:6px">
+          <div><span class="text-sm">Truck</span><br><strong>#${esc(d.truck_number||'—')}${d.trailer_number?' · '+esc(d.trailer_number):''}</strong></div>
+          <div><span class="text-sm">Driver</span><br><strong>${esc(drv?drv.name:'—')}</strong></div>
+          <div><span class="text-sm">Result</span><br><span class="badge ${rb}">${esc(d.overall_result||'')}</span></div>
+          <div><span class="text-sm">Submitted</span><br><strong>${inspDT(d.submitted_at)}</strong></div>
+          <div><span class="text-sm">Odometer</span><br><strong>${d.odometer?Number(d.odometer).toLocaleString():'—'}</strong></div>
+          <div><span class="text-sm">Walk-around</span><br><strong>${dur}</strong>${quick?' <span style="color:var(--warning)" title="Completed very quickly — verify it was a real walk-around">⚠</span>':''}</div>
+          <div style="grid-column:1/-1"><span class="text-sm">Location</span><br>${gps}</div>
+        </div>
+        ${hdr('Tyres — tread / pressure')}
+        ${tyreHtml}
+        ${hdr('Safety checks')}
+        ${checkHtml}
+        ${hdr('Driver signature')}
+        ${sig}
+        ${d.notes?hdr('Driver notes')+`<div class="text-sm">${esc(d.notes)}</div>`:''}
+      </div>
+    </div></div>`;
+  closeInspectionModal();
+  const tmp=document.createElement('div'); tmp.innerHTML=html;
+  if(tmp.firstElementChild) document.body.appendChild(tmp.firstElementChild);
+}
+function closeInspectionModal(){ const m=document.getElementById('insp-modal'); if(m) m.remove(); }
 
 // ═══════════════════════════════════════════════════════
 // ROUTING
