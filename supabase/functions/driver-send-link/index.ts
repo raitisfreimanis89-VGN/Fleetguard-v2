@@ -10,7 +10,7 @@ const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
 const ANON_KEY       = Deno.env.get("SUPABASE_ANON_KEY")!;
 const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;
 const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
-const PORTAL_BASE    = Deno.env.get("PORTAL_BASE_URL") ?? "https://fleetguards.app/driver.html";
+const PORTAL_BASE    = Deno.env.get("PORTAL_BASE_URL") ?? "https://fleetguards.app/driver";
 
 const svc = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -47,7 +47,7 @@ serve(async (req) => {
     truck = v?.truck_number ?? "";
   }
 
-  const url = truck ? `${PORTAL_BASE}?v=${encodeURIComponent(truck)}` : PORTAL_BASE;
+  const url = truck ? `${PORTAL_BASE}/${encodeURIComponent(truck)}` : PORTAL_BASE;
   const msg = `FleetGuard pre-trip${truck ? ` for Truck #${truck}` : ""}: tap to start your inspection ${url}`;
 
   const gv = await fetch(`${GV_SERVICE_URL}/send`, {
