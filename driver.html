@@ -177,7 +177,7 @@ textarea{resize:vertical;min-height:64px}
   color:var(--text2);font-weight:800;font-size:13px;cursor:pointer;min-height:46px}
 .seg button.on-pass{background:var(--success-bg);border-color:var(--success);color:var(--success)}
 .seg button.on-fail{background:var(--danger-bg);border-color:var(--danger);color:var(--danger-text)}
-.seg button.on-na{background:var(--surface-highest);border-color:var(--text3);color:var(--text2)}
+.ci{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;flex-shrink:0}
 .fail-extra{margin-top:13px;padding-top:13px;border-top:1px dashed var(--border);display:none}
 .fail-extra.show{display:block;animation:fade .2s}
 .sev{display:flex;gap:6px;margin-bottom:12px}
@@ -397,10 +397,10 @@ const TOTAL_TYRES=AXLES.reduce((n,a)=>n+a.sides.length,0); // 18
 
 const CHECK_ITEMS=[
   {id:'air_leak',     label:'Air leak',          icon:'💨', hint:'Listen for hissing; check air build-up & governor cut-out.'},
-  {id:'windshield',   label:'Windshield damage', icon:'🪟', hint:'Cracks, chips, wipers, mirrors.'},
+  {id:'windshield',   label:'Windshield damage', icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.6 8.2C4.8 7.3 5.5 6.8 6.4 6.8h11.2c.9 0 1.6.5 1.8 1.4l1 6.2c.16 1-.6 1.9-1.6 1.9H5.2c-1 0-1.76-.9-1.6-1.9z"/><path d="M12 6.8v9.5"/><path d="M6.5 16l2.4-3"/><path d="M17.5 16l-2.4-3"/></svg>', hint:'Cracks, chips, wipers, mirrors.'},
   {id:'hub_leaks',    label:'Hub leaks',         icon:'🛢️', hint:'Oil/grease at wheel hubs and seals.'},
   {id:'abs_light',    label:'ABS light',         icon:'🟡', hint:'Dash ABS lamp off after start-up.'},
-  {id:'check_engine', label:'Check-engine light',icon:'🛑', hint:'MIL / amber engine lamp.'},
+  {id:'check_engine', label:'Check-engine light',icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="#f59e0b" aria-label="check engine"><rect x="5" y="9" width="13" height="8" rx="1.5"/><rect x="7.5" y="6" width="6" height="3.5" rx="1"/><rect x="9" y="4.3" width="1.8" height="2" rx="0.6"/><rect x="13.5" y="7.5" width="5" height="2.4" rx="0.8"/><rect x="3" y="11" width="2.5" height="3" rx="0.8"/><rect x="17.5" y="10.5" width="3" height="3" rx="0.8"/><rect x="6.5" y="16.5" width="2.4" height="2" rx="0.6"/><rect x="13.5" y="16.5" width="2.4" height="2" rx="0.6"/></svg>', hint:'MIL / amber engine lamp.'},
 ];
 
 /* ════════════════════════════════════════════════════════════════
@@ -700,13 +700,12 @@ function buildChecks(){
     const c=state.checks[item.id]||{};
     const div=document.createElement('div'); div.className='card';
     div.innerHTML=
-      '<div class="card-h"><span class="acc"></span>'+item.icon+' '+esc(item.label)+'</div>'
+      '<div class="card-h"><span class="acc"></span><span class="ci">'+item.icon+'</span>'+esc(item.label)+'</div>'
      +'<div class="card-b">'
        +'<div class="hint" style="margin:-2px 0 12px">'+esc(item.hint)+'</div>'
        +'<div class="seg" id="seg-'+item.id+'">'
          +segBtn(item.id,'pass','Pass',c.result)
          +segBtn(item.id,'fail','Fail',c.result)
-         +segBtn(item.id,'na','N/A',c.result)
        +'</div>'
        +'<div class="fail-extra'+(c.result==='fail'?' show':'')+'" id="fx-'+item.id+'">'
          +'<label>Severity</label>'
@@ -731,7 +730,7 @@ function setCheck(id,val){
   state.checks[id]=Object.assign({result:'',severity:'',photo:null,note:''},state.checks[id],{result:val});
   if(val!=='fail')state.checks[id].severity='';
   const seg=$('seg-'+id); seg.querySelectorAll('button').forEach(b=>b.className='');
-  seg.querySelectorAll('button')[{pass:0,fail:1,na:2}[val]].className='on-'+val;
+  seg.querySelectorAll('button')[{pass:0,fail:1}[val]].className='on-'+val;
   $('fx-'+id).classList.toggle('show',val==='fail');
   updateCheckCount(); saveDraft();
 }
