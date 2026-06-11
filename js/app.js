@@ -524,6 +524,7 @@ function renderDispatcherBoard(){
             <span class="status-pill ${brakeClass}">🔧 Brakes ${s.brakeDays!==null?s.brakeDays+'d':'None'}</span>
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
             <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
+            <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 PTI ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
           </div>
         </div>
       </div>`;
@@ -575,6 +576,7 @@ function renderDispatcherBoard(){
           <span class="status-pill ${brakeClass}" style="font-size:9px">🔧 ${s.brakeDays!==null?s.brakeDays+'d':'—'}</span>
           <span class="status-pill ${tyreClass}" style="font-size:9px">⭕ ${s.tyreDays!==null?s.tyreDays+'d':'—'}</span>
           <span class="status-pill ${svcClass}" style="font-size:9px">🔵 ${s.serviceDays!==null?s.serviceDays+'d':'—'}</span>
+          <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}" style="font-size:9px">📋 ${s.preTripToday?'✓':'—'}</span>
         </div>
       </div>`;
     });
