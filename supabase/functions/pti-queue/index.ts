@@ -15,6 +15,7 @@ const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
 const PORTAL_BASE    = Deno.env.get("PORTAL_BASE_URL") ?? "https://fleetguards.app/driver";
 const WAVE_SIZE      = parseInt(Deno.env.get("PTI_WAVE_SIZE") ?? "5", 10);
 const RECENT_DAYS    = parseInt(Deno.env.get("PTI_RECENT_DAYS") ?? "3", 10);
+const RESEND_HOURS   = parseInt(Deno.env.get("PTI_RESEND_HOURS") ?? "24", 10);
 const MAX_ATTEMPTS   = 3;
 
 const svc = createClient(SUPABASE_URL, SERVICE_KEY);
@@ -31,17 +32,20 @@ async function requireAdmin(req: Request): Promise<{ id: string; email: string |
 }
 
 // Skip rules agreed 2026-06-11: vacation, PTI within RECENT_DAYS, sms_hold,
-// no phone, no assigned truck, already pending in the queue.
+// no phone, no assigned truck, already pending in the queue, and any link
+// (bulk or single) successfully sent within RESEND_HOURS — no double-texting.
 async function eligibility() {
   const since = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString();
-  const [dr, ph, ve, insp, q] = await Promise.all([
+  const sinceResend = new Date(Date.now() - RESEND_HOURS * 3_600_000).toISOString();
+  const [dr, ph, ve, insp, q, ls] = await Promise.all([
     svc.from("drivers").select("id, name, on_vacation"),
     svc.from("driver_phones").select("driver_id, phone_number, sms_hold"),
     svc.from("vehicles").select("id, truck_number, assigned_driver_id"),
     svc.from("inspections").select("driver_id").gte("submitted_at", since),
     svc.from("pti_send_queue").select("driver_id").eq("status", "pending"),
+    svc.from("link_sends").select("driver_id").eq("status", "sent").gte("created_at", sinceResend),
   ]);
-  const errs = [dr, ph, ve, insp, q].map((r) => r.error?.message).filter(Boolean);
+  const errs = [dr, ph, ve, insp, q, ls].map((r) => r.error?.message).filter(Boolean);
   if (errs.length) throw new Error("DB read failed: " + errs.join("; "));
 
   const phones = new Map((ph.data ?? []).map((p) => [p.driver_id, p]));
@@ -51,18 +55,20 @@ async function eligibility() {
   });
   const recent = new Set((insp.data ?? []).map((i) => i.driver_id));
   const queued = new Set((q.data ?? []).map((r) => r.driver_id));
+  const recentLink = new Set((ls.data ?? []).map((r) => r.driver_id));
 
-  const skipped = { vacation: 0, recentPTI: 0, smsHold: 0, noPhone: 0, noVehicle: 0, alreadyQueued: 0 };
+  const skipped = { vacation: 0, recentPTI: 0, linkSentRecently: 0, smsHold: 0, noPhone: 0, noVehicle: 0, alreadyQueued: 0 };
   const eligible: { driver_id: string; name: string; vehicle_id: string; truck_number: string; phone: string }[] = [];
   for (const d of dr.data ?? []) {
-    if (d.on_vacation)        { skipped.vacation++;      continue; }
-    if (recent.has(d.id))     { skipped.recentPTI++;     continue; }
+    if (d.on_vacation)        { skipped.vacation++;         continue; }
+    if (recent.has(d.id))     { skipped.recentPTI++;        continue; }
+    if (recentLink.has(d.id)) { skipped.linkSentRecently++; continue; }
     const p = phones.get(d.id);
-    if (!p?.phone_number)     { skipped.noPhone++;       continue; }
-    if (p.sms_hold)           { skipped.smsHold++;       continue; }
+    if (!p?.phone_number)     { skipped.noPhone++;          continue; }
+    if (p.sms_hold)           { skipped.smsHold++;          continue; }
     const v = vehByDriver.get(d.id);
-    if (!v?.truck_number)     { skipped.noVehicle++;     continue; }
-    if (queued.has(d.id))     { skipped.alreadyQueued++; continue; }
+    if (!v?.truck_number)     { skipped.noVehicle++;        continue; }
+    if (queued.has(d.id))     { skipped.alreadyQueued++;    continue; }
     eligible.push({ driver_id: d.id, name: d.name, vehicle_id: v.id, truck_number: v.truck_number, phone: p.phone_number });
   }
   return { total: (dr.data ?? []).length, eligible, skipped };

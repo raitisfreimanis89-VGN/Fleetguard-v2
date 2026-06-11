@@ -336,7 +336,7 @@ async function doBulkSendAll(){
     if(!p.eligible){ showToast('No eligible drivers — everyone is covered or on hold','info'); return; }
     const s=p.skipped||{};
     const ok=await confirm2(`Queue PTI links for ${p.eligible} of ${p.total} drivers?`,
-      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`);
+      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.linkSentRecently||0} got a link in last 24h · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`);
     if(!ok) return;
     const j=await ptiQueueCall(token,'enqueue');
     if(j.httpOk&&j.ok){ showToast(j.queued+' links queued — sending in waves of 5','success'); loadPtiQueueStatus(); }
