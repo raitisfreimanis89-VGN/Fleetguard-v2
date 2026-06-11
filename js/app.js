@@ -336,7 +336,8 @@ async function doBulkSendAll(){
     if(!p.eligible){ showToast('No eligible drivers — everyone is covered or on hold','info'); return; }
     const s=p.skipped||{};
     const ok=await confirm2(`Queue PTI links for ${p.eligible} of ${p.total} drivers?`,
-      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.linkSentRecently||0} got a link in last 24h · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`);
+      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.linkSentRecently||0} got a link in last 24h · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`,
+      '📨 Queue '+p.eligible+' links','btn btn-primary');
     if(!ok) return;
     const j=await ptiQueueCall(token,'enqueue');
     if(j.httpOk&&j.ok){ showToast(j.queued+' links queued — sending in waves of 5','success'); loadPtiQueueStatus(); }
@@ -346,7 +347,7 @@ async function doBulkSendAll(){
 }
 async function doBulkCancel(){
   if(!isAdmin()) return;
-  const ok=await confirm2('Cancel all pending PTI links?','Links already sent are not affected — only the ones still waiting in the queue.');
+  const ok=await confirm2('Cancel all pending PTI links?','Links already sent are not affected — only the ones still waiting in the queue.','Cancel pending','btn btn-danger');
   if(!ok) return;
   try{
     const { data:{ session } } = await sb.auth.getSession();
@@ -1262,10 +1263,12 @@ function showToast(msg,type='success'){
   toast.style.cssText+=';'+(colors[type]||colors.success);toast.textContent=msg;toast.style.opacity='1';
   clearTimeout(toastTimer);toastTimer=setTimeout(()=>{toast.style.opacity='0';},3000);
 }
-async function confirm2(title,body){
+async function confirm2(title,body,okLabel,okClass){
   return new Promise(resolve=>{
     window._confirmResolve=resolve;
     document.getElementById('confirm-title').textContent=title;document.getElementById('confirm-body').textContent=body;
+    const okBtn=document.getElementById('confirm-ok');
+    if(okBtn){ okBtn.textContent=okLabel||'Delete'; okBtn.className=okClass||'btn btn-danger'; }
     document.getElementById('confirm-modal').style.display='flex';
   });
 }
