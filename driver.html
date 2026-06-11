@@ -141,6 +141,8 @@ textarea{resize:vertical;min-height:64px}
 .axle-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
 .axle-name{font-weight:800;font-size:13px}
 .axle-name .cnt{color:var(--text3);font-weight:600;font-size:11px;margin-left:6px}
+.axle-name .phb{font-weight:700;font-size:11px;margin-left:7px;color:var(--warning)}
+.axle-name .phb.ok{color:var(--success)}
 .tyre{border-top:1px dashed var(--border);padding-top:11px;margin-top:11px}
 .tyre:first-of-type{border-top:none;padding-top:0;margin-top:0}
 .tyre-top{display:flex;align-items:center;gap:10px;margin-bottom:9px}
@@ -302,7 +304,7 @@ textarea{resize:vertical;min-height:64px}
     <section class="screen" id="sc-tyres">
       <div class="eyebrow">Step 2 of 4 · <span id="tyre-count">0 / 18 tyres</span></div>
       <div class="screen-title">Tyre tread check</div>
-      <div class="screen-sub">For each tyre set tread (Pass/Fail) and pressure (Good/Low). Photo optional. Tip: "Pass axle" sets a whole axle at once.</div>
+      <div class="screen-sub">For each tyre set tread (Pass/Fail) and pressure (Good/Low). <b>Photos are required — at least one tyre photo on every axle.</b> Tip: "Pass axle" sets a whole axle at once.</div>
       <div id="truck-wrap"></div>
       <div id="axles"></div>
     </section>
@@ -601,7 +603,8 @@ function buildAxles(){
   AXLES.forEach((axle,ai)=>{
     const filled=axle.sides.filter(p=>tyreDone(ai,p)).length;
     const div=document.createElement('div'); div.className='axle'; div.id='axle-'+ai;
-    let h='<div class="axle-head"><div class="axle-name">'+esc(axle.name)+'<span class="cnt">'+filled+'/'+axle.sides.length+'</span></div>'
+    let h='<div class="axle-head"><div class="axle-name">'+esc(axle.name)+'<span class="cnt">'+filled+'/'+axle.sides.length+'</span>'
+         +'<span class="phb'+(axlePhotoCount(ai)>0?' ok':'')+'" id="phb-'+ai+'">'+(axlePhotoCount(ai)>0?'📷 ✓':'📷 photo required')+'</span></div>'
          +'<button class="axle-quick" onclick="passAxle('+ai+')">✓ Pass axle</button></div>';
     axle.sides.forEach(pos=>{
       const k=tyreKey(ai,pos); const t=state.tyres[k]||{};
@@ -616,7 +619,7 @@ function buildAxles(){
           +tyreBtn(ai,pos,'pressure','low','Low',t.pressure)
         +'</div></div>'
         +'<div class="tyre-more">'
-          +'<div class="mini-photo'+(t.photo?' has':'')+'" id="ph-'+ai+'-'+pos+'" onclick="document.getElementById(\'phin-'+ai+'-'+pos+'\').click()">'+(t.photo?'📷 Photo ✓':'📷 Add photo (optional)')+'</div>'
+          +'<div class="mini-photo'+(t.photo?' has':'')+'" id="ph-'+ai+'-'+pos+'" onclick="document.getElementById(\'phin-'+ai+'-'+pos+'\').click()">'+(t.photo?'📷 Photo ✓':'📷 Add photo')+'</div>'
           +'<input id="phin-'+ai+'-'+pos+'" type="file" accept="image/*" capture="environment" style="display:none" onchange="setTyrePhoto('+ai+',\''+pos+'\',this)"/>'
         +'</div></div>';
     });
@@ -638,7 +641,9 @@ function setTyre(ai,pos,group,val){
 function setTyrePhoto(ai,pos,input){
   const f=input.files&&input.files[0]; if(!f)return;
   compress(f,data=>{ const k=tyreKey(ai,pos); state.tyres[k]=Object.assign({rating:'',pressure:'',note:''},state.tyres[k],{photo:data});
-    $('ph-'+ai+'-'+pos).classList.add('has'); $('ph-'+ai+'-'+pos).textContent='📷 Photo ✓'; toast('Photo attached','success'); saveDraft(); });
+    $('ph-'+ai+'-'+pos).classList.add('has'); $('ph-'+ai+'-'+pos).textContent='📷 Photo ✓';
+    refreshAxlePhotoBadge(ai); const ax=$('axle-'+ai); if(ax) ax.classList.remove('missing');
+    toast('Photo attached','success'); saveDraft(); });
 }
 function passAxle(ai){ AXLES[ai].sides.forEach(pos=>{ setTyre(ai,pos,'tread','pass'); setTyre(ai,pos,'pressure','good'); }); toast(AXLES[ai].name+' → Pass + Good','success'); }
 function refreshAxleCount(ai){
@@ -646,6 +651,11 @@ function refreshAxleCount(ai){
   const cnt=$('axle-'+ai).querySelector('.cnt'); if(cnt)cnt.textContent=filled+'/'+axle.sides.length;
 }
 function tyreDone(ai,p){ const t=state.tyres[tyreKey(ai,p)]; return !!(t&&t.rating&&t.pressure); }
+function axlePhotoCount(ai){ return AXLES[ai].sides.filter(p=>state.tyres[tyreKey(ai,p)]?.photo).length; }
+function refreshAxlePhotoBadge(ai){
+  const b=$('phb-'+ai); if(!b)return; const n=axlePhotoCount(ai);
+  b.classList.toggle('ok',n>0); b.textContent=n>0?'📷 ✓':'📷 photo required';
+}
 function countTyres(){ let n=0; AXLES.forEach((a,ai)=>a.sides.forEach(p=>{ if(tyreDone(ai,p))n++; })); return n; }
 function updateTyreCount(){ $('tyre-count').textContent=countTyres()+' / '+TOTAL_TYRES+' tyres'; }
 function validateTyres(){
@@ -656,6 +666,14 @@ function validateTyres(){
     if(miss&&firstMissing===null)firstMissing=ai;
   });
   if(firstMissing!==null){ toast('Set tread + pressure on every tyre','danger'); $('axle-'+firstMissing)?.scrollIntoView({behavior:'smooth',block:'center'}); return false; }
+  // photos are mandatory: at least one tyre photo on every axle
+  let firstNoPhoto=null;
+  AXLES.forEach((axle,ai)=>{
+    const none=axlePhotoCount(ai)===0;
+    const el=$('axle-'+ai); if(el&&none)el.classList.add('missing');
+    if(none&&firstNoPhoto===null)firstNoPhoto=ai;
+  });
+  if(firstNoPhoto!==null){ toast('Photo required — add at least one tyre photo on each axle','danger'); $('axle-'+firstNoPhoto)?.scrollIntoView({behavior:'smooth',block:'center'}); return false; }
   return true;
 }
 // ── semi tractor + trailer diagram ──
