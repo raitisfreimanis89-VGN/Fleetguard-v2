@@ -4,11 +4,14 @@ const cron  = require('node-cron');
 const fetch = require('node-fetch');
 const log   = require('./logger');
 const { pollReplies } = require('./gvoice');
+const { enqueue }      = require('./queue');
 
 const POLL_MINUTES  = parseInt(process.env.REPLY_POLL_INTERVAL_MINUTES || '3', 10);
 const SCAN_MINUTES  = parseInt(process.env.SCAN_INTERVAL_MINUTES || '10', 10);
+const DRAIN_MINUTES = parseInt(process.env.PTI_DRAIN_INTERVAL_MINUTES || '5', 10);
 const INBOUND_URL   = process.env.SUPABASE_INBOUND_SMS_URL;
 const REMINDERS_URL = process.env.SUPABASE_SEND_REMINDERS_URL;
+const DRAIN_URL     = process.env.SUPABASE_PTI_DRAIN_URL;
 const SECRET        = process.env.GV_SERVICE_SECRET;
 const ANON_KEY      = process.env.SUPABASE_ANON_KEY;
 
@@ -53,7 +56,8 @@ async function runReplyPoll() {
   busy = true;
   log.debug('Polling Google Voice inbox...');
   try {
-    const replies = await pollReplies(POLL_MINUTES + 1);
+    // page op goes through the FIFO so polls never collide with sends
+    const replies = await enqueue('reply-poll', () => pollReplies(POLL_MINUTES + 1));
 
     if (replies.length === 0) {
       log.debug('No new replies');
@@ -91,6 +95,39 @@ async function runReplyPoll() {
   }
 }
 
+// ── PTI link queue drain — delivers what an admin explicitly queued ──
+// The cron never decides to send; it only ships rows created by the
+// admin's "Send PTI link to all" action (wave pattern, 5 per cycle).
+let drainBusy = false;
+async function runPtiDrain() {
+  if (!DRAIN_URL) return;
+  if (drainBusy) { log.debug('PTI drain skipped — previous drain still running'); return; }
+  drainBusy = true;
+  try {
+    const res = await fetch(DRAIN_URL, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${ANON_KEY}`,
+        'x-api-key':     SECRET,
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ action: 'drain' }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if ((data.sent ?? 0) || (data.failed ?? 0) || (data.remaining ?? 0)) {
+        log.info(`PTI drain — sent:${data.sent} failed:${data.failed} remaining:${data.remaining}`);
+      }
+    } else {
+      log.warn(`PTI drain returned ${res.status}: ${JSON.stringify(data)}`);
+    }
+  } catch (err) {
+    log.error(`PTI drain failed: ${err.message}`);
+  } finally {
+    drainBusy = false;
+  }
+}
+
 // ── Start all scheduled jobs ───────────────────────────────────
 function startScheduler() {
   // Reply poll: every N minutes
@@ -100,6 +137,12 @@ function startScheduler() {
   // Reminder scan: every SCAN_MINUTES — drains the backlog in batches
   cron.schedule(`*/${SCAN_MINUTES} * * * *`, runStartupScan);
   log.info(`Reminder scan scheduled every ${SCAN_MINUTES} min (batch of 4)`);
+
+  // PTI link drain: only active when SUPABASE_PTI_DRAIN_URL is configured
+  if (DRAIN_URL) {
+    cron.schedule(`*/${DRAIN_MINUTES} * * * *`, runPtiDrain);
+    log.info(`PTI link drain scheduled every ${DRAIN_MINUTES} min (wave of 5)`);
+  }
 }
 
 module.exports = { runStartupScan, startScheduler };

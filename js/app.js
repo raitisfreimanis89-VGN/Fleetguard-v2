@@ -264,7 +264,12 @@ function renderInspections(){
         <select id="sl-vehicle"><option value="">— select truck —</option>${opts}</select></div>
       <button class="btn btn-primary" onclick="doSendLinkFromPicker()">📲 Send link</button>
     </div>
-    <div class="text-sm" style="margin-top:8px;color:var(--text3)">🔒 Links are sent only when you click here — never automatically.</div>`;
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="pti-bulk-btn" class="btn btn-ghost" style="border:1px solid var(--border-strong)" onclick="doBulkSendAll()">📨 Send PTI link to ALL drivers</button>
+      <span class="text-sm" id="pti-queue-status" style="color:var(--text2)"></span>
+    </div>
+    <div class="text-sm" style="margin-top:8px;color:var(--text3)">🔒 Links are sent only when you click here — never automatically. Bulk sends go out in waves of 5 every 5 minutes.</div>`;
+    setTimeout(loadPtiQueueStatus,50);
   }
   html+=`</div></div>`;
   html+=`<div class="card" style="max-width:1040px"><div class="card-body" style="padding:0"><div class="table-wrap"><table>
@@ -311,6 +316,60 @@ async function doSendLinkFromPicker(){
   const v=VEHICLES.find(x=>x.id===vid);
   if(!v||!v.assignedDriverId){ showToast('That truck has no assigned driver','danger'); return; }
   doSendLink(v.assignedDriverId,vid,v.truckNumber);
+}
+
+// ── Bulk PTI rollout: preview → confirm → enqueue; bot drains 5/5min ──
+async function ptiQueueCall(token,action){
+  const r=await fetch(DRIVER_FN_BASE+'/pti-queue',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({action})});
+  const j=await r.json().catch(()=>({}));
+  return {httpOk:r.ok,status:r.status,...j};
+}
+async function doBulkSendAll(){
+  if(!isAdmin()){ showToast('Admins only','danger'); return; }
+  const btn=document.getElementById('pti-bulk-btn'); if(btn)btn.disabled=true;
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token=session&&session.access_token;
+    if(!token){ showToast('Session expired — sign in again','danger'); return; }
+    const p=await ptiQueueCall(token,'preview');
+    if(!p.httpOk||!p.ok){ showToast(p.error||('Preview failed — HTTP '+p.status),'danger'); return; }
+    if(!p.eligible){ showToast('No eligible drivers — everyone is covered or on hold','info'); return; }
+    const s=p.skipped||{};
+    const ok=await confirm2(`Queue PTI links for ${p.eligible} of ${p.total} drivers?`,
+      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`);
+    if(!ok) return;
+    const j=await ptiQueueCall(token,'enqueue');
+    if(j.httpOk&&j.ok){ showToast(j.queued+' links queued — sending in waves of 5','success'); loadPtiQueueStatus(); }
+    else showToast(j.error||'Enqueue failed','danger');
+  }catch(e){ showToast('Bulk send failed: '+((e&&e.message)||'network'),'danger'); }
+  finally{ if(btn)btn.disabled=false; }
+}
+async function doBulkCancel(){
+  if(!isAdmin()) return;
+  const ok=await confirm2('Cancel all pending PTI links?','Links already sent are not affected — only the ones still waiting in the queue.');
+  if(!ok) return;
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token=session&&session.access_token;
+    if(!token){ showToast('Session expired — sign in again','danger'); return; }
+    const j=await ptiQueueCall(token,'cancel');
+    if(j.httpOk&&j.ok){ showToast(j.cancelled+' pending links cancelled','success'); loadPtiQueueStatus(); }
+    else showToast(j.error||'Cancel failed','danger');
+  }catch(e){ showToast('Cancel failed: '+((e&&e.message)||'network'),'danger'); }
+}
+async function loadPtiQueueStatus(){
+  const el=document.getElementById('pti-queue-status'); if(!el||!sb||!isAdmin())return;
+  try{
+    // guarded if table missing (pre-migration) — same convention as INSPECTIONS
+    const {data,error}=await sb.from('pti_send_queue').select('status');
+    if(error||!data){ el.textContent=''; return; }
+    const c={pending:0,sent:0,failed:0};
+    data.forEach(r=>{ if(c[r.status]!=null)c[r.status]++; });
+    el.innerHTML=(c.pending+c.sent+c.failed)===0?'':
+      `Queue: <b>${c.pending}</b> pending · <b style="color:var(--success)">${c.sent}</b> sent`
+      +(c.failed?` · <b style="color:var(--danger)">${c.failed} failed</b>`:'')
+      +(c.pending?` <button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="doBulkCancel()">✕ Cancel pending</button>`:'');
+  }catch(e){}
 }
 
 // ── Inspection detail view (click a row to open the full pre-trip) ──

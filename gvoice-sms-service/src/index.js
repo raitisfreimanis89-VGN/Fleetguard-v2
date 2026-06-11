@@ -3,6 +3,7 @@ require('dotenv').config();
 const express  = require('express');
 const log      = require('./logger');
 const { initBrowser, sendSMS, closeBrowser } = require('./gvoice');
+const { enqueue, queueDepth }                 = require('./queue');
 const { runStartupScan, startScheduler }      = require('./scheduler');
 
 const PORT   = parseInt(process.env.PORT || '3000', 10);
@@ -35,9 +36,14 @@ app.post('/send', requireSecret, async (req, res) => {
   log.info(`Send request → ${to.slice(0, 6)}**** (notif: ${notificationId ?? 'none'})`);
 
   try {
-    await sendSMS(to, body);
+    // serialized: concurrent requests wait their turn for the one GV page
+    await enqueue(`send→${to.slice(0, 6)}****`, () => sendSMS(to, body));
     res.json({ ok: true, notificationId });
   } catch (err) {
+    if (err.queueFull) {
+      log.warn(`Send rejected — queue full (depth ${queueDepth()})`);
+      return res.status(503).json({ ok: false, error: 'Send queue full — try again shortly' });
+    }
     log.error(`sendSMS failed: ${err.message}`);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -48,6 +54,7 @@ app.get('/health', (req, res) => {
   res.json({
     status:  'ok',
     service: 'fleetguard-gvoice',
+    queue:   queueDepth(),
     time:    new Date().toISOString(),
   });
 });
