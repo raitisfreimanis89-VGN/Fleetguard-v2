@@ -15,3 +15,12 @@ If procs.Count = 0 Then
   sh.CurrentDirectory = BOT_DIR   ' .env and logs\ resolve relative to here
   sh.Run "cmd /c node """ & BOT_DIR & "\src\index.js"" >> logs\bot.log 2>&1", 0, False
 End If
+
+' ngrok tunnel (static domain -> :3000). Same pattern: start only if absent.
+' Uses the App Execution Alias path, stable across ngrok store updates.
+Set ngrokProcs = wmi.ExecQuery("SELECT ProcessId FROM Win32_Process WHERE Name='ngrok.exe'")
+If ngrokProcs.Count = 0 Then
+  Set sh2 = CreateObject("WScript.Shell")
+  ngrokExe = sh2.ExpandEnvironmentStrings("%LOCALAPPDATA%") & "\Microsoft\WindowsApps\ngrok.exe"
+  sh2.Run """" & ngrokExe & """ http --url=unsuited-obituary-pranker.ngrok-free.dev 3000", 0, False
+End If
