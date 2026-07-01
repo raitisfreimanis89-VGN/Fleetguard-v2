@@ -91,8 +91,7 @@ function remRenderOverview() {
     const phoneStr = phone ? maskPhone(phone.phone_number) : '— no phone';
 
     if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
-    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:60, icon:'build_circle',   type:'pm_service'     });
-    if (s.hasOOS)         critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.brakeDays,   interval:90, icon:'assignment_turned_in',     type:'dot_inspection' });
+    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.serviceDays, interval:60, icon:'build_circle',   type:'dot_inspection' });
     if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
     if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:60, icon:'build_circle',   type:'pm_service'     });
   });

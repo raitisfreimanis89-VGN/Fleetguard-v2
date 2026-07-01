@@ -238,7 +238,7 @@ function getVehicleStatus(vid){
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
-  const critical=brakeOverdue||serviceOverdue||hasOOS,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue;
+  const critical=brakeOverdue||serviceOverdue,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue; // OOS is a silent record now — never drives critical/red (2026-07-01)
   return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now)};
 }
 

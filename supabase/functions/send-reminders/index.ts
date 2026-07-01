@@ -11,7 +11,7 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
 // ── Table → last-service-date lookup ─────────────────────────
 const SERVICE_SOURCES: Record<string, { table: string; dateCol: string }> = {
-  dot_inspection: { table: "dot_inspections",   dateCol: "inspection_date" },
+  dot_inspection: { table: "service_records",    dateCol: "service_date"    },  // "Periodic/Yard inspection" = 🔧 Service record (2026-07-01); dot_inspections is roadside-only now
   brake_service:  { table: "brake_tests",        dateCol: "test_date"       },
   pm_service:     { table: "service_records",    dateCol: "service_date"    },
   tyre_check:     { table: "tyre_records",       dateCol: "photo_date"      },
@@ -30,8 +30,8 @@ async function getLastDate(vehicleId: string, type: string): Promise<string | nu
 
   if (data?.[src.dateCol]) return data[src.dateCol];
 
-  // pm_service fallback: use maintenance_records.service_date
-  if (type === "pm_service") {
+  // Periodic/Yard (service) fallback: use maintenance_records.service_date if no service_records row
+  if (type === "dot_inspection") {
     const { data: m } = await sb
       .from("maintenance_records")
       .select("service_date")
