@@ -365,7 +365,7 @@ function remRenderReplies() {
 
 // ── SCHEDULE CONFIG ───────────────────────────────────────────
 function remRenderSchedule() {
-  const types = ['dot_inspection','brake_service','pm_service','tyre_check'];
+  const types = ['dot_inspection','brake_service','tyre_check']; // pm_service retired 2026-07-01 (not tracked)
   const icons = { dot_inspection:'assignment_turned_in', brake_service:'construction', pm_service:'build_circle', tyre_check:'tire_repair' };
   const labels = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service', tyre_check:'Tyre Check' };
   const subtitles = { dot_inspection:'Yard inspection', brake_service:'Safety critical', pm_service:'Preventive maint.', tyre_check:'Tread photos' };
