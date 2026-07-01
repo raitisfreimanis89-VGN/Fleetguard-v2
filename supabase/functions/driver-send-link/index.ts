@@ -18,7 +18,7 @@ serve(async (req) => {
   const pf = preflight(req); if (pf) return pf;
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  // --- caller must be an authenticated admin ---
+  // --- caller must be an authenticated admin or dispatcher ---
   const auth = req.headers.get("Authorization") ?? "";
   if (!auth.startsWith("Bearer ")) return json({ error: "Unauthorized" }, 401);
 
@@ -27,7 +27,8 @@ serve(async (req) => {
   if (uErr || !user) return json({ error: "Unauthorized" }, 401);
 
   const { data: prof } = await svc.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (prof?.role !== "admin") return json({ error: "Admins only" }, 403);
+  // Admin OR dispatcher may send (governance updated 2026-07-01). sent_by audit still records who.
+  if (prof?.role !== "admin" && prof?.role !== "dispatcher") return json({ error: "Unauthorized" }, 403);
 
   let b: Record<string, unknown> = {};
   try { b = await req.json(); } catch { /* ignore */ }

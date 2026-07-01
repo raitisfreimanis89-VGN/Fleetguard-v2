@@ -99,11 +99,11 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s ?? 
 // ═══════════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════════
-let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[];
+let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[];
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,ls] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -113,6 +113,7 @@ async function loadAll() {
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
     sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
+    sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -126,6 +127,8 @@ async function loadAll() {
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
   // inspections table may not exist until migration 003 is applied — guarded like the rest
   if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
+  // link_sends: now admin+dispatcher readable (RLS 005) — powers "last PTI link sent" on the vehicle PTI tab
+  if (!ls.error && ls.data) LINK_SENDS = ls.data.map(r=>({...r,driverId:r.driver_id,vehicleId:r.vehicle_id,createdAt:r.created_at}));
 }
 
 async function addDriver(name) {
@@ -298,7 +301,8 @@ function renderInspections(){
 }
 
 async function doSendLink(driverId,vehicleId,truck){
-  if(!isAdmin()){ showToast('Admins only','danger'); return; }
+  // admin OR dispatcher may send — server (driver-send-link) is the real gate. Governance updated 2026-07-01.
+  if(!currentRole){ showToast('Sign in to send','danger'); return; }
   if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
   try{
     const { data:{ session } } = await sb.auth.getSession();
@@ -883,8 +887,8 @@ function renderVehicleDetail(){
   const dots=DOT_INSPECTIONS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.inspectionDate.localeCompare(a.inspectionDate));
   const miles=MILEAGE.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
   const svcs=SERVICE_RECORDS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-  const tabs=['maintenance','brakes','tyres','dot'];
-  const tabLabels={maintenance:'🔧 Service',brakes:'🛑 Brakes',tyres:'⭕ Tyres',dot:'📋 DOT'};
+  const tabs=['maintenance','brakes','tyres','dot','pti'];
+  const tabLabels={maintenance:'🔧 Service',brakes:'🛑 Brakes',tyres:'⭕ Tyres',dot:'📋 DOT',pti:'🚛 PTI'};
   let html=`<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
     <button class="btn btn-ghost btn-sm" onclick="navigate('vehicles')">← Back</button>
     <div>
@@ -974,6 +978,33 @@ function renderVehicleDetail(){
     html+=`<div class="card"><div class="card-header">DOT History (${dots.length})</div><div class="card-body">`;
     if(dots.length===0) html+=`<div class="empty">No DOT inspections recorded</div>`;
     dots.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.inspectionDate)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':r.result==='violation'?'badge-yellow':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDOT('${r.id}')">🗑</button>`:''}</div></div>`;});
+    html+=`</div></div></div>`;
+  }
+  if(currentVehicleTab==='pti'){
+    const preTrips=INSPECTIONS.filter(r=>r.vehicleId===v.id).sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')));
+    const lastLink=LINK_SENDS.filter(r=>r.status==='sent'&&(r.vehicleId===v.id||(v.assignedDriverId&&r.driverId===v.assignedDriverId))).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];
+    html+=`<div class="two-col">`;
+    html+=`<div class="card"><div class="card-header">Send Pre-Trip Link</div><div class="card-body">`;
+    html+=`<div class="text-sm" style="margin-bottom:10px">📤 Last PTI link sent: <b>${lastLink?fmtDate(lastLink.createdAt):'never'}</b></div>`;
+    if(v.assignedDriverId){
+      html+=`<div class="text-sm" style="margin-bottom:12px;color:var(--text2)">Text the driver a link to complete a fresh pre-trip inspection (tyre photos required).</div>
+        <button class="btn btn-primary" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Send PTI link${driver?' to '+esc(driver.name):''}</button>
+        <div class="text-sm" style="margin-top:10px;color:var(--text3)">🔒 Sent only when you click — never automatically.</div>`;
+    } else {
+      html+=`<div class="empty">No driver assigned — assign a driver to this truck to send a PTI link.</div>`;
+    }
+    html+=`</div></div>`;
+    html+=`<div class="card"><div class="card-header">Pre-Trip History (${preTrips.length})</div><div class="card-body">`;
+    if(preTrips.length===0) html+=`<div class="empty">No pre-trip inspections yet</div>`;
+    preTrips.forEach(r=>{
+      const rb=r.overallResult==='defect'?'badge-red':r.overallResult==='minor'?'badge-yellow':'badge-green';
+      const rl=r.overallResult==='defect'?'Defect':r.overallResult==='minor'?'Minor':'Roadworthy';
+      const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
+      const flags=[];
+      if(r.tyresFlagged) flags.push(`${r.tyresFlagged} tyre${r.tyresFlagged>1?'s':''} flagged`);
+      if(r.checksFailed) flags.push(`${r.checksFailed} check${r.checksFailed>1?'s':''} failed`);
+      html+=`<div class="history-item" style="cursor:pointer" onclick="openInspection('${r.id}')" title="Open full inspection"><div><div class="fw-600">${inspDT(r.submittedAt)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${flags.length?`<div class="text-sm" style="color:var(--danger)">${flags.join(' · ')}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${rb}">${rl}</span></div></div>`;
+    });
     html+=`</div></div></div>`;
   }
   return html;
