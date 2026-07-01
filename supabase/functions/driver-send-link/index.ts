@@ -1,9 +1,9 @@
-// driver-send-link — ADMIN-INITIATED ONLY. A logged-in admin (dispatcher app)
+// driver-send-link - ADMIN-INITIATED ONLY. A logged-in admin (dispatcher app)
 // texts a driver the pre-trip portal link. Verifies the caller's Supabase JWT is
 // an admin, sends via gvoice, and writes an audit row. Deploy with --no-verify-jwt.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { preflight, json, maskPhone } from "../_shared/common.ts";
+import { preflight, json, maskPhone, notifyDispatcher, bgRun } from "../_shared/common.ts";
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -70,5 +70,12 @@ serve(async (req) => {
   });
 
   if (!gv.ok) return json({ ok: false, error: "SMS send failed" }, 502);
+
+  // Tell the assigned dispatcher a pre-trip link went out (background).
+  try {
+    const { data: dr } = await svc.from("drivers").select("name").eq("id", driverId).maybeSingle();
+    bgRun(notifyDispatcher(svc, vehicleId || null, `FleetGuard - pre-trip link sent to ${dr?.name ?? "driver"}${truck ? ` (Truck #${truck})` : ""}.`));
+  } catch { /* non-fatal */ }
+
   return json({ ok: true, sentTo: maskPhone(ph.phone_number) });
 });

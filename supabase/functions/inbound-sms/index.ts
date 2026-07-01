@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { notifyDispatcher, bgRun } from "../_shared/common.ts";
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -8,7 +9,7 @@ const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;   // ngrok URL → GV bo
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
-// "DONE" = work finished (check first — more specific)
+// "DONE" = work finished (check first - more specific)
 const DONE_PATTERN = /^\s*(done|finished|complete|completed|fixed)\b/i;
 // "OK" = driver acknowledges they will schedule
 const ACK_PATTERN  = /^\s*(ok|okay|yes|yep|yeah|confirm(ed)?|scheduled?|will\s+do|got\s+it|on\s+it|roger|k)\b/i;
@@ -55,16 +56,25 @@ serve(async (req) => {
 
   // ── Resolve driver: by phone first, else by contact name ──
   let driverId: string | null = null;
-  let driverPhone: string | null = from ?? null;
-
+  // GV delivers sender numbers digit-spaced ("2 0 8 6 1 3 2 4 5 7") - normalize
+  // to E.164 (+1 + last 10) before matching, else ~40% of replies never link.
+  let fromE164: string | null = null;
   if (from) {
-    const { data: pr } = await sb
-      .from("driver_phones")
-      .select("driver_id")
-      .eq("phone_number", from)
-      .maybeSingle();
-    driverId = pr?.driver_id ?? null;
+    const digits = from.replace(/\D/g, "");
+    fromE164 = digits.length === 11 && digits[0] === "1" ? "+" + digits
+             : digits.length === 10 ? "+1" + digits
+             : from.startsWith("+") ? from
+             : digits ? "+" + digits : null;
+    if (fromE164) {
+      const { data: pr } = await sb
+        .from("driver_phones")
+        .select("driver_id")
+        .eq("phone_number", fromE164)
+        .maybeSingle();
+      driverId = pr?.driver_id ?? null;
+    }
   }
+  let driverPhone: string | null = fromE164 ?? from ?? null;
 
   if (!driverId && name) {
     // GV shows saved contact names which may be SHORTER than the DB name
@@ -130,10 +140,19 @@ serve(async (req) => {
     received_at:     receivedTs,
   });
 
+  // Relay the driver's reply to their dispatcher (background; never blocks).
+  if (driverId) {
+    try {
+      const { data: dv }  = await sb.from("drivers").select("name").eq("id", driverId).maybeSingle();
+      const { data: veh } = await sb.from("vehicles").select("id, truck_number").eq("assigned_driver_id", driverId).maybeSingle();
+      if (veh?.id) bgRun(notifyDispatcher(sb, veh.id, `FleetGuard - ${dv?.name ?? "Driver"} (Truck #${veh.truck_number}) replied: "${trimmed}"`));
+    } catch { /* non-fatal */ }
+  }
+
   let action = "logged";
 
   if (notificationId) {
-    // DONE — work finished. Check first (more specific than OK).
+    // DONE - work finished. Check first (more specific than OK).
     if (DONE_PATTERN.test(trimmed)) {
       await sb
         .from("sms_notifications")
@@ -148,7 +167,7 @@ serve(async (req) => {
 
       action = "completed";
 
-    // OK — driver acknowledges, send confirmation + ask for DONE later
+    // OK - driver acknowledges, send confirmation + ask for DONE later
     } else if (ACK_PATTERN.test(trimmed)) {
       await sb
         .from("sms_notifications")
@@ -161,7 +180,7 @@ serve(async (req) => {
         .eq("notification_id", notificationId)
         .eq("escalated_to", "pending");
 
-      // Auto-reply asking them to text DONE when finished —
+      // Auto-reply asking them to text DONE when finished -
       // but never text a driver who is marked on vacation.
       let onVacation = false;
       if (driverId) {

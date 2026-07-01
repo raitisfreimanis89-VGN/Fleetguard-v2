@@ -50,3 +50,35 @@ export function sixDigitCode(): string {
   const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
   return String(n).padStart(6, "0");
 }
+
+/**
+ * Notify the dispatcher assigned to a vehicle. Resolves vehicle → assigned
+ * dispatcher → dispatcher_phones (respecting sms_hold) and texts via the gvoice
+ * bot. Never throws — dispatcher notifications must never break the main flow.
+ */
+export async function notifyDispatcher(sb: any, vehicleId: string | null, message: string): Promise<void> {
+  try {
+    if (!vehicleId) return;
+    const GV_URL = Deno.env.get("GV_SERVICE_URL");
+    const GV_SECRET = Deno.env.get("GV_SERVICE_SECRET");
+    if (!GV_URL || !GV_SECRET) return;
+    const { data: v } = await sb.from("vehicles").select("assigned_dispatcher").eq("id", vehicleId).maybeSingle();
+    const disp = (v?.assigned_dispatcher ?? "").trim();
+    if (!disp) return;
+    const { data: dp } = await sb.from("dispatcher_phones").select("phone_number, sms_hold").eq("dispatcher_name", disp).maybeSingle();
+    if (!dp?.phone_number || dp.sms_hold) return;
+    await fetch(`${GV_URL}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
+      body: JSON.stringify({ to: dp.phone_number, body: message }),
+      signal: AbortSignal.timeout(90_000),
+    }).catch(() => {});
+  } catch { /* swallow — never block the caller */ }
+}
+
+/** Run a promise in the background (Edge Runtime) so it never delays the response. */
+export function bgRun(p: Promise<unknown>): void {
+  const wu = (globalThis as any).EdgeRuntime?.waitUntil;
+  if (typeof wu === "function") wu(p);
+  else (p as Promise<unknown>).catch(() => {});
+}

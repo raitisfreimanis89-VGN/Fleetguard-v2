@@ -1,10 +1,10 @@
-// driver-inspection — receives a completed pre-trip from the portal (driver JWT),
+// driver-inspection - receives a completed pre-trip from the portal (driver JWT),
 // uploads photos/signature, writes inspections (+ tyre_records, mileage_records for
 // dispatcher back-compat), and texts a confirmation. Deploy with --no-verify-jwt.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
-import { preflight, json } from "../_shared/common.ts";
+import { preflight, json, notifyDispatcher, bgRun } from "../_shared/common.ts";
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -146,8 +146,8 @@ serve(async (req) => {
   try {
     const { data: ph } = await sb.from("driver_phones").select("phone_number, sms_hold").eq("driver_id", driverId).maybeSingle();
     if (ph?.phone_number && !ph.sms_hold) {
-      const msg = `FleetGuard: pre-trip received for Truck #${b.truckNumber ?? "—"} (Ref ${ref}).`
-        + (overall !== "roadworthy" ? " Defects noted — dispatch has been alerted." : " All good — drive safe.");
+      const msg = `FleetGuard: pre-trip received for Truck #${b.truckNumber ?? "-"} (Ref ${ref}).`
+        + (overall !== "roadworthy" ? " Defects noted - dispatch has been alerted." : " All good - drive safe.");
       await fetch(`${GV_SERVICE_URL}/send`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
@@ -155,6 +155,16 @@ serve(async (req) => {
         signal: AbortSignal.timeout(60_000),
       }).catch(() => {});
     }
+  } catch { /* non-fatal */ }
+
+  // Alert the assigned dispatcher that the pre-trip is in (background; never blocks the driver).
+  try {
+    const { data: dr } = await sb.from("drivers").select("name").eq("id", driverId).maybeSingle();
+    const who = dr?.name ?? "Driver";
+    const result = overall === "defect" ? "Defect" : overall === "minor" ? "Minor" : "Roadworthy";
+    const flags = overall === "roadworthy" ? "no flags"
+      : `${tyresFlagged} tyre${tyresFlagged === 1 ? "" : "s"} flagged, ${checksFailed} check${checksFailed === 1 ? "" : "s"} failed`;
+    bgRun(notifyDispatcher(sb, vehicleId, `FleetGuard - ${who} (Truck #${b.truckNumber ?? "-"}) completed pre-trip. Result: ${result} (${flags}).`));
   } catch { /* non-fatal */ }
 
   return json({ ok: true, ref });

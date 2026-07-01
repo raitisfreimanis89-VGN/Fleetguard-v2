@@ -14,6 +14,8 @@ const REMINDERS_URL = process.env.SUPABASE_SEND_REMINDERS_URL;
 const DRAIN_URL     = process.env.SUPABASE_PTI_DRAIN_URL;
 const SECRET        = process.env.GV_SERVICE_SECRET;
 const ANON_KEY      = process.env.SUPABASE_ANON_KEY;
+const DIGEST_URL    = process.env.SUPABASE_DISPATCHER_DIGEST_URL;
+const PORT          = parseInt(process.env.PORT || '3000', 10);
 
 // Shared browser lock — scan and poll both drive the same GV page,
 // so they must never run at the same time.
@@ -128,6 +130,38 @@ async function runPtiDrain() {
   }
 }
 
+// ── Dispatcher morning digest — Edge Function computes per-fleet messages,
+// the bot sends them (paced via the GV FIFO). Fires 7:15 AM America/Chicago.
+async function runDispatcherDigest() {
+  if (!DIGEST_URL) return;
+  log.info('Building dispatcher morning digest...');
+  try {
+    const res = await fetch(DIGEST_URL, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${ANON_KEY}`, 'x-api-key': SECRET, 'Content-Type': 'application/json' },
+      body:    '{}',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { log.warn(`Digest compute returned ${res.status}: ${JSON.stringify(data)}`); return; }
+    const msgs = data.messages || [];
+    log.info(`Dispatcher digest: ${msgs.length} message(s) to send`);
+    let sent = 0;
+    for (const m of msgs) {
+      try {
+        const r = await fetch(`http://localhost:${PORT}/send`, {
+          method:  'POST',
+          headers: { 'x-api-key': SECRET, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ to: m.to, body: m.body }),
+        });
+        if (r.ok) sent++; else log.warn(`Digest send (${m.dispatcher}) failed: ${r.status}`);
+      } catch (e) { log.error(`Digest send error (${m.dispatcher}): ${e.message}`); }
+    }
+    log.info(`Dispatcher digest sent ${sent}/${msgs.length}`);
+  } catch (err) {
+    log.error(`Dispatcher digest failed: ${err.message}`);
+  }
+}
+
 // ── Start all scheduled jobs ───────────────────────────────────
 function startScheduler() {
   // Reply poll: every N minutes
@@ -143,6 +177,12 @@ function startScheduler() {
     cron.schedule(`*/${DRAIN_MINUTES} * * * *`, runPtiDrain);
     log.info(`PTI link drain scheduled every ${DRAIN_MINUTES} min (wave of 5)`);
   }
+
+  // Dispatcher morning digest: 7:15 AM America/Chicago (node-cron handles DST)
+  if (DIGEST_URL) {
+    cron.schedule('15 7 * * *', runDispatcherDigest, { timezone: 'America/Chicago' });
+    log.info('Dispatcher digest scheduled 7:15 AM America/Chicago');
+  }
 }
 
-module.exports = { runStartupScan, startScheduler };
+module.exports = { runStartupScan, startScheduler, runDispatcherDigest };
