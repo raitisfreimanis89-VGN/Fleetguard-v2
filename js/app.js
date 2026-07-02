@@ -40,7 +40,9 @@ async function setUserFromSession(session) {
   } catch(e) { await sb.auth.signOut(); showLoginScreen(); return; }
   hideLoginScreen();
   await loadAll();
+  restoreNavState();
   render();
+  syncNavChrome();
   updateUserBar();
 }
 
@@ -466,6 +468,41 @@ let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
 const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
 
+// ── Navigation state persistence ──
+// Remember where the user was so a manual refresh doesn't dump them back on the
+// Dashboard. Saved on every render, restored once after data has loaded.
+const NAV_KEY='fg_nav_v1';
+function saveNavState(){
+  try{
+    localStorage.setItem(NAV_KEY,JSON.stringify({
+      page:currentPage,
+      vehicleId:currentVehicleId,
+      vehicleTab:currentVehicleTab,
+      dispatcherFilter:currentDispatcherFilter,
+    }));
+  }catch(e){}
+}
+function restoreNavState(){
+  try{
+    const raw=localStorage.getItem(NAV_KEY); if(!raw) return;
+    const s=JSON.parse(raw)||{};
+    if(PAGE_TITLES[s.page]) currentPage=s.page;
+    currentVehicleId=s.vehicleId||null;
+    if(s.vehicleTab) currentVehicleTab=s.vehicleTab;
+    currentDispatcherFilter=s.dispatcherFilter||null;
+    // Drop views the current role can't open, or a vehicle that no longer exists.
+    if(['vehicles','drivers','reminders'].includes(currentPage)&&!isAdmin()) currentPage='dashboard';
+    if(currentPage==='vehicle'&&!VEHICLES.some(v=>v.id===currentVehicleId)){ currentPage='dashboard'; currentVehicleId=null; }
+  }catch(e){}
+}
+function syncNavChrome(){
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  const navEl=document.getElementById('nav-'+currentPage);
+  if(navEl) navEl.classList.add('active');
+  const t=document.getElementById('page-title');
+  if(t) t.textContent=PAGE_TITLES[currentPage]||currentPage;
+}
+
 function navigate(page,vehicleId){
   if(page==='users') return;    // Users page hidden for everyone
   if(page==='portal') return;   // Driver Portal hidden for everyone
@@ -509,6 +546,7 @@ function render(){
   if(vehiclesNav) vehiclesNav.style.display=isAdmin()?'flex':'none';
   const driversNav=document.getElementById('nav-drivers');
   if(driversNav) driversNav.style.display=isAdmin()?'flex':'none';
+  saveNavState();
 }
 
 async function renderUsersAsync(){
@@ -1306,17 +1344,45 @@ async function confirm2(title,body,okLabel,okClass){
 function confirmResolve(val){document.getElementById('confirm-modal').style.display='none';if(window._confirmResolve){window._confirmResolve(val);window._confirmResolve=null;}}
 
 // ═══════════════════════════════════════════════════════
+// LIVE REFRESH
+// ═══════════════════════════════════════════════════════
+// Keep the screen current without a manual F5. A 30s timer covers the active
+// tab; the focus/visibility listeners cover the real gap — browsers freeze
+// background timers, so data is stale exactly when the dispatcher tabs back in.
+// Never reload while a form or modal is open, so a refresh can't wipe input.
+let _refreshing=false,_lastRefresh=0;
+function isUserBusy(){
+  const ae=document.activeElement;
+  if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
+  for(const m of document.querySelectorAll('.modal-overlay')){
+    if(getComputedStyle(m).display!=='none') return true;
+  }
+  return false;
+}
+async function refreshData(){
+  if(!sb||!currentUser||_refreshing) return;
+  if(Date.now()-_lastRefresh<1500) return;   // collapse focus+visibility double-fire
+  _refreshing=true;
+  try{
+    // Security: enforce bans on every cycle, even mid-edit.
+    const {data:p}=await sb.from('profiles').select('banned_at').eq('id',currentUser.id).single();
+    if(p?.banned_at){await sb.auth.signOut();localStorage.removeItem('sb_key');localStorage.removeItem('sb_url');showLoginScreen();return;}
+    if(isUserBusy()) return;                  // don't clobber in-progress input
+    await loadAll(); render();
+    _lastRefresh=Date.now();
+  }catch(e){/* transient — next tick recovers */}
+  finally{_refreshing=false;}
+}
+
+// ═══════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════
 async function init(){
   document.getElementById('loading-overlay').style.display='flex';
   await initAuth();
-  setInterval(async()=>{
-    if(sb&&currentUser){
-      const {data:p}=await sb.from('profiles').select('banned_at').eq('id',currentUser.id).single();
-      if(p?.banned_at){await sb.auth.signOut();localStorage.removeItem('sb_key');localStorage.removeItem('sb_url');showLoginScreen();return;}
-      await loadAll();render();
-    }
-  },30000);
+  setInterval(refreshData,30000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshData(); });
+  window.addEventListener('focus',refreshData);
+  window.addEventListener('online',refreshData);
 }
 init();
