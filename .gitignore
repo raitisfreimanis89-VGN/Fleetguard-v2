@@ -1,0 +1,4 @@
+# Local tooling / CLI state — not part of the app
+.preview/
+.claude/
+supabase/.temp/

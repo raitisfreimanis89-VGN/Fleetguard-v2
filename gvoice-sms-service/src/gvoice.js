@@ -23,7 +23,17 @@ async function initBrowser() {
   });
   const pages = browserCtx.pages();
   page = pages.length > 0 ? pages[0] : await browserCtx.newPage();
-  log.info('Browser ready');
+  // Safeguard: an unclean shutdown makes Chromium restore every tab it had
+  // open, and the odd stray tab can appear while running. Keep exactly ONE
+  // tab — close any extras at launch, and auto-close any that open later —
+  // so tabs can never pile up across restarts.
+  for (const extra of pages) {
+    if (extra !== page) { try { await extra.close(); } catch (_) {} }
+  }
+  browserCtx.on('page', async (p) => {
+    if (p !== page) { try { await p.close(); } catch (_) {} }
+  });
+  log.info(`Browser ready — ${pages.length} tab(s) at launch, trimmed to 1`);
 }
 
 // ── Ensure we are logged into Google Voice ────────────────────

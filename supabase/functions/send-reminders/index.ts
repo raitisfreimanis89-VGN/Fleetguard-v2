@@ -6,6 +6,7 @@ const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
 const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;   // http://your-pc:3000
 const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
+const PORTAL_BASE    = Deno.env.get("PORTAL_BASE_URL") ?? "https://fleetguards.app/driver";
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -87,14 +88,15 @@ function buildMessage(truckNum: string, trailerNum: string, type: string, daysUn
 
   if (type === "tyre_check") {
     if (overdue) {
-      return `Safety & Compliance: Tire tread check OVERDUE on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread within 2 days. Confirm by replying OK.`;
+      const link = `${PORTAL_BASE}/${encodeURIComponent(truckNum)}`;
+      return `Safety & Compliance: Tire tread check is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Upload current tread photos here: ${link} (within 2 days). Reply OK to confirm.`;
     }
-    return `Safety & Compliance: Tire tread check due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} on Trk #${truckNum}/Tlr #${trailerNum}. Please text back photos of the tread. Confirm by replying OK.`;
+    return `Safety & Compliance: Tire tread check due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Truck #${truckNum} / Trailer #${trailerNum}. Open your PTI link and upload current tread photos. Reply OK to confirm.`;
   }
 
   if (type === "dot_inspection") {
     if (overdue) {
-      return `Safety & Compliance Alert: Yard truck inspection is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard to complete this inspection within the next 5 days. Reply OK to confirm receipt.`;
+      return `Safety & Compliance Alert: Yard truck inspection is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard to complete this inspection within the next 7 days. Reply OK to confirm receipt.`;
     }
     return `Safety & Compliance Notification: Truck inspection at the yard is due soon for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard and ensure this is completed ASAP. Reply OK to confirm receipt.`;
   }

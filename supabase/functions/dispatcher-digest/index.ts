@@ -17,10 +17,10 @@ const BRAKE = 35, SERVICE = 60, TYRE = 14;
 const BRAKE_W = 5, SERVICE_W = 7, TYRE_W = 2;
 
 const CLEAR: Array<(d: string, n: number) => string> = [
-  (d, n) => `Good morning, ${d} - all ${n} trucks current and every pre-trip in. Great work keeping it clean; keep it up!`,
-  (d, n) => `${d}, your fleet's in top shape this morning - all ${n} trucks green, nothing outstanding. Solid work staying ahead of it.`,
-  (d, n) => `All clear across ${d}'s ${n} trucks - no overdue items, pre-trips done. Excellent management; keep it rolling.`,
-  (d, n) => `Morning ${d} - ${n} trucks, all compliant, nothing due. That's what staying on top of it looks like. Keep it up!`,
+  (d, n) => `Good morning, ${d}! All ${n} trucks are up to date — no overdue inspections or services. Great job staying on top of it!`,
+  (d, n) => `Good morning, ${d}! Fleet is looking good this morning — all ${n} trucks are compliant, nothing outstanding. Keep it up!`,
+  (d, n) => `Good morning, ${d}! Clean sweep across all ${n} trucks — no overdue items and everything on schedule. Excellent work!`,
+  (d, n) => `Good morning, ${d}! All ${n} trucks are on track — no overdue inspections, no pending services. Well done keeping the fleet clean!`,
 ];
 
 type Row = {
@@ -30,32 +30,59 @@ type Row = {
   pti_yesterday: boolean;
 };
 
+function days(n: number): string { return `${n} day${n === 1 ? "" : "s"}`; }
+function dueIn(n: number): string { return n === 0 ? "due today" : `due in ${days(n)}`; }
+
 function buildMessage(disp: string, trucks: Row[]): string {
   const n = trucks.length;
-  const overdue: string[] = [], soon: string[] = [];   // one entry per truck, items grouped
+  const overdueByTruck = new Map<string, string[]>();
+  const soonByTruck    = new Map<string, string[]>();
   let ptiDone = 0;
+
   for (const t of trucks) {
     if (t.pti_yesterday) ptiDone++;
-    if (t.on_vacation) continue;                       // vacation trucks are frozen
+    if (t.on_vacation) continue;
     const { brake_days: b, service_days: s, tyre_days: y, truck_number: tn } = t;
     const od: string[] = [], sn: string[] = [];
-    if (b != null && b > BRAKE)            od.push(`brake ${b - BRAKE}d`);
-    else if (b != null && b > BRAKE - BRAKE_W)     sn.push(`brake in ${BRAKE - b}d`);
-    if (s != null && s > SERVICE)          od.push(`yard ${s - SERVICE}d`);
-    else if (s != null && s > SERVICE - SERVICE_W) sn.push(`yard in ${SERVICE - s}d`);
-    if (y != null && y > TYRE)             od.push(`tyre ${y - TYRE}d`);
-    else if (y != null && y > TYRE - TYRE_W)       sn.push(`tyre in ${TYRE - y}d`);
-    if (od.length) overdue.push(`#${tn} ${od.join("/")}`);
-    if (sn.length) soon.push(`#${tn} ${sn.join("/")}`);
+
+    if (b != null && b > BRAKE)                od.push(`Brake inspection ${days(b - BRAKE)} overdue`);
+    else if (b != null && b > BRAKE - BRAKE_W) sn.push(`Brake inspection ${dueIn(BRAKE - b)}`);
+
+    if (s != null && s > SERVICE)                  od.push(`Yard inspection ${days(s - SERVICE)} overdue`);
+    else if (s != null && s > SERVICE - SERVICE_W) sn.push(`Yard inspection ${dueIn(SERVICE - s)}`);
+
+    if (y != null && y > TYRE)                od.push(`Tire check ${days(y - TYRE)} overdue`);
+    else if (y != null && y > TYRE - TYRE_W)  sn.push(`Tire check ${dueIn(TYRE - y)}`);
+
+    if (od.length) overdueByTruck.set(tn, od);
+    if (sn.length) soonByTruck.set(tn, sn);
   }
-  const ptiLine = ptiDone ? ` Yesterday: ${ptiDone} pre-trip${ptiDone === 1 ? "" : "s"} completed.` : "";
-  if (overdue.length === 0 && soon.length === 0) {
+
+  const ptiLine = ptiDone
+    ? `\nPre-trip inspections yesterday: ${ptiDone} of ${n} completed.`
+    : "";
+
+  if (overdueByTruck.size === 0 && soonByTruck.size === 0) {
     return CLEAR[new Date().getUTCDate() % CLEAR.length](disp, n) + ptiLine;
   }
-  let msg = `Good morning - ${disp}'s fleet (${n} trucks).`;
-  if (overdue.length) msg += ` OVERDUE: ${overdue.join("; ")}.`;
-  if (soon.length)    msg += ` Due soon: ${soon.join("; ")}.`;
-  return msg + ptiLine + " Plan your follow-ups accordingly.";
+
+  let msg = `Good morning, ${disp} - fleet report (${n} trucks).`;
+
+  if (overdueByTruck.size > 0) {
+    msg += `\n\nACTION REQUIRED:\n`;
+    for (const [tn, items] of overdueByTruck) {
+      msg += `Truck #${tn}: ${items.join(", ")}\n`;
+    }
+  }
+
+  if (soonByTruck.size > 0) {
+    msg += `\nCOMING UP:\n`;
+    for (const [tn, items] of soonByTruck) {
+      msg += `Truck #${tn}: ${items.join(", ")}\n`;
+    }
+  }
+
+  return msg + `\nPlease follow up with your drivers today.` + ptiLine;
 }
 
 serve(async (req) => {

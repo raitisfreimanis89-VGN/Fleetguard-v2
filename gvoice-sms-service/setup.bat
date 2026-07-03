@@ -7,6 +7,9 @@ echo   FleetGuard Google Voice SMS — Setup
 echo  ==========================================
 echo.
 
+:: Always run from the folder where this bat file lives
+cd /d "%~dp0"
+
 :: Check Node.js
 node -v >nul 2>&1
 if errorlevel 1 (

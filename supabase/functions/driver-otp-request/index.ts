@@ -3,7 +3,7 @@
 // (never reveals whether a number exists). Deploy with --no-verify-jwt.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { preflight, json, normalizePhone, sha256Hex, sixDigitCode } from "../_shared/common.ts";
+import { preflight, json, normalizePhone, sha256Hex, sixDigitCode, bgRun } from "../_shared/common.ts";
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
@@ -50,14 +50,15 @@ serve(async (req) => {
     const expires_at = new Date(Date.now() + 5 * 60_000).toISOString();
     await sb.from("driver_otp_codes").insert({ phone, code_hash, expires_at });
 
-    // 4. Send via the Google Voice service (same path as reminders).
+    // 4. Fire the GV send in the background — respond to the portal immediately
+    // so the code-entry screen appears without waiting ~25s for the SMS to send.
     const smsBody = `FleetGuard code: ${code}\nExpires in 5 min. Do not share.`;
-    await fetch(`${GV_SERVICE_URL}/send`, {
+    bgRun(fetch(`${GV_SERVICE_URL}/send`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
       body: JSON.stringify({ to: phone, body: smsBody }),
       signal: AbortSignal.timeout(60_000),
-    }).catch(() => { /* swallow — never leak send status */ });
+    }).catch(() => {}));
   } catch (_e) {
     /* swallow all errors — response stays generic */
   }

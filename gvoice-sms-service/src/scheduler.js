@@ -180,8 +180,8 @@ function startScheduler() {
 
   // Dispatcher morning digest: 7:15 AM America/Chicago (node-cron handles DST)
   if (DIGEST_URL) {
-    cron.schedule('15 7 * * *', runDispatcherDigest, { timezone: 'America/Chicago' });
-    log.info('Dispatcher digest scheduled 7:15 AM America/Chicago');
+    cron.schedule('15 7 * * 1-5', runDispatcherDigest, { timezone: 'America/Chicago' });
+    log.info('Dispatcher digest scheduled 7:15 AM America/Chicago (Mon-Fri only)');
   }
 }
 
