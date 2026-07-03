@@ -233,7 +233,8 @@ function getVehicleStatus(vid){
   const lastMaint=maint[0];
   const serviceRefDate=lastService?.serviceDate||lastMaint?.serviceDate||null;
   const serviceDays=serviceRefDate?daysBetween(serviceRefDate,now):null;
-  const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>14;
+  // Tyres are on a weekly cadence — flag overdue at 7d so the card matches the SMS reminder bot (2026-07-03).
+  const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>=7;
   const serviceOverdue=serviceDays>60,serviceDueSoon=serviceDays>53&&!serviceOverdue;
   // nextDue warning: use maintenance nextInspectionDate if it has passed
   const nextDue=maint[0]?.nextInspectionDate;
