@@ -128,6 +128,16 @@ serve(async (req) => {
     }
   }
 
+  // Weekend guard: no driver reminders on Sat/Sun (company timezone). OTP login
+  // codes and PTI links live in other functions and stay available 24/7.
+  const chicagoDow = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Chicago" }).format(new Date());
+  if (chicagoDow === "Sat" || chicagoDow === "Sun") {
+    return new Response(
+      JSON.stringify({ ok: true, weekend: chicagoDow, sent: 0, skipped: 0, note: "reminders paused Sat/Sun" }),
+      { headers: { "Content-Type": "application/json" } }
+    );
+  }
+
   const today    = new Date();
   const todayStr = today.toISOString().split("T")[0];
   let   sent            = 0;
