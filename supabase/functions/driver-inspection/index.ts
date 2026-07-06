@@ -131,7 +131,9 @@ serve(async (req) => {
         axleIndex: t.axleIndex, position: t.position, status: t.status,
         rating: t.rating, pressure: t.pressure ?? null,
       }));
-      const photoDate = String(b.startedAt ?? new Date().toISOString()).split("T")[0];
+      // Stamp the check at completion (submission), not the draft's startedAt —
+      // a stale/resumed draft could otherwise back-date the tyre check.
+      const photoDate = new Date().toISOString().split("T")[0];
       await sb.from("tyre_records").insert({ id: crypto.randomUUID(), vehicle_id: vehicleId, photo_date: photoDate, readings });
     }
     if (vehicleId && typeof b.odometer === "number" && b.odometer > 0) {

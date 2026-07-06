@@ -34,6 +34,31 @@ serve(async (req) => {
     });
   }
 
+  // ── health action ────────────────────────────────────────────
+  // Read-only: recent SMS send outcomes + any stuck rows.
+  if (body.action === "health") {
+    const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+    const { data: recent } = await sb.from("sms_notifications")
+      .select("status, reminder_type, error_message, created_at")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(500);
+    const counts: Record<string, number> = {};
+    for (const r of recent ?? []) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    const failures = (recent ?? []).filter((r) => r.status === "failed").slice(0, 15);
+    // Pending rows older than 10 min = stuck (never flipped to sent/failed)
+    const stuckCutoff = new Date(Date.now() - 600_000).toISOString();
+    const stuck = (recent ?? []).filter((r) => r.status === "pending" && r.created_at < stuckCutoff).length;
+    return new Response(JSON.stringify({
+      ok: true,
+      window: "7 days",
+      countsByStatus: counts,
+      failedCount: counts["failed"] ?? 0,
+      stuckPending: stuck,
+      recentFailures: failures,
+    }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── inspect_vehicle action ───────────────────────────────────
   // Debug: why did a reminder fire while the dashboard shows green?
   if (body.action === "inspect_vehicle") {
@@ -60,9 +85,18 @@ serve(async (req) => {
     const { data: scheds } = await sb.from("reminder_schedules")
       .select("vehicle_id, reminder_type, interval_days, warning_days_before, enabled")
       .or(`vehicle_id.eq.${v.id},vehicle_id.is.null`);
-    const { data: notifs } = await sb.from("sms_notifications")
-      .select("reminder_type, message_body, status, created_at, sent_at")
-      .eq("vehicle_id", v.id).order("created_at", { ascending: false }).limit(12);
+    // Inspections linked to this vehicle_id
+    const { data: inspByVehicle } = await sb.from("inspections")
+      .select("ref, submitted_at, truck_number, vehicle_id, tyres_flagged, checks_failed, overall_result")
+      .eq("vehicle_id", v.id).order("submitted_at", { ascending: false }).limit(6);
+    // Inspections by truck number — catches PTIs that never linked to a vehicle_id
+    const { data: inspByTruck } = await sb.from("inspections")
+      .select("ref, submitted_at, truck_number, vehicle_id, tyres_flagged")
+      .eq("truck_number", truck).order("submitted_at", { ascending: false }).limit(6);
+    // Recent tyre_records (what drives the dashboard tyre date)
+    const { data: tyreRows } = await sb.from("tyre_records")
+      .select("photo_date, created_at")
+      .eq("vehicle_id", v.id).order("created_at", { ascending: false }).limit(6);
 
     const dsince = (d: string | null) => d ? Math.floor((Date.now() - new Date(d).getTime()) / 86_400_000) : null;
     const svcDate = svc ?? maint;
@@ -72,8 +106,67 @@ serve(async (req) => {
       driver: dr,
       lastDates: { brake, tyre, service: svcDate, dot },
       daysSince: { brake: dsince(brake), tyre: dsince(tyre), service: dsince(svcDate), dot: dsince(dot) },
-      schedules: scheds,
-      notifications: notifs,
+      inspectionsByVehicle: inspByVehicle,
+      inspectionsByTruckNumber: inspByTruck,
+      tyreRecords: tyreRows,
+    }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── set_last_tyre_date action ────────────────────────────────
+  // Correct the photo_date on a vehicle's most-recent tyre_records row (used to
+  // fix a PTI that stamped a stale draft date instead of the submission date).
+  if (body.action === "set_last_tyre_date") {
+    const truck = String(body.truck ?? "").trim();
+    const date  = String(body.date ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return new Response(JSON.stringify({ error: "date must be YYYY-MM-DD" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    const { data: v } = await sb.from("vehicles").select("id").eq("truck_number", truck).maybeSingle();
+    if (!v) return new Response(JSON.stringify({ error: "No vehicle", truck }), { status: 404, headers: { "Content-Type": "application/json" } });
+    const { data: row } = await sb.from("tyre_records").select("id, photo_date, created_at").eq("vehicle_id", v.id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!row) return new Response(JSON.stringify({ error: "No tyre_records for vehicle" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    const { error } = await sb.from("tyre_records").update({ photo_date: date }).eq("id", row.id);
+    if (error) return new Response(JSON.stringify({ error: "Update failed", detail: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, truck, rowId: row.id, oldPhotoDate: row.photo_date, newPhotoDate: date, rowCreatedAt: row.created_at }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── scan_stale_tyre action ───────────────────────────────────
+  // Find vehicles whose LATEST tyre record is back-dated (photo_date well
+  // before created_at) — the stale-draft bug. Cross-checks each against a PTI
+  // submitted at the same moment so we only flag PTI-created rows, not manual
+  // dispatcher entries. suggestedDate = the submission (created_at) date.
+  if (body.action === "scan_stale_tyre") {
+    const minGap = Number(body.minGapDays ?? 3);
+    const { data: rows } = await sb.from("tyre_records")
+      .select("vehicle_id, photo_date, created_at")
+      .order("created_at", { ascending: false }).limit(3000);
+    const latestByVeh = new Map<string, { photo_date: string; created_at: string }>();
+    for (const r of rows ?? []) {
+      if (r.vehicle_id && !latestByVeh.has(r.vehicle_id)) latestByVeh.set(r.vehicle_id, r);
+    }
+    const vehIds = [...latestByVeh.keys()];
+    const { data: vehs } = await sb.from("vehicles").select("id, truck_number").in("id", vehIds);
+    const vmap = new Map((vehs ?? []).map((v) => [v.id, v.truck_number]));
+    const { data: insp } = await sb.from("inspections")
+      .select("vehicle_id, submitted_at").order("submitted_at", { ascending: false }).limit(3000);
+    const inspByVeh = new Map<string, number[]>();
+    for (const i of insp ?? []) {
+      if (!i.vehicle_id) continue;
+      if (!inspByVeh.has(i.vehicle_id)) inspByVeh.set(i.vehicle_id, []);
+      inspByVeh.get(i.vehicle_id)!.push(new Date(i.submitted_at).getTime());
+    }
+    const flagged: unknown[] = [];
+    for (const [vid, r] of latestByVeh) {
+      const gap = Math.floor((new Date(r.created_at.slice(0, 10)).getTime() - new Date(r.photo_date).getTime()) / 86_400_000);
+      if (gap < minGap) continue;
+      const createdMs = new Date(r.created_at).getTime();
+      const ptiLinked = (inspByVeh.get(vid) ?? []).some((ms) => Math.abs(ms - createdMs) < 120_000);
+      flagged.push({ truck: vmap.get(vid) ?? vid, photo_date: r.photo_date, created_at: r.created_at.slice(0, 10), gapDays: gap, ptiLinked, suggestedDate: r.created_at.slice(0, 10) });
+    }
+    (flagged as { gapDays: number }[]).sort((a, b) => b.gapDays - a.gapDays);
+    return new Response(JSON.stringify({
+      ok: true, minGap,
+      flaggedCount: flagged.length,
+      ptiLinkedCount: (flagged as { ptiLinked: boolean }[]).filter((f) => f.ptiLinked).length,
+      flagged,
     }, null, 2), { headers: { "Content-Type": "application/json" } });
   }
 
