@@ -137,10 +137,10 @@ serve(async (req) => {
   const chicagoDow  = nowParts.find((p) => p.type === "weekday")?.value ?? "";
   const chicagoHour = Number(nowParts.find((p) => p.type === "hour")?.value ?? "0");
   const isWeekend    = chicagoDow === "Sat" || chicagoDow === "Sun";
-  const outsideHours = chicagoHour < 7 || chicagoHour >= 17;   // 7 AM-5 PM CST
+  const outsideHours = chicagoHour < 7 || chicagoHour >= 18;   // 07:00-17:59 CST (through 5:59 PM)
   if (isWeekend || outsideHours) {
     return new Response(
-      JSON.stringify({ ok: true, sent: 0, skipped: 0, paused: isWeekend ? "weekend" : "outside 7AM-5PM CST", day: chicagoDow, hour: chicagoHour }),
+      JSON.stringify({ ok: true, sent: 0, skipped: 0, paused: isWeekend ? "weekend" : "outside 07:00-17:59 CST", day: chicagoDow, hour: chicagoHour }),
       { headers: { "Content-Type": "application/json" } }
     );
   }
