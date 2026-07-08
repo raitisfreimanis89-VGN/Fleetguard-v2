@@ -168,11 +168,11 @@ function startScheduler() {
   cron.schedule(`*/${POLL_MINUTES} * * * *`, runReplyPoll);
   log.info(`Reply poller scheduled every ${POLL_MINUTES} min`);
 
-  // Reminder scan: every SCAN_MINUTES, Mon-Fri only — drains the backlog in
-  // batches. The send-reminders function also hard-blocks weekends, so this is
-  // just to avoid pointless weekend calls.
-  cron.schedule(`*/${SCAN_MINUTES} * * * 1-5`, runStartupScan);
-  log.info(`Reminder scan scheduled every ${SCAN_MINUTES} min, Mon-Fri (batch of 4)`);
+  // Reminder scan: every SCAN_MINUTES, Mon-Fri 7AM-5PM CST — drains the backlog
+  // in batches. The send-reminders function also hard-enforces this window, so
+  // this just avoids pointless off-hours calls.
+  cron.schedule(`*/${SCAN_MINUTES} 7-16 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
+  log.info(`Reminder scan scheduled every ${SCAN_MINUTES} min, Mon-Fri 7AM-5PM CST (batch of 4)`);
 
   // PTI link drain: only active when SUPABASE_PTI_DRAIN_URL is configured
   if (DRAIN_URL) {

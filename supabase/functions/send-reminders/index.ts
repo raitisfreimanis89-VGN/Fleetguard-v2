@@ -128,12 +128,19 @@ serve(async (req) => {
     }
   }
 
-  // Weekend guard: no driver reminders on Sat/Sun (company timezone). OTP login
-  // codes and PTI links live in other functions and stay available 24/7.
-  const chicagoDow = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: "America/Chicago" }).format(new Date());
-  if (chicagoDow === "Sat" || chicagoDow === "Sun") {
+  // Send window: reminders only Mon-Fri, 7 AM-5 PM America/Chicago. No texting
+  // drivers about overdue items at night or on weekends. OTP login codes and
+  // PTI links live in other functions and remain available 24/7.
+  const nowParts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago", weekday: "short", hour: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date());
+  const chicagoDow  = nowParts.find((p) => p.type === "weekday")?.value ?? "";
+  const chicagoHour = Number(nowParts.find((p) => p.type === "hour")?.value ?? "0");
+  const isWeekend    = chicagoDow === "Sat" || chicagoDow === "Sun";
+  const outsideHours = chicagoHour < 7 || chicagoHour >= 17;   // 7 AM-5 PM CST
+  if (isWeekend || outsideHours) {
     return new Response(
-      JSON.stringify({ ok: true, weekend: chicagoDow, sent: 0, skipped: 0, note: "reminders paused Sat/Sun" }),
+      JSON.stringify({ ok: true, sent: 0, skipped: 0, paused: isWeekend ? "weekend" : "outside 7AM-5PM CST", day: chicagoDow, hour: chicagoHour }),
       { headers: { "Content-Type": "application/json" } }
     );
   }
