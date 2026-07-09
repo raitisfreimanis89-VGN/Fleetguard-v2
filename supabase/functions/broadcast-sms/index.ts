@@ -128,6 +128,47 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, truck, rowId: row.id, oldPhotoDate: row.photo_date, newPhotoDate: date, rowCreatedAt: row.created_at }), { headers: { "Content-Type": "application/json" } });
   }
 
+  // ── list_drivers_vehicles action ─────────────────────────────
+  // All drivers with their currently-assigned truck (for name resolution).
+  if (body.action === "list_drivers_vehicles") {
+    const { data: drivers } = await sb.from("drivers").select("id, name").order("name");
+    const { data: vehicles } = await sb.from("vehicles").select("id, truck_number, assigned_driver_id");
+    const vehByDriver = new Map<string, { id: string; truck_number: string }>();
+    for (const v of vehicles ?? []) if (v.assigned_driver_id) vehByDriver.set(v.assigned_driver_id, v);
+    const out = (drivers ?? []).map((d) => ({
+      name: d.name, driverId: d.id,
+      truck: vehByDriver.get(d.id)?.truck_number ?? null,
+      vehicleId: vehByDriver.get(d.id)?.id ?? null,
+    }));
+    return new Response(JSON.stringify({ ok: true, count: out.length, drivers: out }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── add_dot_batch action ─────────────────────────────────────
+  // Insert DOT roadside inspections. items: [{driverId, vehicleId, date, result, notes}]
+  if (body.action === "add_dot_batch") {
+    const items = Array.isArray(body.items) ? body.items : [];
+    const results: unknown[] = [];
+    for (const it of items as Record<string, string>[]) {
+      if (!/^(pass|violation|oos)$/.test(it.result)) { results.push({ driverId: it.driverId, ok: false, error: "bad result" }); continue; }
+      // Resolve the driver's current truck unless a vehicleId is given explicitly.
+      let vehicleId: string | null = (it.vehicleId as string) ?? null;
+      if (!vehicleId && it.driverId) {
+        const { data: veh } = await sb.from("vehicles").select("id").eq("assigned_driver_id", it.driverId).maybeSingle();
+        vehicleId = (veh as { id: string } | null)?.id ?? null;
+      }
+      const { error } = await sb.from("dot_inspections").insert({
+        id: crypto.randomUUID(),
+        vehicle_id: vehicleId,
+        driver_id: it.driverId ?? null,
+        inspection_date: it.date,
+        result: it.result,
+        notes: it.notes ?? null,
+      });
+      results.push({ driverId: it.driverId, date: it.date, result: it.result, ok: !error, error: error?.message ?? null });
+    }
+    return new Response(JSON.stringify({ ok: true, inserted: (results as { ok: boolean }[]).filter((r) => r.ok).length, results }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── scan_stale_tyre action ───────────────────────────────────
   // Find vehicles whose LATEST tyre record is back-dated (photo_date well
   // before created_at) — the stale-draft bug. Cross-checks each against a PTI
