@@ -135,6 +135,19 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, dispatchers: data }, null, 2), { headers: { "Content-Type": "application/json" } });
   }
 
+  // ── rename_driver action ─────────────────────────────────────
+  // Debug/admin helper: rename a driver by exact (case-insensitive) old name.
+  if (body.action === "rename_driver") {
+    const oldName = String(body.oldName ?? "").trim();
+    const newName = String(body.newName ?? "").trim();
+    if (!oldName || !newName) return new Response(JSON.stringify({ error: "oldName and newName required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    const { data: d } = await sb.from("drivers").select("id, name").ilike("name", oldName).maybeSingle();
+    if (!d) return new Response(JSON.stringify({ error: "No driver by that name", oldName }), { status: 404, headers: { "Content-Type": "application/json" } });
+    const { error } = await sb.from("drivers").update({ name: newName }).eq("id", d.id);
+    if (error) return new Response(JSON.stringify({ error: "Update failed", detail: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, driverId: d.id, oldName: d.name, newName }), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── set_vacation action ──────────────────────────────────────
   // Debug/admin helper: toggle a driver's on_vacation flag by exact name.
   if (body.action === "set_vacation") {
