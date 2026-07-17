@@ -128,6 +128,86 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, truck, rowId: row.id, oldPhotoDate: row.photo_date, newPhotoDate: date, rowCreatedAt: row.created_at }), { headers: { "Content-Type": "application/json" } });
   }
 
+  // ── list_dispatchers action ──────────────────────────────────
+  if (body.action === "list_dispatchers") {
+    const { data } = await sb.from("dispatcher_phones")
+      .select("dispatcher_name, phone_number, sms_hold").order("dispatcher_name");
+    return new Response(JSON.stringify({ ok: true, dispatchers: data }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── set_vacation action ──────────────────────────────────────
+  // Debug/admin helper: toggle a driver's on_vacation flag by exact name.
+  if (body.action === "set_vacation") {
+    const name = String(body.name ?? "").trim();
+    const on   = !!body.on;
+    const { data: d } = await sb.from("drivers").select("id, name").ilike("name", name).maybeSingle();
+    if (!d) return new Response(JSON.stringify({ error: "No driver by that name", name }), { status: 404, headers: { "Content-Type": "application/json" } });
+    const { error } = await sb.from("drivers").update({ on_vacation: on }).eq("id", d.id);
+    if (error) return new Response(JSON.stringify({ error: "Update failed", detail: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, driver: d.name, on_vacation: on }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── update_dispatcher_phone action ───────────────────────────
+  // Upsert a dispatcher's cell. Keyed by dispatcher_name (= vehicles.assigned_dispatcher).
+  if (body.action === "update_dispatcher_phone") {
+    const name = String(body.name ?? "").trim();
+    const raw  = String(body.phone ?? "").trim();
+    const digits = raw.replace(/\D/g, "");
+    const phone = digits.length === 10 ? "+1" + digits
+                : digits.length === 11 && digits[0] === "1" ? "+" + digits
+                : raw.startsWith("+") ? raw : "";
+    if (!name) return new Response(JSON.stringify({ error: "Missing name" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) return new Response(JSON.stringify({ error: "Invalid phone (E.164)", got: phone }), { status: 400, headers: { "Content-Type": "application/json" } });
+
+    const { data: existing } = await sb.from("dispatcher_phones").select("phone_number").eq("dispatcher_name", name).maybeSingle();
+    const now = new Date().toISOString();
+    const { error } = await sb.from("dispatcher_phones").upsert({ dispatcher_name: name, phone_number: phone, sms_hold: false, updated_at: now }, { onConflict: "dispatcher_name" });
+    if (error) return new Response(JSON.stringify({ error: "Update failed", detail: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+    return new Response(JSON.stringify({ ok: true, dispatcher: name, oldPhone: existing?.phone_number ?? null, newPhone: phone, wasNew: !existing }), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── add_driver action ────────────────────────────────────────
+  // Create driver + vehicle + phone together. Refuses duplicates.
+  if (body.action === "add_driver") {
+    const name       = String(body.name ?? "").trim();
+    const truck      = String(body.truck ?? "").trim();
+    const trailer    = String(body.trailer ?? "").trim() || null;
+    const dispatcher = String(body.dispatcher ?? "").trim() || "";
+    const raw        = String(body.phone ?? "").trim();
+    const digits     = raw.replace(/\D/g, "");
+    const phone = digits.length === 10 ? "+1" + digits
+                : digits.length === 11 && digits[0] === "1" ? "+" + digits
+                : raw.startsWith("+") ? raw : "";
+    if (!name || !truck) return new Response(JSON.stringify({ error: "name and truck required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) return new Response(JSON.stringify({ error: "invalid phone", got: phone }), { status: 400, headers: { "Content-Type": "application/json" } });
+
+    const { data: dupDriver } = await sb.from("drivers").select("id, name").ilike("name", name).maybeSingle();
+    if (dupDriver) return new Response(JSON.stringify({ error: "driver already exists", existing: dupDriver }), { status: 409, headers: { "Content-Type": "application/json" } });
+
+    const now = new Date().toISOString();
+    const driverId = crypto.randomUUID();
+    const { error: dErr } = await sb.from("drivers").insert({ id: driverId, name, on_vacation: false, created_at: now });
+    if (dErr) return new Response(JSON.stringify({ error: "driver insert failed", detail: dErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+    // Reuse the truck if it already exists, otherwise create it.
+    const { data: veh } = await sb.from("vehicles").select("id").eq("truck_number", truck).maybeSingle();
+    let vehicleId: string;
+    if (veh) {
+      vehicleId = veh.id;
+      await sb.from("vehicles").update({ trailer_number: trailer, assigned_driver_id: driverId, assigned_dispatcher: dispatcher }).eq("id", vehicleId);
+    } else {
+      vehicleId = crypto.randomUUID();
+      const { error: vErr } = await sb.from("vehicles").insert({ id: vehicleId, truck_number: truck, trailer_number: trailer, assigned_driver_id: driverId, assigned_dispatcher: dispatcher, created_at: now });
+      if (vErr) return new Response(JSON.stringify({ error: "vehicle insert failed", detail: vErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    }
+
+    const { error: pErr } = await sb.from("driver_phones").insert({ driver_id: driverId, phone_number: phone, verified: false, added_at: now, updated_at: now });
+    if (pErr) return new Response(JSON.stringify({ error: "phone insert failed", detail: pErr.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+
+    return new Response(JSON.stringify({ ok: true, driver: name, driverId, truck, trailer, dispatcher, phone, vehicleCreated: !veh }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── list_drivers_vehicles action ─────────────────────────────
   // All drivers with their currently-assigned truck (for name resolution).
   if (body.action === "list_drivers_vehicles") {

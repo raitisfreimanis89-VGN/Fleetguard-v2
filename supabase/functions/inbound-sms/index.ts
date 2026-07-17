@@ -1,11 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { notifyDispatcher, bgRun } from "../_shared/common.ts";
+import { notifyDispatcher, bgRun, maskPhone } from "../_shared/common.ts";
 
 const SUPABASE_URL   = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY    = Deno.env.get("SERVICE_ROLE_KEY")!;
 const GV_SECRET      = Deno.env.get("GV_SERVICE_SECRET")!;
 const GV_SERVICE_URL = Deno.env.get("GV_SERVICE_URL")!;   // ngrok URL → GV bot
+const PORTAL_BASE    = Deno.env.get("PORTAL_BASE_URL") ?? "https://fleetguards.app/driver";
 
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
@@ -13,6 +14,10 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 const DONE_PATTERN = /^\s*(done|finished|complete|completed|fixed)\b/i;
 // "OK" = driver acknowledges they will schedule
 const ACK_PATTERN  = /^\s*(ok|okay|yes|yep|yeah|confirm(ed)?|scheduled?|will\s+do|got\s+it|on\s+it|roger|k)\b/i;
+// Driver is asking for a fresh PTI link ("send link", "link please", "need a new link"...).
+// Kept broad (bare "link") but length-capped so it doesn't fire mid-sentence in an
+// unrelated, longer message.
+const LINK_REQUEST_PATTERN = /\blink\b/i;
 
 const CONFIRM_REPLY =
   "Safety & Compliance: Confirmation received. Please text back DONE once the work is finished. Thank you! ✓";
@@ -140,16 +145,57 @@ serve(async (req) => {
     received_at:     receivedTs,
   });
 
-  // Relay the driver's reply to their dispatcher (background; never blocks).
+  // Look up the driver's name + currently-assigned vehicle once — used for the
+  // dispatcher relay below and for a link-request auto-reply.
+  let driverName: string | null = null;
+  let assignedVehicle: { id: string; truck_number: string } | null = null;
   if (driverId) {
-    try {
-      const { data: dv }  = await sb.from("drivers").select("name").eq("id", driverId).maybeSingle();
-      const { data: veh } = await sb.from("vehicles").select("id, truck_number").eq("assigned_driver_id", driverId).maybeSingle();
-      if (veh?.id) bgRun(notifyDispatcher(sb, veh.id, `FleetGuard - ${dv?.name ?? "Driver"} (Truck #${veh.truck_number}) replied: "${trimmed}"`));
-    } catch { /* non-fatal */ }
+    const { data: dv }  = await sb.from("drivers").select("name").eq("id", driverId).maybeSingle();
+    const { data: veh } = await sb.from("vehicles").select("id, truck_number").eq("assigned_driver_id", driverId).maybeSingle();
+    driverName = dv?.name ?? null;
+    assignedVehicle = veh ?? null;
+  }
+
+  // Relay the driver's reply to their dispatcher (background; never blocks).
+  if (driverId && assignedVehicle?.id) {
+    bgRun(notifyDispatcher(sb, assignedVehicle.id, `FleetGuard - ${driverName ?? "Driver"} (Truck #${assignedVehicle.truck_number}) replied: "${trimmed}"`));
   }
 
   let action = "logged";
+
+  // ── Driver is asking for a fresh PTI link — send one right away. ──
+  // Independent of any active notification: PTI links are available 24/7.
+  if (driverId && LINK_REQUEST_PATTERN.test(trimmed) && trimmed.length <= 60) {
+    const { data: dv2 } = await sb.from("drivers").select("on_vacation").eq("id", driverId).maybeSingle();
+    const { data: ph }  = await sb.from("driver_phones").select("phone_number, sms_hold").eq("driver_id", driverId).maybeSingle();
+    const onVacation = !!dv2?.on_vacation;
+    const onHold     = !!ph?.sms_hold;
+    const toPhone    = ph?.phone_number ?? driverPhone;
+
+    if (toPhone && !onVacation && !onHold) {
+      const truck = assignedVehicle?.truck_number ?? "";
+      const url   = truck ? `${PORTAL_BASE}/${encodeURIComponent(truck)}` : PORTAL_BASE;
+      const msg   = `FleetGuard pre-trip${truck ? ` for Truck #${truck}` : ""}: tap to start your inspection ${url}`;
+      const ok = await sendReply(toPhone, msg);
+
+      await sb.from("link_sends").insert({
+        sent_by: null,
+        sent_by_email: "auto-reply:driver-requested",
+        driver_id: driverId,
+        vehicle_id: assignedVehicle?.id ?? null,
+        phone_masked: maskPhone(toPhone),
+        status: ok ? "sent" : "failed",
+        error_message: ok ? null : "gvoice send failed",
+      });
+
+      if (ok && assignedVehicle?.id) {
+        bgRun(notifyDispatcher(sb, assignedVehicle.id, `FleetGuard - PTI link auto-sent to ${driverName ?? "Driver"} (Truck #${assignedVehicle.truck_number}) — they texted requesting one.`));
+      }
+      action = ok ? "link_sent" : "link_send_failed";
+    } else {
+      action = onVacation ? "link_skipped_vacation" : onHold ? "link_skipped_hold" : "link_skipped_no_phone";
+    }
+  }
 
   if (notificationId) {
     // DONE - work finished. Check first (more specific than OK).
