@@ -6,10 +6,26 @@ const { initBrowser, sendSMS, closeBrowser } = require('./gvoice');
 const { enqueue, queueDepth }                 = require('./queue');
 const { runStartupScan, startScheduler }      = require('./scheduler');
 
-const PORT   = parseInt(process.env.PORT || '3000', 10);
-const SECRET = process.env.GV_SERVICE_SECRET;
-const app    = express();
+const PORT         = parseInt(process.env.PORT || '3000', 10);
+const SECRET       = process.env.GV_SERVICE_SECRET;
+const ADMIN_PHONE  = process.env.ADMIN_ALERT_PHONE || '';
+const app          = express();
 app.use(express.json());
+
+// ── Admin status alerts (start/stop) ───────────────────────────
+// Best-effort: the bot is the only texting capability in this system, so a
+// hard crash/kill/power-loss can't self-report (nothing left to send it).
+// This covers the reachable cases — clean start, and graceful shutdown.
+async function notifyAdmin(message) {
+  if (!ADMIN_PHONE) return;
+  try {
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('notify timeout')), 30_000));
+    await Promise.race([sendSMS(ADMIN_PHONE, message), timeout]);
+    log.info(`Admin alert sent: ${message}`);
+  } catch (e) {
+    log.warn(`Admin alert failed: ${e.message}`);
+  }
+}
 
 // ── Auth middleware ───────────────────────────────────────────
 function requireSecret(req, res, next) {
@@ -62,6 +78,7 @@ app.get('/health', (req, res) => {
 // ── Graceful shutdown ─────────────────────────────────────────
 async function shutdown(signal) {
   log.info(`${signal} received — shutting down`);
+  await notifyAdmin(`FleetGuard: bot is shutting down (${signal}).`);
   await closeBrowser();
   process.exit(0);
 }
@@ -96,4 +113,8 @@ process.on('unhandledRejection', (e) => log.error(`Unhandled: ${e}`));
 
   log.info('FleetGuard GVoice service fully started ✅');
   log.info(`Press Ctrl+C to stop`);
+
+  // 6. Confirm to the admin that the bot is up (covers both a fresh start
+  // and a watchdog-triggered recovery restart after a crash).
+  await notifyAdmin('FleetGuard: bot is ONLINE.');
 })();
