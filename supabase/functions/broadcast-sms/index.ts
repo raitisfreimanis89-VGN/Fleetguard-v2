@@ -135,6 +135,69 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, dispatchers: data }, null, 2), { headers: { "Content-Type": "application/json" } });
   }
 
+  // ── scan_all_pti_links action ────────────────────────────────
+  // Fleet-wide audit: every inspection checked against (a) whether its
+  // vehicle_id is set and resolvable, (b) whether the tyre_records row for
+  // that date actually exists, (c) whether its stored truck_number label
+  // still matches the linked vehicle's current truck_number. Read-only.
+  if (body.action === "scan_all_pti_links") {
+    const { data: insps } = await sb.from("inspections")
+      .select("id, ref, vehicle_id, driver_id, truck_number, submitted_at, odometer, details")
+      .order("submitted_at", { ascending: false }).limit(1000);
+    const list = insps ?? [];
+
+    const { data: allVeh } = await sb.from("vehicles").select("id, truck_number, assigned_driver_id");
+    const vehByTruck  = new Map((allVeh ?? []).map((v) => [v.truck_number, v]));
+    const vehByDriver = new Map((allVeh ?? []).filter((v) => v.assigned_driver_id).map((v) => [v.assigned_driver_id, v]));
+    const vehById     = new Map((allVeh ?? []).map((v) => [v.id, v]));
+
+    const { data: allTyre } = await sb.from("tyre_records").select("vehicle_id, photo_date");
+    const tk = (vid: string, d: string) => `${vid}|${d}`;
+    const tyreSet = new Set((allTyre ?? []).map((t) => tk(t.vehicle_id, t.photo_date)));
+
+    const unresolved: unknown[] = [];
+    const fixableNoLink: unknown[] = [];
+    const missingTyreRecord: unknown[] = [];
+    const labelMismatch: unknown[] = [];
+
+    for (const insp of list) {
+      const submittedDate = String(insp.submitted_at).split("T")[0];
+      const vid = insp.vehicle_id as string | null;
+
+      if (!vid) {
+        const byTruck  = vehByTruck.get(insp.truck_number);
+        const byDriver = insp.driver_id ? vehByDriver.get(insp.driver_id) : undefined;
+        const resolved = byTruck ?? byDriver;
+        if (resolved) {
+          fixableNoLink.push({ ref: insp.ref, submittedDate, truckNumberOnRecord: insp.truck_number, resolvedVia: byTruck ? "truck_number" : "driver_assignment", resolvedVehicleId: resolved.id, resolvedTruckNumber: resolved.truck_number });
+        } else {
+          unresolved.push({ ref: insp.ref, submittedDate, truckNumberOnRecord: insp.truck_number, driverId: insp.driver_id });
+        }
+        continue;
+      }
+
+      const hasTyres = Array.isArray(insp.details?.tyres) && insp.details.tyres.length > 0;
+      if (hasTyres && !tyreSet.has(tk(vid, submittedDate))) {
+        missingTyreRecord.push({ ref: insp.ref, submittedDate, vehicleId: vid, truckNumberOnRecord: insp.truck_number });
+      }
+
+      const veh = vehById.get(vid);
+      if (veh && veh.truck_number !== insp.truck_number) {
+        labelMismatch.push({ ref: insp.ref, submittedDate, inspectionTruckNumber: insp.truck_number, currentVehicleTruckNumber: veh.truck_number, vehicleId: vid });
+      }
+    }
+
+    return new Response(JSON.stringify({
+      ok: true,
+      totalInspections: list.length,
+      unresolvedCount: unresolved.length,
+      fixableNoLinkCount: fixableNoLink.length,
+      missingTyreRecordCount: missingTyreRecord.length,
+      labelMismatchCount: labelMismatch.length,
+      unresolved, fixableNoLink, missingTyreRecord, labelMismatch,
+    }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── test_vehicle_resolution action ───────────────────────────
   // Dry-run of driver-inspection's vehicle-resolution logic (primary match
   // by truck_number, then fallback to the driver's assigned vehicle). Writes
@@ -169,8 +232,18 @@ serve(async (req) => {
     const ref = String(body.ref ?? "").trim();
     const { data: insp } = await sb.from("inspections").select("*").eq("ref", ref).maybeSingle();
     if (!insp) return new Response(JSON.stringify({ error: "No inspection with that ref" }), { status: 404, headers: { "Content-Type": "application/json" } });
-    const { data: veh } = await sb.from("vehicles").select("id").eq("truck_number", insp.truck_number).maybeSingle();
-    if (!veh) return new Response(JSON.stringify({ error: "No vehicle matches this inspection's truck_number", truck: insp.truck_number }), { status: 404, headers: { "Content-Type": "application/json" } });
+    let veh: { id: string } | null = null;
+    if (insp.vehicle_id) {
+      veh = { id: insp.vehicle_id };
+    } else {
+      const { data: byTruck } = await sb.from("vehicles").select("id").eq("truck_number", insp.truck_number).maybeSingle();
+      veh = byTruck;
+      if (!veh && insp.driver_id) {
+        const { data: byDriver } = await sb.from("vehicles").select("id").eq("assigned_driver_id", insp.driver_id).maybeSingle();
+        veh = byDriver;
+      }
+    }
+    if (!veh) return new Response(JSON.stringify({ error: "No vehicle resolves for this inspection (truck_number or driver assignment)", truck: insp.truck_number, driverId: insp.driver_id }), { status: 404, headers: { "Content-Type": "application/json" } });
 
     const steps: Record<string, unknown> = {};
     if (!insp.vehicle_id) {
@@ -181,15 +254,25 @@ serve(async (req) => {
     }
 
     const submittedDate = String(insp.submitted_at).split("T")[0];
+    const submittedTs = new Date(insp.submitted_at).getTime();
     const tyres = insp.details?.tyres ?? [];
     if (tyres.length) {
-      const { data: existingTyre } = await sb.from("tyre_records").select("id").eq("vehicle_id", veh.id).eq("photo_date", submittedDate).maybeSingle();
-      if (!existingTyre) {
+      // A tyre_records row written within 5 min of this submission is the SAME
+      // write, possibly mis-dated by the old stale-draft bug - correct its date
+      // rather than inserting a duplicate. Only insert if no such row exists.
+      const { data: vehTyres } = await sb.from("tyre_records").select("id, photo_date, created_at").eq("vehicle_id", veh.id);
+      const nearby = (vehTyres ?? []).find((r) => Math.abs(new Date(r.created_at).getTime() - submittedTs) < 5 * 60_000);
+      if (nearby) {
+        if (nearby.photo_date !== submittedDate) {
+          const { error } = await sb.from("tyre_records").update({ photo_date: submittedDate }).eq("id", nearby.id);
+          steps.tyreRecord = !error ? `corrected date ${nearby.photo_date} -> ${submittedDate}` : "correction failed";
+        } else {
+          steps.tyreRecord = "already correct";
+        }
+      } else {
         const readings = tyres.map((t: Record<string, unknown>) => ({ axleIndex: t.axleIndex, position: t.position, status: t.status, rating: t.rating, pressure: t.pressure ?? null }));
         const { error } = await sb.from("tyre_records").insert({ id: crypto.randomUUID(), vehicle_id: veh.id, photo_date: submittedDate, readings });
-        steps.tyreRecordInserted = !error;
-      } else {
-        steps.tyreRecordInserted = "already exists for that date";
+        steps.tyreRecord = !error ? "inserted (was genuinely missing)" : "insert failed";
       }
     }
 
