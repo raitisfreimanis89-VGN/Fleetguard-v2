@@ -135,6 +135,86 @@ serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, dispatchers: data }, null, 2), { headers: { "Content-Type": "application/json" } });
   }
 
+  // ── test_vehicle_resolution action ───────────────────────────
+  // Dry-run of driver-inspection's vehicle-resolution logic (primary match
+  // by truck_number, then fallback to the driver's assigned vehicle). Writes
+  // nothing — used to verify the fallback without a live driver session.
+  if (body.action === "test_vehicle_resolution") {
+    const truckNumber = String(body.truckNumber ?? "");
+    const driverId = String(body.driverId ?? "");
+    const { data: primary } = await sb.from("vehicles").select("id, truck_number").eq("truck_number", truckNumber).maybeSingle();
+    let vehicleId = primary?.id ?? null;
+    let usedFallback = false;
+    if (!vehicleId && driverId) {
+      const { data: fb } = await sb.from("vehicles").select("id, truck_number").eq("assigned_driver_id", driverId).maybeSingle();
+      if (fb?.id) { vehicleId = fb.id; usedFallback = true; }
+      return new Response(JSON.stringify({ ok: true, truckNumber, driverId, primaryMatch: null, fallbackMatch: fb ?? null, resolvedVehicleId: vehicleId, usedFallback }, null, 2), { headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ ok: true, truckNumber, driverId, primaryMatch: primary, resolvedVehicleId: vehicleId, usedFallback }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── get_inspection action ────────────────────────────────────
+  // Full row for a given inspection ref, including details.tyres/checks.
+  if (body.action === "get_inspection") {
+    const ref = String(body.ref ?? "").trim();
+    const { data } = await sb.from("inspections").select("*").eq("ref", ref).maybeSingle();
+    return new Response(JSON.stringify({ ok: true, inspection: data }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── backfill_inspection_link action ──────────────────────────
+  // Fix a PTI whose vehicle_id resolution failed at submit time: set
+  // inspections.vehicle_id, and (if missing) insert the tyre_records /
+  // mileage_records rows that driver-inspection would have written.
+  if (body.action === "backfill_inspection_link") {
+    const ref = String(body.ref ?? "").trim();
+    const { data: insp } = await sb.from("inspections").select("*").eq("ref", ref).maybeSingle();
+    if (!insp) return new Response(JSON.stringify({ error: "No inspection with that ref" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    const { data: veh } = await sb.from("vehicles").select("id").eq("truck_number", insp.truck_number).maybeSingle();
+    if (!veh) return new Response(JSON.stringify({ error: "No vehicle matches this inspection's truck_number", truck: insp.truck_number }), { status: 404, headers: { "Content-Type": "application/json" } });
+
+    const steps: Record<string, unknown> = {};
+    if (!insp.vehicle_id) {
+      const { error } = await sb.from("inspections").update({ vehicle_id: veh.id }).eq("ref", ref);
+      steps.inspectionLinked = !error;
+    } else {
+      steps.inspectionLinked = "already linked";
+    }
+
+    const submittedDate = String(insp.submitted_at).split("T")[0];
+    const tyres = insp.details?.tyres ?? [];
+    if (tyres.length) {
+      const { data: existingTyre } = await sb.from("tyre_records").select("id").eq("vehicle_id", veh.id).eq("photo_date", submittedDate).maybeSingle();
+      if (!existingTyre) {
+        const readings = tyres.map((t: Record<string, unknown>) => ({ axleIndex: t.axleIndex, position: t.position, status: t.status, rating: t.rating, pressure: t.pressure ?? null }));
+        const { error } = await sb.from("tyre_records").insert({ id: crypto.randomUUID(), vehicle_id: veh.id, photo_date: submittedDate, readings });
+        steps.tyreRecordInserted = !error;
+      } else {
+        steps.tyreRecordInserted = "already exists for that date";
+      }
+    }
+
+    if (typeof insp.odometer === "number" && insp.odometer > 0) {
+      const { data: existingMil } = await sb.from("mileage_records").select("id").eq("vehicle_id", veh.id).eq("date", submittedDate).maybeSingle();
+      if (!existingMil) {
+        const { error } = await sb.from("mileage_records").insert({ id: crypto.randomUUID(), vehicle_id: veh.id, driver_id: insp.driver_id, mileage: insp.odometer, date: submittedDate });
+        steps.mileageRecordInserted = !error;
+      } else {
+        steps.mileageRecordInserted = "already exists for that date";
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, ref, vehicleId: veh.id, submittedDate, steps }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── find_vehicles action ─────────────────────────────────────
+  // Debug: raw vehicle rows matching a truck number (ilike, trimmed) — used
+  // to catch duplicates / stale rows that would make an exact-match lookup fail.
+  if (body.action === "find_vehicles") {
+    const truck = String(body.truck ?? "").trim();
+    const { data } = await sb.from("vehicles").select("id, truck_number, trailer_number, assigned_driver_id, created_at").ilike("truck_number", `%${truck}%`);
+    return new Response(JSON.stringify({ ok: true, count: data?.length ?? 0, vehicles: data }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── rename_driver action ─────────────────────────────────────
   // Debug/admin helper: rename a driver by exact (case-insensitive) old name.
   if (body.action === "rename_driver") {

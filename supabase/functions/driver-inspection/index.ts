@@ -67,6 +67,22 @@ serve(async (req) => {
     vehicleId = veh?.id ?? null;
   }
 
+  // Fallback: the typed truckNumber can go stale (renumbering, a cached portal
+  // draft, a mistyped digit) and silently drop the vehicle link — the
+  // inspection still saves, but the tyre/mileage back-compat writes below get
+  // skipped and the dashboard never updates (seen on truck 25019, 2026-07-17).
+  // driverId comes from the verified session token, so it's safe to trust:
+  // fall back to whatever vehicle is currently assigned to this driver.
+  if (!vehicleId) {
+    const { data: veh2 } = await sb.from("vehicles").select("id").eq("assigned_driver_id", driverId).maybeSingle();
+    if (veh2?.id) {
+      vehicleId = veh2.id;
+      console.warn(`driver-inspection: truckNumber="${b.truckNumber}" didn't match a vehicle for driver ${driverId} — fell back to their assigned vehicle ${vehicleId}.`);
+    } else {
+      console.error(`driver-inspection: vehicle resolution FAILED for truckNumber="${b.truckNumber}", driver ${driverId} has no assigned vehicle either. Inspection will save without a vehicle link — tyre/mileage back-compat writes will be skipped.`);
+    }
+  }
+
   const tyres  = Array.isArray(b.tyres)  ? b.tyres  : [];
   const checks = Array.isArray(b.checks) ? b.checks : [];
   const tyresFlagged = tyres.filter((t: any) => t.rating === "fail" || t.pressure === "low").length;
