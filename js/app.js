@@ -68,13 +68,12 @@ function showLoginScreen(mode) {
   document.getElementById('loading-overlay').style.display = 'none';
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
-  if (mode === 'db') {
-    document.getElementById('login-db-setup').style.display = 'block';
-    document.getElementById('login-form-section').style.display = 'none';
-  } else {
-    document.getElementById('login-db-setup').style.display = 'none';
-    document.getElementById('login-form-section').style.display = 'block';
-  }
+  // login-db-setup was removed; guard against its absence and always fall back to the sign-in form.
+  const dbSetup = document.getElementById('login-db-setup');
+  const formSection = document.getElementById('login-form-section');
+  const showDb = mode === 'db' && !!dbSetup;
+  if (dbSetup) dbSetup.style.display = showDb ? 'block' : 'none';
+  if (formSection) formSection.style.display = showDb ? 'none' : 'block';
 }
 
 function hideLoginScreen() {
