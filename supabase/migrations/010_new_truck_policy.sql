@@ -60,11 +60,19 @@ RETURNS TABLE (
   after_ladder    int
 )
 LANGUAGE plpgsql AS $$
+-- RETURNS TABLE turns reminder_type/applies_today/ladder/after_ladder into
+-- plpgsql variables, which collide with the real columns. ON CONFLICT needs a
+-- bare column name and cannot be qualified, so tell plpgsql that columns win.
+-- Safe here: no local variable (v_id, v_count, p_*) shares a column name.
+#variable_conflict use_column
 DECLARE
   v_id    uuid;
   v_count int;
 BEGIN
-  SELECT count(*), min(v.id) INTO v_count, v_id
+  -- Counted and fetched separately: there is no min() aggregate for uuid, so
+  -- combining these into one aggregate query fails with "function min(uuid)
+  -- does not exist".
+  SELECT count(*) INTO v_count
   FROM vehicles v WHERE v.truck_number = p_truck_number;
 
   IF v_count = 0 THEN
@@ -73,6 +81,9 @@ BEGIN
     RAISE EXCEPTION '% vehicles share truck_number % — resolve the duplicate first.', v_count, p_truck_number;
   END IF;
 
+  SELECT v.id INTO v_id
+  FROM vehicles v WHERE v.truck_number = p_truck_number;
+
   IF p_received > current_date THEN
     RAISE EXCEPTION 'Received date % is in the future.', p_received;
   END IF;
@@ -80,21 +91,33 @@ BEGIN
   -- Baselines. Each interval counts from the newest row in its OWN table, so all
   -- three are required: send-reminders does `if (!lastDate) continue`, meaning a
   -- missing baseline silently produces no reminder at all.
-  INSERT INTO service_records (id, vehicle_id, service_date, result, notes)
-  SELECT gen_random_uuid(), v_id, p_received, 'pass', 'New truck received — baseline yard inspection'
-  WHERE NOT EXISTS (SELECT 1 FROM service_records s
-                     WHERE s.vehicle_id = v_id AND s.service_date = p_received);
+  -- These date columns are a MIX of types across tables (brake_tests.test_date
+  -- is text, service_records.service_date is date). Neither a bare date nor an
+  -- explicit ::text works for both: casts FROM a string type are assignment-level
+  -- only for an untyped literal, and text -> date is explicit-only. %L emits a
+  -- quoted literal of unknown type, which Postgres coerces to whatever each
+  -- column actually is. Reads use ::date for the same reason.
+  EXECUTE format($q$
+    INSERT INTO service_records (id, vehicle_id, service_date, result, notes)
+    SELECT gen_random_uuid(), %1$L::uuid, %2$L, 'pass', 'New truck received - baseline yard inspection'
+    WHERE NOT EXISTS (SELECT 1 FROM service_records s
+                       WHERE s.vehicle_id = %1$L::uuid AND s.service_date::date = %2$L::date)
+  $q$, v_id, p_received);
 
-  INSERT INTO brake_tests (id, vehicle_id, test_date, result, notes)
-  SELECT gen_random_uuid(), v_id, p_received, 'pass', 'New truck received — baseline brake inspection'
-  WHERE NOT EXISTS (SELECT 1 FROM brake_tests b
-                     WHERE b.vehicle_id = v_id AND b.test_date = p_received);
+  EXECUTE format($q$
+    INSERT INTO brake_tests (id, vehicle_id, test_date, result, notes)
+    SELECT gen_random_uuid(), %1$L::uuid, %2$L, 'pass', 'New truck received - baseline brake inspection'
+    WHERE NOT EXISTS (SELECT 1 FROM brake_tests b
+                       WHERE b.vehicle_id = %1$L::uuid AND b.test_date::date = %2$L::date)
+  $q$, v_id, p_received);
 
   -- Uncast '[]' so Postgres coerces it to the column's own json/jsonb type.
-  INSERT INTO tyre_records (id, vehicle_id, photo_date, readings)
-  SELECT gen_random_uuid(), v_id, p_received, '[]'
-  WHERE NOT EXISTS (SELECT 1 FROM tyre_records t
-                     WHERE t.vehicle_id = v_id AND t.photo_date = p_received);
+  EXECUTE format($q$
+    INSERT INTO tyre_records (id, vehicle_id, photo_date, readings)
+    SELECT gen_random_uuid(), %1$L::uuid, %2$L, '[]'
+    WHERE NOT EXISTS (SELECT 1 FROM tyre_records t
+                       WHERE t.vehicle_id = %1$L::uuid AND t.photo_date::date = %2$L::date)
+  $q$, v_id, p_received);
 
   -- Schedule rows straight from the policy. Steady state prefers the existing
   -- global row so the truck rejoins whatever the fleet actually runs.

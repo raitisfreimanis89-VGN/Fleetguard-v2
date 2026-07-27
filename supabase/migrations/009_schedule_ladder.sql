@@ -79,21 +79,25 @@ LEFT JOIN LATERAL (
   SELECT count(*)::int AS n
   FROM (
     -- Only the table that actually drives this reminder type is counted.
-    SELECT bt.test_date AS d
+    -- Every branch is cast to date: these columns are a mix of text and date
+    -- across the schema (brake_tests.test_date is text, service_records.service_date
+    -- is date), and an uncast UNION fails with "types text and date cannot be
+    -- matched". Migration 007 casts the same way.
+    SELECT bt.test_date::date AS d
       FROM brake_tests bt
      WHERE rs.reminder_type = 'brake_service' AND bt.vehicle_id = rs.vehicle_id
     UNION ALL
     -- Yard/periodic and PM both read service history; maintenance_records is
     -- included to match the fallback used by the dashboard and send-reminders.
-    SELECT sr.service_date
+    SELECT sr.service_date::date
       FROM service_records sr
      WHERE rs.reminder_type IN ('dot_inspection','pm_service') AND sr.vehicle_id = rs.vehicle_id
     UNION ALL
-    SELECT mr.service_date
+    SELECT mr.service_date::date
       FROM maintenance_records mr
      WHERE rs.reminder_type IN ('dot_inspection','pm_service') AND mr.vehicle_id = rs.vehicle_id
     UNION ALL
-    SELECT tr.photo_date
+    SELECT tr.photo_date::date
       FROM tyre_records tr
      WHERE rs.reminder_type = 'tyre_check' AND tr.vehicle_id = rs.vehicle_id
   ) r
