@@ -100,11 +100,39 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s ?? 
 // ═══════════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════════
-let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[];
+let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[], SCHEDULES=[];
+
+// ── Per-vehicle inspection intervals ─────────────────────────────────────────
+// Source: the vehicle_effective_schedules view, which has already resolved any
+// new-truck ladder (e.g. tyres 21 -> 14 -> 7) down to today's interval.
+// Fleet defaults below MUST mirror the historical hardcoded thresholds so that any
+// truck without its own row behaves exactly as before.
+// Deliberate: the view exposes only VEHICLE-SPECIFIC rows. Global rows (vehicle_id
+// NULL) steer the SMS bot but must not shift the dashboard, otherwise editing a
+// global default would silently re-grade the whole fleet.
+const SCHED_DEFAULTS={
+  brake_service : {interval:42, warn:7},  // brakeOverdue >42, dueSoon >35
+  dot_inspection: {interval:60, warn:7},  // yard/periodic: serviceOverdue >60, dueSoon >53
+  tyre_check    : {interval:7,  warn:0},  // tyreOverdue >=7
+};
+function vehSched(vehicleId,type){
+  const def=SCHED_DEFAULTS[type];
+  const row=SCHEDULES.find(s=>s.vehicle_id===vehicleId&&s.reminder_type===type&&s.enabled!==false);
+  if(!row||!(row.interval_days>0)) return {interval:def.interval,warn:def.warn,custom:false};
+  return {interval:row.interval_days,warn:row.warning_days_before??def.warn,custom:true};
+}
+// True only while a new-truck ladder is still stepping down. Once every ladder is
+// exhausted the row survives on the fleet interval, so `custom` stays true — this
+// is what the NEW TRUCK watermark keys off, so the mark clears itself on expiry.
+function onNewTruckLadder(vehicleId){
+  return SCHEDULES.some(s=>s.vehicle_id===vehicleId&&s.enabled!==false
+    &&Array.isArray(s.step_intervals)&&s.step_intervals.length>0
+    &&(s.completed_since_exemption??0)<s.step_intervals.length);
+}
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,ls] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,ls,sch] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -115,6 +143,7 @@ async function loadAll() {
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
     sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
     sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
+    sb.from('vehicle_effective_schedules').select('vehicle_id,reminder_type,interval_days,warning_days_before,enabled,step_intervals,completed_since_exemption'),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -130,6 +159,11 @@ async function loadAll() {
   if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
   // link_sends: now admin+dispatcher readable (RLS 005) — powers "last PTI link sent" on the vehicle PTI tab
   if (!ls.error && ls.data) LINK_SENDS = ls.data.map(r=>({...r,driverId:r.driver_id,vehicleId:r.vehicle_id,createdAt:r.created_at}));
+  // vehicle_effective_schedules (migration 009) already resolves the new-truck
+  // ladder to the interval that applies today, so nothing is computed here.
+  // Guarded like the rest — a failed fetch leaves SCHEDULES as-is, and an empty
+  // SCHEDULES simply means every truck uses the fleet defaults.
+  if (!sch.error && sch.data) SCHEDULES = sch.data;
 }
 
 async function addDriver(name) {
@@ -232,16 +266,20 @@ function getVehicleStatus(vid){
   const lastMaint=maint[0];
   const serviceRefDate=lastService?.serviceDate||lastMaint?.serviceDate||null;
   const serviceDays=serviceRefDate?daysBetween(serviceRefDate,now):null;
-  // Tyres are on a weekly cadence — flag overdue at 7d so the card matches the SMS reminder bot (2026-07-03).
-  const brakeOverdue=brakeDays>42,brakeDueSoon=brakeDays>35&&!brakeOverdue,tyreOverdue=tyreDays>=7;
-  const serviceOverdue=serviceDays>60,serviceDueSoon=serviceDays>53&&!serviceOverdue;
+  // Thresholds come from reminder_schedules when this vehicle has its own row, else the
+  // fleet defaults in SCHED_DEFAULTS (42/60/7) — identical to the previous hardcoded values.
+  // Tyres stay on the weekly default so the card matches the SMS reminder bot (2026-07-03).
+  const bSch=vehSched(vid,'brake_service'),sSch=vehSched(vid,'dot_inspection'),tSch=vehSched(vid,'tyre_check');
+  const brakeOverdue=brakeDays>bSch.interval,brakeDueSoon=brakeDays>bSch.interval-bSch.warn&&!brakeOverdue,tyreOverdue=tyreDays>=tSch.interval;
+  const serviceOverdue=serviceDays>sSch.interval,serviceDueSoon=serviceDays>sSch.interval-sSch.warn&&!serviceOverdue;
   // nextDue warning: use maintenance nextInspectionDate if it has passed
   const nextDue=maint[0]?.nextInspectionDate;
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
   const critical=brakeOverdue||serviceOverdue,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue; // OOS is a silent record now — never drives critical/red (2026-07-01)
-  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now)};
+  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now),
+    brakeInterval:bSch.interval,serviceInterval:sSch.interval,tyreInterval:tSch.interval,customSchedule:bSch.custom||sSch.custom||tSch.custom,newTruck:onNewTruckLadder(vid)};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -760,7 +798,7 @@ function renderDashboard(){
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟡 Brake Test Due Soon</div><div class="card-body">`;
   if(brakeDueSoon.length===0) html+=`<div class="empty">No vehicles due in next 7 days</div>`;
-  brakeDueSoon.forEach(x=>{const d=42-x.s.brakeDays;html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">Due in ${d} day${d===1?'':'s'}</div></div><span class="badge badge-yellow">DUE SOON</span></div>`;});
+  brakeDueSoon.forEach(x=>{const d=x.s.brakeInterval-x.s.brakeDays;html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">Due in ${d} day${d===1?'':'s'}</div></div><span class="badge badge-yellow">DUE SOON</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟠 Tyre Check Overdue</div><div class="card-body">`;
   if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
@@ -801,7 +839,8 @@ function renderVehicles(){
     const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
     const s=getVehicleStatus(v.id);
     const sb2=s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">OK</span>`;
-    html+=`<div class="card" id="vcard-${v.id}">
+    html+=`<div class="card${s.newTruck?' has-watermark':''}" id="vcard-${v.id}">
+      ${s.newTruck?`<span class="card-watermark" aria-hidden="true">NEW TRUCK</span>`:''}
       <!-- VIEW MODE -->
       <div id="vview-${v.id}" class="card-body" style="padding:16px">
         <div class="flex-between mb-4" style="margin-bottom:10px">

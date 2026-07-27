@@ -24,16 +24,21 @@ const CLEAR: Array<(d: string, n: number) => string> = [
 ];
 
 type Row = {
-  dispatcher_name: string; phone_number: string; truck_number: string;
+  dispatcher_name: string; phone_number: string; vehicle_id: string; truck_number: string;
   driver_name: string | null; on_vacation: boolean;
   brake_days: number | null; service_days: number | null; tyre_days: number | null;
   pti_yesterday: boolean;
 };
 
+// Per-vehicle interval overrides: vehicle_id -> { reminder_type: interval_days }.
+// Only vehicle-specific rows are loaded; trucks without one keep the fleet
+// constants above, so a global row can never re-grade the whole fleet here.
+type SchedMap = Map<string, Record<string, number>>;
+
 function days(n: number): string { return `${n} day${n === 1 ? "" : "s"}`; }
 function dueIn(n: number): string { return n === 0 ? "due today" : `due in ${days(n)}`; }
 
-function buildMessage(disp: string, trucks: Row[]): string {
+function buildMessage(disp: string, trucks: Row[], sched: SchedMap): string {
   const n = trucks.length;
   const overdueByTruck = new Map<string, string[]>();
   const soonByTruck    = new Map<string, string[]>();
@@ -45,14 +50,21 @@ function buildMessage(disp: string, trucks: Row[]): string {
     const { brake_days: b, service_days: s, tyre_days: y, truck_number: tn } = t;
     const od: string[] = [], sn: string[] = [];
 
-    if (b != null && b > BRAKE)                od.push(`Brake inspection ${days(b - BRAKE)} overdue`);
-    else if (b != null && b > BRAKE - BRAKE_W) sn.push(`Brake inspection ${dueIn(BRAKE - b)}`);
+    // Per-vehicle intervals when this truck has its own reminder_schedules row,
+    // otherwise the fleet constants — identical output for every other truck.
+    const ov = sched.get(t.vehicle_id) ?? {};
+    const BR = ov.brake_service  ?? BRAKE;
+    const SV = ov.dot_inspection ?? SERVICE;
+    const TY = ov.tyre_check     ?? TYRE;
 
-    if (s != null && s > SERVICE)                  od.push(`Yard inspection ${days(s - SERVICE)} overdue`);
-    else if (s != null && s > SERVICE - SERVICE_W) sn.push(`Yard inspection ${dueIn(SERVICE - s)}`);
+    if (b != null && b > BR)             od.push(`Brake inspection ${days(b - BR)} overdue`);
+    else if (b != null && b > BR - BRAKE_W) sn.push(`Brake inspection ${dueIn(BR - b)}`);
 
-    if (y != null && y > TYRE)                od.push(`Tire check ${days(y - TYRE)} overdue`);
-    else if (y != null && y > TYRE - TYRE_W)  sn.push(`Tire check ${dueIn(TYRE - y)}`);
+    if (s != null && s > SV)               od.push(`Yard inspection ${days(s - SV)} overdue`);
+    else if (s != null && s > SV - SERVICE_W) sn.push(`Yard inspection ${dueIn(SV - s)}`);
+
+    if (y != null && y > TY)            od.push(`Tire check ${days(y - TY)} overdue`);
+    else if (y != null && y > TY - TYRE_W) sn.push(`Tire check ${dueIn(TY - y)}`);
 
     if (od.length) overdueByTruck.set(tn, od);
     if (sn.length) soonByTruck.set(tn, sn);
@@ -91,6 +103,21 @@ serve(async (req) => {
   const { data: rows, error } = await sb.rpc("dispatcher_digest_data");
   if (error) return json({ ok: false, error: error.message }, 500);
 
+  // Vehicle-specific interval overrides. A failed fetch is non-fatal: the map
+  // stays empty and every truck falls back to the fleet constants.
+  const sched: SchedMap = new Map();
+  // The view has already resolved any new-truck ladder to today's interval.
+  const { data: schedRows } = await sb
+    .from("vehicle_effective_schedules")
+    .select("vehicle_id,reminder_type,interval_days,enabled")
+    .eq("enabled", true);
+  for (const s of schedRows ?? []) {
+    if (!(s.interval_days > 0)) continue;
+    const m = sched.get(s.vehicle_id) ?? {};
+    m[s.reminder_type] = s.interval_days;
+    sched.set(s.vehicle_id, m);
+  }
+
   const byDisp = new Map<string, { phone: string; trucks: Row[] }>();
   for (const r of (rows ?? []) as Row[]) {
     if (!byDisp.has(r.dispatcher_name)) byDisp.set(r.dispatcher_name, { phone: r.phone_number, trucks: [] });
@@ -101,7 +128,7 @@ serve(async (req) => {
   // own queue), so this stays fast and never hits the function time limit.
   const messages: Array<{ dispatcher: string; to: string; body: string }> = [];
   for (const [disp, info] of byDisp) {
-    messages.push({ dispatcher: disp, to: info.phone, body: buildMessage(disp, info.trucks) });
+    messages.push({ dispatcher: disp, to: info.phone, body: buildMessage(disp, info.trucks, sched) });
   }
   return json({ ok: true, dispatchers: byDisp.size, messages });
 });

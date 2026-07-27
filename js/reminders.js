@@ -90,10 +90,11 @@ function remRenderOverview() {
     const phone = DRIVER_PHONES.find(p => p.driver_id === driver.id);
     const phoneStr = phone ? maskPhone(phone.phone_number) : '— no phone';
 
-    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
-    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.serviceDays, interval:60, icon:'build_circle',   type:'dot_inspection' });
-    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:42, icon:'construction',  type:'brake_service'  });
-    if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:60, icon:'build_circle',   type:'pm_service'     });
+    // intervals come from getVehicleStatus so a truck on a custom schedule shows its own numbers
+    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'construction',  type:'brake_service'  });
+    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.serviceDays, interval:s.serviceInterval, icon:'build_circle',   type:'dot_inspection' });
+    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'construction',  type:'brake_service'  });
+    if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:s.serviceInterval, icon:'build_circle',   type:'pm_service'     });
   });
 
   const recentNotifs = SMS_NOTIFS.slice(0, 6);

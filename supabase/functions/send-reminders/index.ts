@@ -48,8 +48,11 @@ async function getLastDate(vehicleId: string, type: string): Promise<string | nu
 // ── Get effective schedule for a vehicle + type ───────────────
 // Vehicle-specific row wins over global default (vehicle_id = null)
 async function getSchedule(vehicleId: string, type: string) {
+  // vehicle_effective_schedules (migration 009) resolves any new-truck ladder
+  // (e.g. tyres 21 -> 14 -> 7) to the interval that applies today. For rows
+  // without a ladder it returns interval_days unchanged.
   const { data: specific } = await sb
-    .from("reminder_schedules")
+    .from("vehicle_effective_schedules")
     .select("*")
     .eq("vehicle_id", vehicleId)
     .eq("reminder_type", type)

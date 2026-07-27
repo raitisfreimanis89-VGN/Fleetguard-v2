@@ -208,6 +208,25 @@ nav { padding: 14px 10px; flex: 1; }
 .card-header-accent { width: 3px; height: 16px; background: var(--primary); border-radius: 2px; flex-shrink: 0; }
 .card-body { padding: 18px 20px; }
 
+/* --- NEW-TRUCK WATERMARK (vehicle cards) ---
+   Marks a truck while its new-truck exemption ladder is still stepping down.
+   The mark is a sibling of .card-body, not a child, so the body can sit on a
+   higher layer and keep the text crisp over it. */
+.card.has-watermark { position: relative; overflow: hidden; }
+.card.has-watermark > .card-body { position: relative; z-index: 1; }
+.card-watermark {
+  /* Fills the card and centres the text, so rotating about the centre cannot
+     push the glyphs outside and get them clipped by overflow:hidden. */
+  position: absolute; inset: 0; z-index: 0;
+  display: flex; align-items: center; justify-content: center;
+  transform: rotate(-16deg);
+  font-family: 'Manrope', sans-serif; font-weight: 800;
+  font-size: 26px; letter-spacing: 2px; line-height: 1; white-space: nowrap;
+  color: var(--primary); opacity: 0.14;
+  pointer-events: none;  /* must never intercept the card's click targets */
+  user-select: none;
+}
+
 /* --- STATS GRID --- */
 .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 26px; }
 .stat-card { background: var(--surface-container); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow-card); transition: background 0.2s, box-shadow 0.2s, transform 0.2s; }
