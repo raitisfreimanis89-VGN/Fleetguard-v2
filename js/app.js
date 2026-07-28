@@ -101,6 +101,9 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s ?? 
 // DATA LAYER
 // ═══════════════════════════════════════════════════════
 let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[], SCHEDULES=[];
+// Flipped on by loadAll() once inspections carries the migration-011 repair
+// columns. Gates every part of the defect-repair feature.
+let REPAIRS_AVAILABLE=false;
 
 // ── Per-vehicle inspection intervals ─────────────────────────────────────────
 // Source: the vehicle_effective_schedules view, which has already resolved any
@@ -132,7 +135,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,ls,sch] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,rep,ls,sch] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -141,7 +144,13 @@ async function loadAll() {
     sb.from('dot_inspections').select('id,vehicle_id,driver_id,inspection_date,result,notes').order('created_at'),
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
-    sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed,repair_status,repaired_at,repair_notes').order('submitted_at',{ascending:false}).limit(500),
+    sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
+    // Repair columns live in a SEPARATE query on purpose. They arrive with
+    // migration 011, and folding them into the select above would make the
+    // whole inspections fetch fail with 42703 until that migration is applied —
+    // blanking the PTI pills and Inspections page fleet-wide. Split this way,
+    // a missing column costs only the defect-tracking feature.
+    sb.from('inspections').select('id,repair_status,repaired_at,repair_notes').order('submitted_at',{ascending:false}).limit(500),
     sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
     sb.from('vehicle_effective_schedules').select('vehicle_id,reminder_type,interval_days,warning_days_before,enabled,step_intervals,completed_since_exemption'),
   ]);
@@ -156,7 +165,21 @@ async function loadAll() {
   if (!mil.error && mil.data) MILEAGE = mil.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
   // inspections table may not exist until migration 003 is applied — guarded like the rest
-  if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed,repairStatus:r.repair_status,repairedAt:r.repaired_at,repairNotes:r.repair_notes}));
+  if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
+  // Defect tracking switches itself on only once migration 011 has been applied.
+  // Until then REPAIRS_AVAILABLE stays false and isOpenDefect() returns false for
+  // everything, so status, pills and buttons behave exactly as they do today —
+  // rather than marking every historical defect red with no way to clear it.
+  REPAIRS_AVAILABLE = !rep.error && !!rep.data;
+  if (REPAIRS_AVAILABLE) {
+    const byId = new Map(rep.data.map(r=>[r.id,r]));
+    INSPECTIONS.forEach(r=>{
+      const x = byId.get(r.id);
+      r.repairStatus = x?.repair_status ?? null;
+      r.repairedAt   = x?.repaired_at   ?? null;
+      r.repairNotes  = x?.repair_notes  ?? null;
+    });
+  }
   // link_sends: now admin+dispatcher readable (RLS 005) — powers "last PTI link sent" on the vehicle PTI tab
   if (!ls.error && ls.data) LINK_SENDS = ls.data.map(r=>({...r,driverId:r.driver_id,vehicleId:r.vehicle_id,createdAt:r.created_at}));
   // vehicle_effective_schedules (migration 009) already resolves the new-truck
@@ -298,6 +321,7 @@ const DRIVER_FN_BASE='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
 // submission, so NULL must read as open — anything else would silently treat an
 // untouched defect as resolved.
 function isOpenDefect(r){
+  if(!REPAIRS_AVAILABLE) return false;   // migration 011 not applied yet
   return (r.overallResult==='defect'||r.overallResult==='minor')
       && (r.repairStatus==null||r.repairStatus==='open');
 }
