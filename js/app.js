@@ -1179,9 +1179,12 @@ async function doMarkRepaired(inspectionId){
   if(!isAdmin()) return;
   const rec=INSPECTIONS.find(r=>r.id===inspectionId);
   if(!rec||!isOpenDefect(rec)) return;
+  // confirm2 defaults to a red "Delete" button — pass an explicit label and
+  // class, or closing a defect looks like it destroys the inspection record.
   const ok=await confirm2(
     `Mark defect repaired on Truck #${rec.truckNumber||''}?`,
-    'Records you as closing it, with the date and time. The truck clears its red status once saved.');
+    'Records you as closing it, with the date and time. The truck clears its red status once saved. The inspection record itself is kept.',
+    '✓ Mark Repaired','btn btn-success');
   if(!ok) return;
   const stamp=new Date().toISOString();
   const {error}=await sb.from('inspections')
