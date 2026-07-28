@@ -141,7 +141,7 @@ async function loadAll() {
     sb.from('dot_inspections').select('id,vehicle_id,driver_id,inspection_date,result,notes').order('created_at'),
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
-    sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
+    sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed,repair_status,repaired_at,repair_notes').order('submitted_at',{ascending:false}).limit(500),
     sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
     sb.from('vehicle_effective_schedules').select('vehicle_id,reminder_type,interval_days,warning_days_before,enabled,step_intervals,completed_since_exemption'),
   ]);
@@ -156,7 +156,7 @@ async function loadAll() {
   if (!mil.error && mil.data) MILEAGE = mil.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
   // inspections table may not exist until migration 003 is applied — guarded like the rest
-  if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
+  if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed,repairStatus:r.repair_status,repairedAt:r.repaired_at,repairNotes:r.repair_notes}));
   // link_sends: now admin+dispatcher readable (RLS 005) — powers "last PTI link sent" on the vehicle PTI tab
   if (!ls.error && ls.data) LINK_SENDS = ls.data.map(r=>({...r,driverId:r.driver_id,vehicleId:r.vehicle_id,createdAt:r.created_at}));
   // vehicle_effective_schedules (migration 009) already resolves the new-truck
@@ -277,15 +277,37 @@ function getVehicleStatus(vid){
   const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
-  const critical=brakeOverdue||serviceOverdue,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue; // OOS is a silent record now — never drives critical/red (2026-07-01)
+  // An unresolved pre-trip defect makes the truck critical: the driver reported
+  // it, the record is signed and GPS-stamped, so dispatching on green would be
+  // indefensible. 'minor' is proportionate — a warning, not a stop.
+  const openDefect=openDefectFor(vid);
+  const defectCritical=!!openDefect&&openDefect.overallResult==='defect';
+  const defectMinor   =!!openDefect&&openDefect.overallResult==='minor';
+  const critical=brakeOverdue||serviceOverdue||defectCritical,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue||defectMinor; // OOS is a silent record now — never drives critical/red (2026-07-01)
   return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now),
-    brakeInterval:bSch.interval,serviceInterval:sSch.interval,tyreInterval:tSch.interval,customSchedule:bSch.custom||sSch.custom||tSch.custom,newTruck:onNewTruckLadder(vid)};
+    brakeInterval:bSch.interval,serviceInterval:sSch.interval,tyreInterval:tSch.interval,customSchedule:bSch.custom||sSch.custom||tSch.custom,newTruck:onNewTruckLadder(vid),
+    openDefect,defectCritical,defectMinor};
 }
 
 // ═══════════════════════════════════════════════════════
 // PRE-TRIP INSPECTIONS (driver portal results)
 // ═══════════════════════════════════════════════════════
 const DRIVER_FN_BASE='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
+// A pre-trip defect stays OPEN until someone explicitly repairs or defers it.
+// repair_status is absent on rows written before migration 011 and on every new
+// submission, so NULL must read as open — anything else would silently treat an
+// untouched defect as resolved.
+function isOpenDefect(r){
+  return (r.overallResult==='defect'||r.overallResult==='minor')
+      && (r.repairStatus==null||r.repairStatus==='open');
+}
+// Newest unresolved pre-trip defect for a vehicle, or null.
+function openDefectFor(vehicleId){
+  return INSPECTIONS
+    .filter(r=>r.vehicleId===vehicleId&&isOpenDefect(r))
+    .sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')))[0]||null;
+}
+
 function inspDur(s){ if(s==null) return '—'; const m=Math.floor(s/60),x=s%60; return m+'m '+(x<10?'0':'')+x+'s'; }
 function inspDT(iso){ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); }
 
@@ -294,10 +316,36 @@ function renderInspections(){
   const todayStr=today();
   const todayCount=rows.filter(i=>String(i.submittedAt||'').split('T')[0]===todayStr).length;
   const defectCount=rows.filter(i=>i.overallResult==='defect').length;
-  let html=`<div class="card" style="max-width:1040px;margin-bottom:18px"><div class="card-header"><span class="card-header-accent"></span>📋 Driver Pre-Trip Inspections</div><div class="card-body">
+  const openRows=rows.filter(isOpenDefect);
+  let html='';
+  // Open defects lead the page: an unrepaired defect is the only thing here
+  // that needs action today, and it is what the CSA driver-observed category
+  // is scored on.
+  if(openRows.length){
+    html+=`<div class="card" style="max-width:1040px;margin-bottom:18px;border-left:3px solid var(--danger)"><div class="card-header"><span class="card-header-accent"></span>🛠 Open Defects (${openRows.length})</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
+      <thead><tr><th style="padding-left:18px">Truck</th><th>Reported</th><th>Driver</th><th>Issues</th><th>Result</th>${isAdmin()?'<th>Action</th>':''}</tr></thead><tbody>`;
+    openRows.forEach(r=>{
+      const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
+      const ageDays=r.submittedAt?daysBetween(String(r.submittedAt).split('T')[0],today()):null;
+      const flags=[];
+      if(r.tyresFlagged) flags.push(`${r.tyresFlagged} tyre${r.tyresFlagged>1?'s':''}`);
+      if(r.checksFailed) flags.push(`${r.checksFailed} check${r.checksFailed>1?'s':''}`);
+      html+=`<tr>
+        <td style="padding-left:18px"><strong>Truck #${esc(r.truckNumber||'—')}</strong></td>
+        <td class="text-sm">${inspDT(r.submittedAt)}${ageDays>0?` <span class="badge badge-red" style="font-size:10px">${ageDays}d open</span>`:''}</td>
+        <td class="text-sm">${dName?esc(dName):'—'}</td>
+        <td class="text-sm" style="color:var(--danger)">${flags.join(' · ')||'—'}</td>
+        <td><span class="badge ${r.overallResult==='defect'?'badge-red':'badge-yellow'}">${r.overallResult==='defect'?'Defect':'Minor'}</span></td>
+        ${isAdmin()?`<td><button class="btn btn-success btn-sm mark-repaired-btn" data-insp="${esc(r.id)}">✓ Repaired</button></td>`:''}
+      </tr>`;
+    });
+    html+=`</tbody></table></div></div></div>`;
+  }
+  html+=`<div class="card" style="max-width:1040px;margin-bottom:18px"><div class="card-header"><span class="card-header-accent"></span>📋 Driver Pre-Trip Inspections</div><div class="card-body">
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <span class="badge badge-blue">${rows.length} total</span>
       ${todayCount?`<span class="badge badge-green">● ${todayCount} today</span>`:`<span class="badge badge-gray">none today</span>`}
+      ${openRows.length?`<span class="badge badge-red">🛠 ${openRows.length} unrepaired</span>`:`<span class="badge badge-green">✓ none unrepaired</span>`}
       ${defectCount?`<span class="badge badge-red">${defectCount} with defects</span>`:''}
     </div>`;
   if(isAdmin()){
@@ -573,6 +621,12 @@ function render(){
   else if(currentPage==='users') renderUsersAsync();
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
   else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
+  // Bound after every render: the button lives in markup rebuilt each time.
+  // data-* + addEventListener rather than an inline onclick, so ids never reach
+  // a JS string context.
+  document.querySelectorAll('.mark-repaired-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.stopPropagation();doMarkRepaired(btn.dataset.insp);});
+  });
   const usersNav=document.getElementById('nav-users');
   if(usersNav) usersNav.style.display='none';       // Users hidden for everyone
   const remindersNav=document.getElementById('nav-reminders');
@@ -665,6 +719,7 @@ function renderDispatcherBoard(){
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
             <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
             <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 PTI ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
+            ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
           </div>
         </div>
       </div>`;
@@ -860,6 +915,7 @@ function renderVehicles(){
           <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
           <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
           <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 Pre-trip ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
+          ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
         </div>
         ${isAdmin()&&v.assignedDriverId?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Send pre-trip link</button>`:''}
       </div>
@@ -1080,11 +1136,38 @@ function renderVehicleDetail(){
       const flags=[];
       if(r.tyresFlagged) flags.push(`${r.tyresFlagged} tyre${r.tyresFlagged>1?'s':''} flagged`);
       if(r.checksFailed) flags.push(`${r.checksFailed} check${r.checksFailed>1?'s':''} failed`);
-      html+=`<div class="history-item" style="cursor:pointer" onclick="openInspection('${r.id}')" title="Open full inspection"><div><div class="fw-600">${inspDT(r.submittedAt)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${flags.length?`<div class="text-sm" style="color:var(--danger)">${flags.join(' · ')}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${rb}">${rl}</span></div></div>`;
+      const isOpen=isOpenDefect(r);
+      const repairLine=isOpen
+        ? `<div class="text-sm" style="color:var(--danger);font-weight:600">🛠 Not repaired</div>`
+        : (r.repairStatus==='repaired'||r.repairStatus==='deferred')
+          ? `<div class="text-sm" style="color:var(--text3)">🛠 ${r.repairStatus==='repaired'?'Repaired':'Deferred'}${r.repairedAt?' · '+fmtDate(r.repairedAt):''}${r.repairNotes?' · '+esc(r.repairNotes):''}</div>`
+          : '';
+      html+=`<div class="history-item"${isOpen?' style="border-left:3px solid var(--danger);padding-left:9px"':''}><div style="cursor:pointer;flex:1" onclick="openInspection('${r.id}')" title="Open full inspection"><div class="fw-600">${inspDT(r.submittedAt)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${flags.length?`<div class="text-sm" style="color:var(--danger)">${flags.join(' · ')}</div>`:''}${repairLine}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${rb}">${rl}</span>${isOpen&&isAdmin()?`<button class="btn btn-success btn-sm mark-repaired-btn" data-insp="${esc(r.id)}" title="Record that this defect has been repaired">✓ Repaired</button>`:''}</div></div>`;
     });
     html+=`</div></div></div>`;
   }
   return html;
+}
+
+// Close out a pre-trip defect. Admin-only: this is a compliance assertion, and
+// RLS (insp_update_admin) enforces it server-side regardless of this check.
+async function doMarkRepaired(inspectionId){
+  if(!isAdmin()) return;
+  const rec=INSPECTIONS.find(r=>r.id===inspectionId);
+  if(!rec||!isOpenDefect(rec)) return;
+  const ok=await confirm2(
+    `Mark defect repaired on Truck #${rec.truckNumber||''}?`,
+    'Records you as closing it, with the date and time. The truck clears its red status once saved.');
+  if(!ok) return;
+  const stamp=new Date().toISOString();
+  const {error}=await sb.from('inspections')
+    .update({repair_status:'repaired',repaired_by:currentUser?.id??null,repaired_at:stamp})
+    .eq('id',inspectionId);
+  if(error){ console.error('mark repaired failed',error); showToast('Could not save — try again','danger'); return; }
+  // Mirror locally so the pill clears without waiting for the 30s refresh.
+  rec.repairStatus='repaired'; rec.repairedAt=stamp;
+  showToast('Defect marked repaired','success');
+  render();
 }
 
 let _brakeResult='pass',_dotResult='pass',_serviceResult='pass';
