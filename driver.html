@@ -399,6 +399,11 @@ const CHECK_ITEMS=[
   {id:'air_leak',     label:'Air leak',          icon:'💨', hint:'Listen for hissing; check air build-up & governor cut-out.'},
   {id:'windshield',   label:'Windshield damage', icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><path d="M4.6 8.2C4.8 7.3 5.5 6.8 6.4 6.8h11.2c.9 0 1.6.5 1.8 1.4l1 6.2c.16 1-.6 1.9-1.6 1.9H5.2c-1 0-1.76-.9-1.6-1.9z"/><path d="M12 6.8v9.5"/><path d="M6.5 16l2.4-3"/><path d="M17.5 16l-2.4-3"/></svg>', hint:'Cracks, chips, wipers, mirrors.'},
   {id:'hub_leaks',    label:'Hub leaks',         icon:'🛢️', hint:'Oil/grease at wheel hubs and seals.'},
+  // Lights sit with the walk-around items, above the two in-cab dash lamps.
+  // Kept as ONE item to match the DVIR convention — splitting head/tail/brake/
+  // turn/marker into separate toggles would add five taps to a phone check
+  // drivers do daily, and the failure severity already captures which is out.
+  {id:'lights',       label:'Lights & reflectors', icon:'💡', hint:'Head, tail, brake, turn, marker, hazards + reflectors. Walk around with flashers on.'},
   {id:'abs_light',    label:'ABS light',         icon:'🟡', hint:'Dash ABS lamp off after start-up.'},
   {id:'check_engine', label:'Check-engine light',icon:'<svg viewBox="0 0 24 24" width="20" height="20" fill="#f59e0b" aria-label="check engine"><rect x="5" y="9" width="13" height="8" rx="1.5"/><rect x="7.5" y="6" width="6" height="3.5" rx="1"/><rect x="9" y="4.3" width="1.8" height="2" rx="0.6"/><rect x="13.5" y="7.5" width="5" height="2.4" rx="0.8"/><rect x="3" y="11" width="2.5" height="3" rx="0.8"/><rect x="17.5" y="10.5" width="3" height="3" rx="0.8"/><rect x="6.5" y="16.5" width="2.4" height="2" rx="0.6"/><rect x="13.5" y="16.5" width="2.4" height="2" rx="0.6"/></svg>', hint:'MIL / amber engine lamp.'},
 ];
