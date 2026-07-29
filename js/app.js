@@ -1305,6 +1305,120 @@ function calNext(){calendarMonth.setMonth(calendarMonth.getMonth()+1);render();}
 // ═══════════════════════════════════════════════════════
 // REPORTS
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// DRIVER PTI COMPLIANCE & SAFETY SCORE
+// ═══════════════════════════════════════════════════════
+// Tunable in one place so the numbers can be argued with rather than guessed at.
+const PTI_WINDOW_DAYS   = 30;
+const THOROUGH_FULL_SEC = 180;  // walk-around at/above this earns full thoroughness
+const THOROUGH_ZERO_SEC = 60;   // at/below this scores zero — a 40s "inspection" is a cab-check
+const SCORE_COMPLIANCE_MAX = 60;
+const SCORE_THOROUGH_MAX   = 40;
+
+// Mon–Fri days in the window. A DVIR is required per driving day and we do not
+// record which days a truck actually ran, so business days is a proxy — the same
+// assumption the SMS reminder bot already makes by pausing at weekends.
+function businessDaysInWindow(days){
+  const out=[]; const d=new Date(today()+'T00:00:00Z');
+  for(let i=0;i<days;i++){
+    const wd=d.getUTCDay();
+    if(wd!==0&&wd!==6) out.push(d.toISOString().split('T')[0]);
+    d.setUTCDate(d.getUTCDate()-1);
+  }
+  return out;
+}
+function median(nums){
+  const a=nums.filter(n=>typeof n==='number'&&n>=0).sort((x,y)=>x-y);
+  if(!a.length) return null;
+  const m=Math.floor(a.length/2);
+  return a.length%2 ? a[m] : Math.round((a[m-1]+a[m])/2);
+}
+function driverPtiStats(driverId){
+  const biz=businessDaysInWindow(PTI_WINDOW_DAYS);
+  const from=biz[biz.length-1];
+  const mine=INSPECTIONS.filter(r=>r.driverId===driverId&&r.submittedAt&&String(r.submittedAt).split('T')[0]>=from);
+  const daysDone=new Set(mine.map(r=>String(r.submittedAt).split('T')[0]));
+  const onBiz=[...daysDone].filter(d=>biz.includes(d)).length;
+  const expected=biz.length;
+  return {
+    expected, done:onBiz,
+    pct: expected? Math.round(onBiz/expected*100) : null,
+    medianSec: median(mine.map(r=>r.durationSec)),
+    // Defects FOUND are deliberately reported as a positive, never a penalty —
+    // scoring them down would pay drivers to stay quiet about faults.
+    defectsFound: mine.filter(r=>r.overallResult==='defect'||r.overallResult==='minor').length,
+    total: mine.length,
+    lastPti: mine.map(r=>r.submittedAt).sort().pop()||null
+  };
+}
+function driverSafetyScore(st){
+  const compliance = st.pct==null ? 0 : Math.round(SCORE_COMPLIANCE_MAX*Math.min(st.pct,100)/100);
+  let thorough = 0;
+  if(st.medianSec!=null){
+    const span=THOROUGH_FULL_SEC-THOROUGH_ZERO_SEC;
+    const t=(st.medianSec-THOROUGH_ZERO_SEC)/span;
+    thorough=Math.round(SCORE_THOROUGH_MAX*Math.max(0,Math.min(1,t)));
+  }
+  return {score:compliance+thorough, compliance, thorough};
+}
+const scoreColour=s=>s>=80?'var(--success)':s>=55?'var(--warning)':'var(--danger)';
+
+function _driverSafetyCard(){
+  // Only drivers who could actually have done a PTI: one needs an assigned truck,
+  // and a driver currently on vacation would otherwise read as non-compliant.
+  const eligible=DRIVERS.filter(d=>!d.on_vacation&&VEHICLES.some(v=>v.assignedDriverId===d.id));
+  const rows=eligible.map(d=>{
+    const st=driverPtiStats(d.id);
+    return {d,st,sc:driverSafetyScore(st)};
+  }).sort((a,b)=>a.sc.score-b.sc.score);   // weakest first — that is who needs attention
+
+  const fleetPct=rows.length?Math.round(rows.reduce((t,r)=>t+(r.st.pct||0),0)/rows.length):null;
+  const caught=rows.reduce((t,r)=>t+r.st.defectsFound,0);
+
+  let html=`<div class="card" style="grid-column:1/-1"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:30px;height:30px;border-radius:8px;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:15px">🦺</div>
+      <div><div style="font-size:13px;font-weight:700">Driver Pre-Trip Compliance</div>
+      <div style="font-size:11px;color:var(--text3);font-weight:400;margin-top:1px">Last ${PTI_WINDOW_DAYS} days · business days only · weakest first</div></div>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center">
+      ${fleetPct!==null?`<span class="badge ${fleetPct>=80?'badge-green':fleetPct>=55?'badge-yellow':'badge-red'}">Fleet ${fleetPct}%</span>`:''}
+      ${caught?`<span class="badge badge-blue">${caught} defect${caught>1?'s':''} caught</span>`:''}
+    </div></div>`;
+
+  if(!rows.length){
+    html+=`<div class="card-body"><div class="empty">No drivers with an assigned truck.</div></div></div>`;
+    return html;
+  }
+
+  html+=`<div class="card-body" style="padding:0"><div class="table-wrap"><table>
+    <thead><tr><th style="padding-left:18px">Driver</th><th>PTIs done</th><th>Compliance</th><th>Median walk-around</th><th>Defects caught</th><th>Last PTI</th><th>Score</th></tr></thead><tbody>`;
+  rows.forEach((r,i)=>{
+    const {d,st,sc}=r;
+    const pc=st.pct??0;
+    const pcCol=pc>=80?'var(--success)':pc>=55?'var(--warning)':'var(--danger)';
+    const dur=st.medianSec==null?'—':inspDur(st.medianSec);
+    const durCol=st.medianSec==null?'var(--text3)':st.medianSec<THOROUGH_ZERO_SEC?'var(--danger)':st.medianSec<THOROUGH_FULL_SEC?'var(--warning)':'var(--success)';
+    const stripe=i%2===1?'background:var(--row-stripe)':'';
+    html+=`<tr style="${stripe}">
+      <td style="padding:11px 14px 11px 18px"><span class="fw-600">${esc(d.name)}</span></td>
+      <td class="text-sm">${st.done} / ${st.expected}</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${Math.min(pc,100)}%;background:${pcCol};border-radius:3px"></div></div><span style="font-size:12px;font-weight:700;color:${pcCol}">${pc}%</span></div></td>
+      <td class="text-sm" style="color:${durCol};font-weight:600">${dur}</td>
+      <td class="text-sm">${st.defectsFound?`<span style="color:var(--success);font-weight:600" title="Catching defects is good — it never lowers the score">✓ ${st.defectsFound}</span>`:`<span style="color:var(--text3)">—</span>`}</td>
+      <td class="text-sm">${st.lastPti?fmtDate(st.lastPti):'<span style="color:var(--danger)">never</span>'}</td>
+      <td><span style="display:inline-block;min-width:40px;text-align:center;background:${scoreColour(sc.score)};color:#0d1117;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:800" title="Compliance ${sc.compliance}/${SCORE_COMPLIANCE_MAX} + thoroughness ${sc.thorough}/${SCORE_THOROUGH_MAX}">${sc.score}</span></td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);line-height:1.7">
+      <b>Score</b> = compliance (${SCORE_COMPLIANCE_MAX}) + walk-around thoroughness (${SCORE_THOROUGH_MAX}). Full thoroughness at ${Math.round(THOROUGH_FULL_SEC/60)} min, zero at ${THOROUGH_ZERO_SEC}s.<br>
+      <b>Reporting a defect never lowers a score</b> — a driver who finds faults is doing the job, and penalising it would only teach them to stay quiet.<br>
+      Compliance counts business days, since driving days aren't recorded; a driver off sick or on leave during the window will read low.
+    </div></div></div>`;
+  return html;
+}
+
 function renderReports(){
   const statuses=VEHICLES.map(v=>({v,s:getVehicleStatus(v.id)}));
   const roadworthy=statuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length,pending=VEHICLES.length-roadworthy;
@@ -1369,6 +1483,7 @@ function renderReports(){
     <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--danger)">${brakeFail}</div><div class="chart-bar" style="background:var(--danger);height:${Math.round(brakeFail/maxBar*100)}%"></div><div class="chart-bar-label">Fail</div></div>
   </div><div class="text-sm" style="margin-top:8px">Pass rate: <strong>${BRAKE_TESTS.length?Math.round(brakePass/BRAKE_TESTS.length*100):0}%</strong></div></div></div>
   ${_dotCardHtml}
+  ${_driverSafetyCard()}
   <div class="card" style="grid-column:1/-1"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
     <thead><tr><th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th></tr></thead>
     <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${esc(v.truckNumber)}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
