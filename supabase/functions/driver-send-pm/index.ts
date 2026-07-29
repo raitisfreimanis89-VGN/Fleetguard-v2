@@ -1,10 +1,11 @@
-// driver-send-pm - HUMAN-INITIATED ONLY. A logged-in admin or dispatcher texts a
+// driver-send-pm - ADMIN-ONLY, HUMAN-INITIATED ONLY. A logged-in admin texts a
 // driver to route for PM service (oil change) at any TA or Love's. Verifies the
 // caller's Supabase JWT, sends via gvoice, writes an audit row.
 // Deploy with --no-verify-jwt.
 //
-// Same governance as driver-send-link: never scheduled, never automatic, only
-// on an explicit click, and always attributed to the person who clicked.
+// Stricter than driver-send-link, which was opened to dispatchers on 2026-07-01:
+// this one stays admin-only by decision (2026-07-29). Never scheduled, never
+// automatic, only on an explicit click, always attributed to whoever clicked.
 // Audited to sms_notifications with reminder_type 'pm_service' so these sends
 // sit alongside the bot's own reminders rather than in a separate silo.
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
@@ -31,8 +32,13 @@ serve(async (req) => {
   const { data: { user }, error: uErr } = await userClient.auth.getUser();
   if (uErr || !user) return json({ error: "Unauthorized" }, 401);
 
+  // ADMIN ONLY — deliberately narrower than driver-send-link, which was opened to
+  // dispatchers on 2026-07-01. Committing the company to a paid oil change is a
+  // maintenance decision, not a dispatch one. The UI hides the button from
+  // dispatchers, but this is the gate that actually holds: without it a
+  // dispatcher could call the function directly with their own token.
   const { data: prof } = await svc.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (prof?.role !== "admin" && prof?.role !== "dispatcher") return json({ error: "Unauthorized" }, 403);
+  if (prof?.role !== "admin") return json({ error: "Admins only" }, 403);
 
   let b: Record<string, unknown> = {};
   try { b = await req.json(); } catch { /* ignore */ }

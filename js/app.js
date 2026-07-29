@@ -216,9 +216,13 @@ async function deleteDriver(id) {
   DRIVERS=DRIVERS.filter(d=>d.id!==id); DOT_INSPECTIONS=DOT_INSPECTIONS.map(r=>r.driverId===id?{...r,driverId:null}:r); MILEAGE=MILEAGE.filter(r=>r.driverId!==id);
   await sb.from('drivers').delete().eq('id',id);
 }
-async function addVehicle(truckNumber,trailerNumber,assignedDriverId,assignedDispatcher) {
-  const rec={id:crypto.randomUUID(),truckNumber,trailerNumber,assignedDriverId:assignedDriverId||null,assignedDispatcher:assignedDispatcher||'',created_at:new Date().toISOString()};
-  VEHICLES.push(rec); await sb.from('vehicles').insert({id:rec.id,truck_number:truckNumber,trailer_number:trailerNumber,assigned_driver_id:assignedDriverId||null,assigned_dispatcher:assignedDispatcher||'',created_at:rec.created_at}); return rec;
+async function addVehicle(truckNumber,trailerNumber,assignedDriverId,assignedDispatcher,annualExpiry) {
+  const rec={id:crypto.randomUUID(),truckNumber,trailerNumber,assignedDriverId:assignedDriverId||null,assignedDispatcher:assignedDispatcher||'',annualExpiry:annualExpiry||null,created_at:new Date().toISOString()};
+  const row={id:rec.id,truck_number:truckNumber,trailer_number:trailerNumber,assigned_driver_id:assignedDriverId||null,assigned_dispatcher:assignedDispatcher||'',created_at:rec.created_at};
+  // Only send the column when migration 012 has landed — including it earlier
+  // would fail the whole insert and block adding trucks entirely.
+  if(ANNUAL_AVAILABLE&&annualExpiry) row.annual_inspection_expiry=annualExpiry;
+  VEHICLES.push(rec); await sb.from('vehicles').insert(row); return rec;
 }
 async function updateVehicle(id,truckNumber,trailerNumber,assignedDriverId,assignedDispatcher) {
   VEHICLES=VEHICLES.map(v=>v.id===id?{...v,truckNumber,trailerNumber,assignedDriverId:assignedDriverId||null,assignedDispatcher:assignedDispatcher||''}:v);
@@ -471,7 +475,9 @@ async function doSendLink(driverId,vehicleId,truck){
 // Confirmed first: this reaches a real phone, and an accidental click is a
 // driver diverting to a truck stop for nothing.
 async function doSendPM(driverId,vehicleId,truck){
-  if(!currentRole){ showToast('Sign in to send','danger'); return; }
+  // Admin-only, matching driver-send-pm's server-side gate. This check is just
+  // UX — the function rejects non-admins regardless of what the browser does.
+  if(!isAdmin()){ showToast('Admins only','danger'); return; }
   if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
   const ok=await confirm2(
     `Text the driver about PM service${truck?` on Truck #${truck}`:''}?`,
@@ -963,6 +969,9 @@ function renderDashboard(){
 // ═══════════════════════════════════════════════════════
 // VEHICLES
 // ═══════════════════════════════════════════════════════
+// The card carries status only — no send actions. Both live on the vehicle
+// detail page instead (PTI link under the PTI tab, PM/oil under Service):
+// the card is too narrow for them and they duplicated what detail already had.
 function renderVehicles(){
   let html='';
   if(isAdmin()){
@@ -972,6 +981,7 @@ function renderVehicles(){
         <div><label>Trailer Number</label><input type="text" id="v-trailer" placeholder="e.g. TR001"/></div>
         <div><label>Assign Driver</label><select id="v-driver"><option value="">— optional —</option>${DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select></div>
         <div><label>Assign Dispatcher</label><input type="text" id="v-dispatcher" placeholder="Dispatcher name"/></div>
+        ${ANNUAL_AVAILABLE?`<div><label>Annual DOT expiry</label><input type="date" id="v-annual" title="Expiry date on the truck's annual DOT inspection certificate"/></div>`:''}
       </div>
       <button class="btn btn-primary" onclick="doAddVehicle()">+ Add Vehicle</button>
     </div></div>`;
@@ -1006,10 +1016,6 @@ function renderVehicles(){
           ${annualPill(s)}
           ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
         </div>
-        ${isAdmin()&&v.assignedDriverId?`<div style="display:flex;gap:6px;margin-top:10px">
-          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Pre-trip link</button>
-          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="doSendPM('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')" title="Text the driver to get an oil change at any TA or Love's">🛢️ PM / oil</button>
-        </div>`:''}
       </div>
       <!-- EDIT MODE -->
       <div id="vedit-${v.id}" style="display:none" class="card-body" style="padding:16px">
@@ -1036,7 +1042,8 @@ async function doAddVehicle(){
   if(!isAdmin()) return;
   const truck=document.getElementById('v-truck').value.trim(),trailer=document.getElementById('v-trailer').value.trim(),driver=document.getElementById('v-driver').value,dispatcher=document.getElementById('v-dispatcher').value.trim();
   if(!truck||!trailer){showToast('Enter truck and trailer numbers','danger');return;}
-  await addVehicle(truck,trailer,driver||null,dispatcher||''); showToast('Vehicle added!','success'); render();
+  const annual=document.getElementById('v-annual')?.value||null;
+  await addVehicle(truck,trailer,driver||null,dispatcher||'',annual); showToast('Vehicle added!','success'); render();
 }
 let _avmDispatcher='';
 function openAddVehicleModal(dispatcherName){
@@ -1055,6 +1062,7 @@ function openAddVehicleModal(dispatcherName){
         <div><label>Trailer Number</label><input type="text" id="avm-trailer" placeholder="e.g. TR001"/></div>
         <div><label>Assign Driver</label><select id="avm-driver"><option value="">— optional —</option>${driverOptions}</select></div>
         <div><label>Dispatcher</label><input type="text" id="avm-dispatcher" value="${dispatcherName.replace(/"/g,'&quot;')}"/></div>
+        ${ANNUAL_AVAILABLE?`<div><label>Annual DOT expiry</label><input type="date" id="avm-annual" title="Expiry date on the truck's annual DOT inspection certificate"/></div>`:''}
       </div>
     </div>`;
   document.getElementById('add-vehicle-modal').style.display='flex';
@@ -1072,7 +1080,8 @@ async function doAddFromModal(){
   const dispatcher=document.getElementById('avm-dispatcher').value.trim();
   if(!truck||!trailer){showToast('Enter truck and trailer numbers','danger');return;}
   if(driverName){const nd=await addDriver(driverName);driverId=nd.id;}
-  await addVehicle(truck,trailer,driverId||null,dispatcher||_avmDispatcher);
+  const annual=document.getElementById('avm-annual')?.value||null;
+  await addVehicle(truck,trailer,driverId||null,dispatcher||_avmDispatcher,annual);
   closeAddVehicleModal();
   showToast('Added to fleet!','success');
   render();
@@ -1153,6 +1162,15 @@ function renderVehicleDetail(){
         <div><label>Notes (optional)</label><textarea id="svc-notes" rows="2" placeholder="Any notes..."></textarea></div>
       </div>
       <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddUnifiedService('${v.id}')">Save Service Record</button>
+    </div></div>`;
+    // PM/oil request lives here rather than on the Vehicles card: it belongs with
+    // the service actions, and the card had no room for a second button.
+    if(isAdmin()) html+=`<div class="card" style="grid-column:1/-1"><div class="card-header">🛢️ PM / Oil Change Request</div><div class="card-body">
+      ${v.assignedDriverId
+        ? `<div class="text-sm" style="margin-bottom:12px;color:var(--text2)">Texts ${driver?esc(driver.name):'the driver'} to route to any TA or Love's for an oil change ASAP and send the receipt back.</div>
+           <button class="btn btn-primary" onclick="doSendPM('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">🛢️ Send PM request${driver?' to '+esc(driver.name):''}</button>
+           <div class="text-sm" style="margin-top:10px;color:var(--text3)">🔒 Sent only when you click — never automatically.</div>`
+        : `<div class="empty">No driver assigned — assign a driver to this truck to send a PM request.</div>`}
     </div></div>`;
     html+=`<div class="card"><div class="card-header">Service History (${allSvcRecords.length})`;
     if(nextDueDate) html+=` <span class="badge ${nextDueDays!==null&&nextDueDays<0?'badge-red':nextDueDays!==null&&nextDueDays<=14?'badge-yellow':'badge-blue'}" style="margin-left:8px">Next due: ${fmtDate(nextDueDate)}</span>`;
