@@ -58,10 +58,14 @@ serve(async (req) => {
     trailer = v?.trailer_number ?? "";
   }
 
-  // Wording mirrors the bot's brake reminder so drivers get a consistent voice.
+  // Plain GSM-7 only — no emoji or smart quotes, which would force UCS-2 and cut
+  // the segment size from 153 chars to 67, doubling the cost of every send.
+  // "Reply OK" matches the bot's existing two-stage protocol: OK marks it
+  // acknowledged and auto-replies asking for DONE once the work is finished.
   const unit = truck ? ` for Truck #${truck}${trailer ? ` / Trailer #${trailer}` : ""}` : "";
-  const msg  = `From Safety & Compliance: PM service (oil change) is due${unit}. `
-             + `Please route to any TA or Love's to get it done ASAP and send the receipt. Reply OK to confirm.`;
+  const msg  = `From Safety & Compliance: PM / oil change is due${unit}. `
+             + `Please plan to get it done ASAP at any TA or Love's, `
+             + `and double-check your brakes while you're there. Reply OK to confirm.`;
 
   const gv = await fetch(`${GV_SERVICE_URL}/send`, {
     method: "POST",
