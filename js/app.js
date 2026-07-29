@@ -104,6 +104,11 @@ let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DO
 // Flipped on by loadAll() once inspections carries the migration-011 repair
 // columns. Gates every part of the defect-repair feature.
 let REPAIRS_AVAILABLE=false;
+// Same idea for vehicles.annual_inspection_expiry (migration 012).
+let ANNUAL_AVAILABLE=false;
+// Certificate expiry warning windows.
+const ANNUAL_WARN_DAYS=30;   // amber from here
+const ANNUAL_CRIT_DAYS=7;    // red from here, and red once expired
 
 // ── Per-vehicle inspection intervals ─────────────────────────────────────────
 // Source: the vehicle_effective_schedules view, which has already resolved any
@@ -135,7 +140,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,rep,ls,sch] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -145,6 +150,11 @@ async function loadAll() {
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
     sb.from('inspections').select('id,ref,vehicle_id,driver_id,truck_number,trailer_number,submitted_at,duration_sec,odometer,overall_result,tyres_flagged,checks_failed').order('submitted_at',{ascending:false}).limit(500),
+    // Same guarded-separate-query pattern as the repair columns below: folding
+    // annual_inspection_expiry into the vehicles select above would fail the
+    // WHOLE vehicles fetch with 42703 before migration 012, emptying the fleet
+    // everywhere in the app. Split, a missing column costs only this one pill.
+    sb.from('vehicles').select('id,annual_inspection_expiry').order('created_at'),
     // Repair columns live in a SEPARATE query on purpose. They arrive with
     // migration 011, and folding them into the select above would make the
     // whole inspections fetch fail with 42703 until that migration is applied —
@@ -166,6 +176,13 @@ async function loadAll() {
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
   // inspections table may not exist until migration 003 is applied — guarded like the rest
   if (!insp.error && insp.data) INSPECTIONS = insp.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,truckNumber:r.truck_number,trailerNumber:r.trailer_number,submittedAt:r.submitted_at,durationSec:r.duration_sec,overallResult:r.overall_result,tyresFlagged:r.tyres_flagged,checksFailed:r.checks_failed}));
+  // Annual DOT expiry arrives with migration 012; until then the column is
+  // absent, ANNUAL_AVAILABLE stays false and the pill is simply not rendered.
+  ANNUAL_AVAILABLE = !vex.error && !!vex.data;
+  if (ANNUAL_AVAILABLE) {
+    const byId = new Map(vex.data.map(r=>[r.id,r.annual_inspection_expiry]));
+    VEHICLES.forEach(v=>{ v.annualExpiry = byId.get(v.id) ?? null; });
+  }
   // Defect tracking switches itself on only once migration 011 has been applied.
   // Until then REPAIRS_AVAILABLE stays false and isOpenDefect() returns false for
   // everything, so status, pills and buttons behave exactly as they do today —
@@ -303,13 +320,24 @@ function getVehicleStatus(vid){
   // An unresolved pre-trip defect makes the truck critical: the driver reported
   // it, the record is signed and GPS-stamped, so dispatching on green would be
   // indefensible. 'minor' is proportionate — a warning, not a stop.
+  // Annual DOT certificate. daysBetween(from,to) counts forward, so expiry->today
+  // is positive once it has lapsed and negative while it is still valid.
+  const _veh=VEHICLES.find(x=>x.id===vid);
+  const annualExpiry=_veh?.annualExpiry||null;
+  const annualDaysLeft=annualExpiry?-daysBetween(annualExpiry,now):null;
+  const annualExpired=annualDaysLeft!==null&&annualDaysLeft<0;
+  const annualDueSoon=annualDaysLeft!==null&&annualDaysLeft>=0&&annualDaysLeft<=ANNUAL_WARN_DAYS;
+
   const openDefect=openDefectFor(vid);
   const defectCritical=!!openDefect&&openDefect.overallResult==='defect';
   const defectMinor   =!!openDefect&&openDefect.overallResult==='minor';
-  const critical=brakeOverdue||serviceOverdue||defectCritical,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue||defectMinor; // OOS is a silent record now — never drives critical/red (2026-07-01)
+  // An expired annual certificate is an out-of-service item at roadside, so it
+  // is critical. Approaching expiry is a warning — there is still time to book.
+  const critical=brakeOverdue||serviceOverdue||defectCritical||annualExpired,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue||defectMinor||annualDueSoon; // OOS is a silent record now — never drives critical/red (2026-07-01)
   return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now),
     brakeInterval:bSch.interval,serviceInterval:sSch.interval,tyreInterval:tSch.interval,customSchedule:bSch.custom||sSch.custom||tSch.custom,newTruck:onNewTruckLadder(vid),
-    openDefect,defectCritical,defectMinor};
+    openDefect,defectCritical,defectMinor,
+    annualExpiry,annualDaysLeft,annualExpired,annualDueSoon};
 }
 
 // ═══════════════════════════════════════════════════════
@@ -330,6 +358,19 @@ function openDefectFor(vehicleId){
   return INSPECTIONS
     .filter(r=>r.vehicleId===vehicleId&&isOpenDefect(r))
     .sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')))[0]||null;
+}
+
+// Annual DOT certificate pill. Renders nothing at all until migration 012 is
+// applied. A vehicle with no date recorded shows grey "not set" — an unknown
+// expiry must never read as green, since that is the state an officer fines.
+function annualPill(s,compact){
+  if(!ANNUAL_AVAILABLE) return '';
+  const sz=compact?' style="font-size:9px"':'';
+  if(!s.annualExpiry) return `<span class="status-pill badge-gray"${sz} title="Annual DOT inspection expiry not recorded">📅 Annual ${compact?'—':'not set'}</span>`;
+  const d=s.annualDaysLeft;
+  const cls=s.annualExpired||d<=ANNUAL_CRIT_DAYS?'badge-red':d<=ANNUAL_WARN_DAYS?'badge-yellow':'badge-green';
+  const txt=s.annualExpired?`EXPIRED ${Math.abs(d)}d`:`${d}d`;
+  return `<span class="status-pill ${cls}"${sz} title="Annual DOT inspection expires ${fmtDate(s.annualExpiry)}">📅 ${compact?'':'Annual '}${txt}</span>`;
 }
 
 function inspDur(s){ if(s==null) return '—'; const m=Math.floor(s/60),x=s%60; return m+'m '+(x<10?'0':'')+x+'s'; }
@@ -426,6 +467,28 @@ async function doSendLink(driverId,vehicleId,truck){
     else showToast(j.error||('Send failed — HTTP '+r.status),'danger');
   }catch(e){ showToast('Send failed: '+((e&&e.message)||'network'),'danger'); }
 }
+// Texts the driver to route for PM service (oil change) at any TA or Love's.
+// Confirmed first: this reaches a real phone, and an accidental click is a
+// driver diverting to a truck stop for nothing.
+async function doSendPM(driverId,vehicleId,truck){
+  if(!currentRole){ showToast('Sign in to send','danger'); return; }
+  if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
+  const ok=await confirm2(
+    `Text the driver about PM service${truck?` on Truck #${truck}`:''}?`,
+    'Asks them to route to any TA or Love\'s for an oil change ASAP and send the receipt. Sends immediately, and records you as the sender.',
+    '📲 Send PM text','btn btn-primary');
+  if(!ok) return;
+  try{
+    const { data:{ session } } = await sb.auth.getSession();
+    const token=session&&session.access_token;
+    if(!token){ showToast('Session expired — sign in again','danger'); return; }
+    const r=await fetch(DRIVER_FN_BASE+'/driver-send-pm',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({driverId,vehicleId:vehicleId||null})});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok&&j.ok) showToast('PM request sent to '+(j.sentTo||'driver')+(truck?(' (Truck #'+truck+')'):''),'success');
+    else showToast(j.error||('Send failed — HTTP '+r.status),'danger');
+  }catch(e){ showToast('Send failed: '+((e&&e.message)||'network'),'danger'); }
+}
+
 async function doSendLinkFromPicker(){
   const sel=document.getElementById('sl-vehicle'); const vid=sel?sel.value:'';
   if(!vid){ showToast('Pick a truck first','danger'); return; }
@@ -743,6 +806,7 @@ function renderDispatcherBoard(){
             <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
             <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
             <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 PTI ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
+            ${annualPill(s)}
             ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
           </div>
         </div>
@@ -939,9 +1003,13 @@ function renderVehicles(){
           <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
           <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
           <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 Pre-trip ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
+          ${annualPill(s)}
           ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
         </div>
-        ${isAdmin()&&v.assignedDriverId?`<button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Send pre-trip link</button>`:''}
+        ${isAdmin()&&v.assignedDriverId?`<div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Pre-trip link</button>
+          <button class="btn btn-ghost btn-sm" style="flex:1" onclick="doSendPM('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')" title="Text the driver to get an oil change at any TA or Love's">🛢️ PM / oil</button>
+        </div>`:''}
       </div>
       <!-- EDIT MODE -->
       <div id="vedit-${v.id}" style="display:none" class="card-body" style="padding:16px">
@@ -951,6 +1019,7 @@ function renderVehicles(){
           <div><label>Trailer #</label><input type="text" id="ve-trailer-${v.id}" value="${esc(v.trailerNumber)}"/></div>
           <div><label>Driver</label><select id="ve-driver-${v.id}"><option value="">— none —</option>${DRIVERS.map(d=>`<option value="${d.id}"${v.assignedDriverId===d.id?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
           <div><label>Dispatcher</label><input type="text" id="ve-dispatcher-${v.id}" value="${esc(v.assignedDispatcher||'')}"/></div>
+          ${ANNUAL_AVAILABLE?`<div><label>Annual DOT expiry</label><input type="date" id="ve-annual-${v.id}" value="${esc(v.annualExpiry||'')}"/></div>`:''}
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-primary btn-sm" onclick="doSaveVehicle('${v.id}')">Save</button>
@@ -1021,6 +1090,17 @@ async function doSaveVehicle(id){
   const truck=document.getElementById('ve-truck-'+id).value.trim(),trailer=document.getElementById('ve-trailer-'+id).value.trim(),driver=document.getElementById('ve-driver-'+id).value,dispatcher=document.getElementById('ve-dispatcher-'+id).value.trim();
   if(!truck||!trailer){showToast('Truck and trailer numbers required','danger');return;}
   await updateVehicle(id,truck,trailer,driver||null,dispatcher||'');
+  // Written separately so the core vehicle save still works if migration 012
+  // has not been applied — the input only exists when the column does.
+  if(ANNUAL_AVAILABLE){
+    const el=document.getElementById('ve-annual-'+id);
+    if(el){
+      const val=el.value||null;
+      const {error}=await sb.from('vehicles').update({annual_inspection_expiry:val}).eq('id',id);
+      if(error){ console.error('annual expiry save failed',error); showToast('Vehicle saved, but the annual expiry did not','danger'); }
+      else { const veh=VEHICLES.find(x=>x.id===id); if(veh) veh.annualExpiry=val; }
+    }
+  }
   showToast('Vehicle updated!','success'); render();
 }
 async function doDeleteVehicle(id,num){
