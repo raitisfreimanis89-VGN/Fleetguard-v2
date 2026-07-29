@@ -13,7 +13,11 @@ const GV_SECRET    = Deno.env.get("GV_SERVICE_SECRET")!;
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
 // Overdue thresholds (days) + warning windows, matching the reminder cadence.
-const BRAKE = 35, SERVICE = 60, TYRE = 14;
+// Brake was 35 here while the dashboard used 42 — dispatchers were told a truck
+// was overdue a week before the board agreed. Aligned to 42 on 2026-07-29.
+// These are fleet fallbacks only; a vehicle with its own reminder_schedules row
+// (e.g. a new-truck exemption) overrides them via vehicle_effective_schedules.
+const BRAKE = 42, SERVICE = 60, TYRE = 14;
 const BRAKE_W = 5, SERVICE_W = 7, TYRE_W = 2;
 
 const CLEAR: Array<(d: string, n: number) => string> = [
