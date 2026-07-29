@@ -79,39 +79,84 @@ const TYPE_LABEL: Record<string, string> = {
   pm_service:     "PM service",
 };
 
+// HARD LIMIT 153 CHARS — Google Voice does not concatenate multipart SMS. It
+// sends the first segment and silently drops the rest. Until 2026-07-29 four of
+// these templates ran 182-206 chars, so every one of them lost its trailing
+// "Reply OK to confirm" — the instruction the whole acknowledgement flow depends
+// on — and the tyre message was cut MID-URL, handing drivers a dead upload link.
+// Keep every message under 153 and plain GSM-7 (emoji/smart quotes force UCS-2,
+// which cuts the segment to 67). fit() is the backstop if an identifier is long.
+const GSM_SINGLE = 153;
+
+// Shed detail rather than let Google Voice cut mid-sentence: try the full text,
+// then without the trailer, then without the unit. The reply instruction and any
+// link must always survive.
+function fit(variants: string[]): string {
+  return variants.find((v) => v.length <= GSM_SINGLE) ?? variants[variants.length - 1];
+}
+
 function buildMessage(truckNum: string, trailerNum: string, type: string, daysUntilDue: number): string {
   const overdue = daysUntilDue <= 0;
+  const d       = `${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}`;
+  const unit    = ` for Trk #${truckNum} / Tlr #${trailerNum}`;
+  const short   = ` for Trk #${truckNum}`;
 
   if (type === "brake_service") {
     if (overdue) {
-      return `From Safety & Compliance: Your brake inspection is overdue for Truck #${truckNum} / Trailer #${trailerNum}. Please route to a TA or Love's to complete this inspection within the next 5 days. Reply OK to confirm.`;
+      return fit([
+        `Safety & Compliance: Brake inspection OVERDUE${unit}. Route to any TA or Love's within 5 days. Reply OK to confirm.`,
+        `Safety & Compliance: Brake inspection OVERDUE${short}. Route to any TA or Love's within 5 days. Reply OK to confirm.`,
+      ]);
     }
-    return `Safety & Compliance: Brake inspection due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Trk #${truckNum} / Tlr #${trailerNum}. Please visit TA/Loves soon. Confirm by replying OK.`;
+    return fit([
+      `Safety & Compliance: Brake inspection due in ${d}${unit}. Please visit TA/Loves soon. Reply OK to confirm.`,
+      `Safety & Compliance: Brake inspection due in ${d}${short}. Please visit TA/Loves soon. Reply OK to confirm.`,
+    ]);
   }
 
   if (type === "tyre_check") {
+    // The link is the entire point of this message — the trailer number goes
+    // first if anything has to give.
+    const link = `${PORTAL_BASE}/${encodeURIComponent(truckNum)}`;
     if (overdue) {
-      const link = `${PORTAL_BASE}/${encodeURIComponent(truckNum)}`;
-      return `Safety & Compliance: Tire tread check is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Upload current tread photos here: ${link} (within 2 days). Reply OK to confirm.`;
+      return fit([
+        `Safety & Compliance: Tire tread check OVERDUE${short}. Upload photos: ${link} (within 2 days). Reply OK.`,
+        `Safety & Compliance: Tire tread check OVERDUE. Upload photos: ${link} (within 2 days). Reply OK.`,
+      ]);
     }
-    return `Safety & Compliance: Tire tread check due in ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""} for Truck #${truckNum} / Trailer #${trailerNum}. Open your PTI link and upload current tread photos. Reply OK to confirm.`;
+    return fit([
+      `Safety & Compliance: Tire tread check due in ${d}${short}. Upload photos: ${link}. Reply OK to confirm.`,
+      `Safety & Compliance: Tire tread check due. Upload photos: ${link}. Reply OK to confirm.`,
+    ]);
   }
 
   if (type === "dot_inspection") {
     if (overdue) {
-      return `Safety & Compliance Alert: Yard truck inspection is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard to complete this inspection within the next 7 days. Reply OK to confirm receipt.`;
+      return fit([
+        `Safety & Compliance: Yard inspection OVERDUE${unit}. Please visit the yard within 7 days. Reply OK to confirm.`,
+        `Safety & Compliance: Yard inspection OVERDUE${short}. Please visit the yard within 7 days. Reply OK to confirm.`,
+      ]);
     }
-    return `Safety & Compliance Notification: Truck inspection at the yard is due soon for Truck #${truckNum} / Trailer #${trailerNum}. Please plan to visit the yard and ensure this is completed ASAP. Reply OK to confirm receipt.`;
+    return fit([
+      `Safety & Compliance: Yard inspection due soon${unit}. Please plan a yard visit ASAP. Reply OK to confirm.`,
+      `Safety & Compliance: Yard inspection due soon${short}. Please plan a yard visit ASAP. Reply OK to confirm.`,
+    ]);
   }
 
   if (type === "pm_service") {
     if (overdue) {
-      return `Safety & Compliance Alert: PM Service is OVERDUE for Truck #${truckNum} / Trailer #${trailerNum}. Please visit a TA or Love's to complete this within the next 5 days. Reply OK to confirm receipt.`;
+      return fit([
+        `Safety & Compliance: PM Service OVERDUE${unit}. Visit any TA or Love's within 5 days. Reply OK to confirm.`,
+        `Safety & Compliance: PM Service OVERDUE${short}. Visit any TA or Love's within 5 days. Reply OK to confirm.`,
+      ]);
     }
-    return `Safety & Compliance Notification: PM Service is due soon for Truck #${truckNum} / Trailer #${trailerNum}. Please schedule a visit to a TA or Love's within the next ${daysUntilDue} day${daysUntilDue !== 1 ? "s" : ""}. Reply OK to confirm receipt.`;
+    return fit([
+      `Safety & Compliance: PM Service due in ${d}${unit}. Please schedule a TA or Love's visit. Reply OK to confirm.`,
+      `Safety & Compliance: PM Service due in ${d}${short}. Please schedule a TA or Love's visit. Reply OK to confirm.`,
+    ]);
   }
 
-  return `From Safety & Compliance: Truck #${truckNum} has a service due. Reply OK to confirm.`;
+  return `Safety & Compliance: Trk #${truckNum} has a service due. Reply OK to confirm.`;
 }
 
 // ── Main handler ──────────────────────────────────────────────
