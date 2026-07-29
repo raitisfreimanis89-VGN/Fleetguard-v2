@@ -58,14 +58,21 @@ serve(async (req) => {
     trailer = v?.trailer_number ?? "";
   }
 
-  // Plain GSM-7 only — no emoji or smart quotes, which would force UCS-2 and cut
-  // the segment size from 153 chars to 67, doubling the cost of every send.
-  // "Reply OK" matches the bot's existing two-stage protocol: OK marks it
-  // acknowledged and auto-replies asking for DONE once the work is finished.
-  const unit = truck ? ` for Truck #${truck}${trailer ? ` / Trailer #${trailer}` : ""}` : "";
-  const msg  = `From Safety & Compliance: PM / oil change is due${unit}. `
-             + `Please plan to get it done ASAP at any TA or Love's, `
-             + `and double-check your brakes while you're there. Reply OK to confirm.`;
+  // HARD LIMIT 153 CHARS. Google Voice does not concatenate multipart SMS — it
+  // sends the first segment and silently drops the rest. A 212-char message
+  // arrived cut at "...and double" (2026-07-29), losing "Reply OK to confirm"
+  // entirely, which is what drives the acknowledgement flow.
+  // Plain GSM-7 only: emoji or smart quotes force UCS-2 and cut the segment to 67.
+  const GSM_SINGLE = 153;
+  const build = (u: string) =>
+    `Safety & Compliance: PM / oil change due${u}. `
+    + `Get it done ASAP at any TA or Love's. Check brakes too. Reply OK.`;
+
+  // Shed the trailer, then the unit, rather than let GV cut mid-sentence. An
+  // unusually long truck number must never cost us the "Reply OK".
+  let msg = build(truck ? ` for Trk #${truck}${trailer ? ` / Tlr #${trailer}` : ""}` : "");
+  if (msg.length > GSM_SINGLE && truck) msg = build(` for Trk #${truck}`);
+  if (msg.length > GSM_SINGLE)          msg = build("");
 
   const gv = await fetch(`${GV_SERVICE_URL}/send`, {
     method: "POST",
