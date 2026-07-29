@@ -13,12 +13,13 @@ const GV_SECRET    = Deno.env.get("GV_SERVICE_SECRET")!;
 const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 
 // Overdue thresholds (days) + warning windows, matching the reminder cadence.
-// Brake was 35 here while the dashboard used 42 — dispatchers were told a truck
-// was overdue a week before the board agreed. Aligned to 42 on 2026-07-29.
-// These are fleet fallbacks only; a vehicle with its own reminder_schedules row
-// (e.g. a new-truck exemption) overrides them via vehicle_effective_schedules.
-const BRAKE = 42, SERVICE = 60, TYRE = 14;
-const BRAKE_W = 5, SERVICE_W = 7, TYRE_W = 2;
+// LAST-RESORT fallbacks only. Resolution order is: this truck's own row, then
+// the fleet default row in reminder_schedules (vehicle_id IS NULL), then these.
+// Until 2026-07-29 these constants WERE the policy here, and they had drifted
+// from the dashboard — brakes 35 vs 42, tyres 14 vs 7 — so dispatchers were told
+// a truck was fine for another week after the board had flagged it.
+const BRAKE = 42, SERVICE = 60, TYRE = 7;
+const BRAKE_W = 7, SERVICE_W = 7, TYRE_W = 2;
 
 const CLEAR: Array<(d: string, n: number) => string> = [
   (d, n) => `Good morning, ${d}! All ${n} trucks are up to date — no overdue inspections or services. Great job staying on top of it!`,
@@ -35,14 +36,14 @@ type Row = {
 };
 
 // Per-vehicle interval overrides: vehicle_id -> { reminder_type: interval_days }.
-// Only vehicle-specific rows are loaded; trucks without one keep the fleet
-// constants above, so a global row can never re-grade the whole fleet here.
+// A truck without its own row falls back to the fleet default row, then to the
+// constants above.
 type SchedMap = Map<string, Record<string, number>>;
 
 function days(n: number): string { return `${n} day${n === 1 ? "" : "s"}`; }
 function dueIn(n: number): string { return n === 0 ? "due today" : `due in ${days(n)}`; }
 
-function buildMessage(disp: string, trucks: Row[], sched: SchedMap): string {
+function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Record<string, number>): string {
   const n = trucks.length;
   const overdueByTruck = new Map<string, string[]>();
   const soonByTruck    = new Map<string, string[]>();
@@ -54,12 +55,12 @@ function buildMessage(disp: string, trucks: Row[], sched: SchedMap): string {
     const { brake_days: b, service_days: s, tyre_days: y, truck_number: tn } = t;
     const od: string[] = [], sn: string[] = [];
 
-    // Per-vehicle intervals when this truck has its own reminder_schedules row,
-    // otherwise the fleet constants — identical output for every other truck.
+    // Truck's own row -> fleet default row -> constant. Same chain the dashboard
+    // and the SMS bot use, so all three agree on when a truck is overdue.
     const ov = sched.get(t.vehicle_id) ?? {};
-    const BR = ov.brake_service  ?? BRAKE;
-    const SV = ov.dot_inspection ?? SERVICE;
-    const TY = ov.tyre_check     ?? TYRE;
+    const BR = ov.brake_service  ?? fleet.brake_service  ?? BRAKE;
+    const SV = ov.dot_inspection ?? fleet.dot_inspection ?? SERVICE;
+    const TY = ov.tyre_check     ?? fleet.tyre_check     ?? TYRE;
 
     if (b != null && b > BR)             od.push(`Brake inspection ${days(b - BR)} overdue`);
     else if (b != null && b > BR - BRAKE_W) sn.push(`Brake inspection ${dueIn(BR - b)}`);
@@ -122,6 +123,18 @@ serve(async (req) => {
     sched.set(s.vehicle_id, m);
   }
 
+  // Fleet defaults — the same rows the SMS bot reads, so the digest can no
+  // longer disagree with it about when something is due.
+  const fleet: Record<string, number> = {};
+  const { data: fleetRows } = await sb
+    .from("reminder_schedules")
+    .select("reminder_type,interval_days,enabled")
+    .is("vehicle_id", null)
+    .eq("enabled", true);
+  for (const f of fleetRows ?? []) {
+    if (f.interval_days > 0) fleet[f.reminder_type] = f.interval_days;
+  }
+
   const byDisp = new Map<string, { phone: string; trucks: Row[] }>();
   for (const r of (rows ?? []) as Row[]) {
     if (!byDisp.has(r.dispatcher_name)) byDisp.set(r.dispatcher_name, { phone: r.phone_number, trucks: [] });
@@ -132,7 +145,7 @@ serve(async (req) => {
   // own queue), so this stays fast and never hits the function time limit.
   const messages: Array<{ dispatcher: string; to: string; body: string }> = [];
   for (const [disp, info] of byDisp) {
-    messages.push({ dispatcher: disp, to: info.phone, body: buildMessage(disp, info.trucks, sched) });
+    messages.push({ dispatcher: disp, to: info.phone, body: buildMessage(disp, info.trucks, sched, fleet) });
   }
   return json({ ok: true, dispatchers: byDisp.size, messages });
 });

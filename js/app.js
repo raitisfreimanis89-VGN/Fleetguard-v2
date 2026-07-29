@@ -100,7 +100,7 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s ?? 
 // ═══════════════════════════════════════════════════════
 // DATA LAYER
 // ═══════════════════════════════════════════════════════
-let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[], SCHEDULES=[];
+let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DOT_INSPECTIONS=[], MILEAGE=[], SERVICE_RECORDS=[], INSPECTIONS=[], LINK_SENDS=[], SCHEDULES=[], GLOBAL_SCHED=[];
 // Flipped on by loadAll() once inspections carries the migration-011 repair
 // columns. Gates every part of the defect-repair feature.
 let REPAIRS_AVAILABLE=false;
@@ -110,14 +110,16 @@ let ANNUAL_AVAILABLE=false;
 const ANNUAL_WARN_DAYS=30;   // amber from here
 const ANNUAL_CRIT_DAYS=7;    // red from here, and red once expired
 
-// ── Per-vehicle inspection intervals ─────────────────────────────────────────
-// Source: the vehicle_effective_schedules view, which has already resolved any
-// new-truck ladder (e.g. tyres 21 -> 14 -> 7) down to today's interval.
-// Fleet defaults below MUST mirror the historical hardcoded thresholds so that any
-// truck without its own row behaves exactly as before.
-// Deliberate: the view exposes only VEHICLE-SPECIFIC rows. Global rows (vehicle_id
-// NULL) steer the SMS bot but must not shift the dashboard, otherwise editing a
-// global default would silently re-grade the whole fleet.
+// ── Inspection intervals: one resolution chain for the whole app ─────────────
+//   1. vehicle-specific row  (vehicle_effective_schedules — ladder already applied)
+//   2. fleet default row     (reminder_schedules WHERE vehicle_id IS NULL)
+//   3. the constants below   (last resort, only if no global row exists)
+//
+// Step 2 was added 2026-07-29. Previously the dashboard skipped straight to the
+// constants, so fleet policy lived in three places — here, the digest, and the
+// global rows driving the SMS bot — and they drifted: brakes read 42 here but 35
+// in the digest and bot, tyres 7 here but 14 in the digest. Reading the global
+// rows makes one UPDATE move every system together.
 const SCHED_DEFAULTS={
   brake_service : {interval:42, warn:7},  // brakeOverdue >42, dueSoon >35
   dot_inspection: {interval:60, warn:7},  // yard/periodic: serviceOverdue >60, dueSoon >53
@@ -125,9 +127,14 @@ const SCHED_DEFAULTS={
 };
 function vehSched(vehicleId,type){
   const def=SCHED_DEFAULTS[type];
+  // 1. this truck's own row (new-truck exemption etc.) — already ladder-resolved
   const row=SCHEDULES.find(s=>s.vehicle_id===vehicleId&&s.reminder_type===type&&s.enabled!==false);
-  if(!row||!(row.interval_days>0)) return {interval:def.interval,warn:def.warn,custom:false};
-  return {interval:row.interval_days,warn:row.warning_days_before??def.warn,custom:true};
+  if(row&&row.interval_days>0) return {interval:row.interval_days,warn:row.warning_days_before??def.warn,custom:true};
+  // 2. fleet default from the database — the same row the SMS bot reads
+  const g=GLOBAL_SCHED.find(s=>s.reminder_type===type&&s.enabled!==false);
+  if(g&&g.interval_days>0) return {interval:g.interval_days,warn:g.warning_days_before??def.warn,custom:false};
+  // 3. constants, only when no global row has been configured
+  return {interval:def.interval,warn:def.warn,custom:false};
 }
 // True only while a new-truck ladder is still stepping down. Once every ladder is
 // exhausted the row survives on the fleet interval, so `custom` stays true — this
@@ -140,7 +147,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -163,6 +170,9 @@ async function loadAll() {
     sb.from('inspections').select('id,repair_status,repaired_at,repair_notes').order('submitted_at',{ascending:false}).limit(500),
     sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
     sb.from('vehicle_effective_schedules').select('vehicle_id,reminder_type,interval_days,warning_days_before,enabled,step_intervals,completed_since_exemption'),
+    // Fleet defaults. Guarded like the rest: if this fails, GLOBAL_SCHED stays
+    // empty and vehSched falls through to the constants, i.e. today's behaviour.
+    sb.from('reminder_schedules').select('reminder_type,interval_days,warning_days_before,enabled').is('vehicle_id',null),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -204,6 +214,7 @@ async function loadAll() {
   // Guarded like the rest — a failed fetch leaves SCHEDULES as-is, and an empty
   // SCHEDULES simply means every truck uses the fleet defaults.
   if (!sch.error && sch.data) SCHEDULES = sch.data;
+  if (!gsch.error && gsch.data) GLOBAL_SCHED = gsch.data;
 }
 
 async function addDriver(name) {
