@@ -39,6 +39,22 @@ async function initBrowser() {
 // ── Ensure we are logged into Google Voice ────────────────────
 async function ensureLoggedIn() {
   try {
+    // The Chromium window is VISIBLE (headless:false), so a person can close it
+    // and it dies with the desktop session — while this process keeps running.
+    //
+    // page.url() is a CACHED accessor: it keeps returning the last known URL
+    // long after the browser is gone. Without this guard the fast path below
+    // reported "session already active", returned success, and every send then
+    // failed with "Target page, context or browser has been closed" — silently,
+    // for a full day (2026-08-04, 35+ reminders lost). The watchdog never fired
+    // because the Node process itself was healthy.
+    if (!browserCtx || !page || page.isClosed()) {
+      log.warn('Browser or page is gone — relaunching Chromium');
+      try { await browserCtx?.close(); } catch (_) { /* already dead */ }
+      browserCtx = null; page = null;
+      await initBrowser();
+    }
+
     // If already on GV, skip navigation (fast path)
     if (page.url().includes('voice.google.com')) {
       log.info('Google Voice session already active (fast path)');
