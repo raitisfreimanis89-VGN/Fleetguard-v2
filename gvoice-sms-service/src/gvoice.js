@@ -13,12 +13,25 @@ let page       = null;
 let lastPollTs = Date.now();
 
 // ── Boot: launch persistent browser context ───────────────────
+// GV_HEADLESS=true in .env hides the window entirely. Default stays visible:
+// Google routinely blocks sign-in from headless Chromium, and while an existing
+// session in .browser-profile keeps working, a re-login would fail with nobody
+// there to see it. If a headless run ever stops sending, set this back to false,
+// restart, let it log in visibly once, then switch back.
+// GV_WINDOW_OFFSCREEN=true keeps a real (Google-friendly) browser but parks it
+// off-screen, so it cannot be closed by accident — which is what took SMS down
+// for a day on 2026-08-04.
+const HEADLESS   = String(process.env.GV_HEADLESS || 'false').toLowerCase() === 'true';
+const OFFSCREEN  = String(process.env.GV_WINDOW_OFFSCREEN || 'false').toLowerCase() === 'true';
+
 async function initBrowser() {
-  log.info('Launching Chromium (persistent session)...');
+  log.info(`Launching Chromium (persistent session) — ${HEADLESS ? 'HEADLESS' : OFFSCREEN ? 'visible, off-screen' : 'visible'}...`);
+  const args = ['--no-sandbox', '--disable-dev-shm-usage', '--window-size=1100,820'];
+  if (!HEADLESS && OFFSCREEN) args.push('--window-position=-32000,-32000');
   browserCtx = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: false,           // visible window so you can see it working
+    headless: HEADLESS,
     slowMo: 80,
-    args: ['--no-sandbox', '--disable-dev-shm-usage', '--window-size=1100,820'],
+    args,
     viewport: { width: 1100, height: 820 },
   });
   const pages = browserCtx.pages();
