@@ -48,7 +48,21 @@ async function ensureLoggedIn() {
     // failed with "Target page, context or browser has been closed" — silently,
     // for a full day (2026-08-04, 35+ reminders lost). The watchdog never fired
     // because the Node process itself was healthy.
-    if (!browserCtx || !page || page.isClosed()) {
+    // isClosed() alone is NOT enough: when the Chromium process dies abruptly
+    // the client can still report the page as open, so the fast path below
+    // fired and every send threw "Target page, context or browser has been
+    // closed" anyway (observed 2026-08-04). Actively touch the browser — a
+    // round-trip that throws the moment the target is gone.
+    let alive = !!browserCtx && !!page && !page.isClosed();
+    if (alive) {
+      try {
+        await page.title();
+      } catch (err) {
+        log.warn(`Browser handle is stale (${err.message.split('\n')[0]})`);
+        alive = false;
+      }
+    }
+    if (!alive) {
       log.warn('Browser or page is gone — relaunching Chromium');
       try { await browserCtx?.close(); } catch (_) { /* already dead */ }
       browserCtx = null; page = null;
