@@ -43,15 +43,23 @@ type SchedMap = Map<string, Record<string, number>>;
 function days(n: number): string { return `${n} day${n === 1 ? "" : "s"}`; }
 function dueIn(n: number): string { return n === 0 ? "due today" : `due in ${days(n)}`; }
 
-function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Record<string, number>): string {
-  const n = trucks.length;
+// Returns null when the dispatcher has no active trucks — the caller skips them
+// rather than sending "All 0 trucks are up to date".
+function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Record<string, number>): string | null {
+  // Trucks on vacation are excluded outright. They were already skipped for
+  // overdue items, but still counted toward the header total and the pre-trip
+  // ratio — so a dispatcher with 2 of 8 parked up read "(8 trucks)" and
+  // "3 of 8 completed" when only 6 could ever have completed one.
+  const active = trucks.filter((t) => !t.on_vacation);
+  if (active.length === 0) return null;
+
+  const n = active.length;
   const overdueByTruck = new Map<string, string[]>();
   const soonByTruck    = new Map<string, string[]>();
   let ptiDone = 0;
 
-  for (const t of trucks) {
+  for (const t of active) {
     if (t.pti_yesterday) ptiDone++;
-    if (t.on_vacation) continue;
     const { brake_days: b, service_days: s, tyre_days: y, truck_number: tn } = t;
     const od: string[] = [], sn: string[] = [];
 
@@ -145,7 +153,9 @@ serve(async (req) => {
   // own queue), so this stays fast and never hits the function time limit.
   const messages: Array<{ dispatcher: string; to: string; body: string }> = [];
   for (const [disp, info] of byDisp) {
-    messages.push({ dispatcher: disp, to: info.phone, body: buildMessage(disp, info.trucks, sched, fleet) });
+    const body = buildMessage(disp, info.trucks, sched, fleet);
+    if (!body) continue;   // every truck on vacation — nothing worth texting
+    messages.push({ dispatcher: disp, to: info.phone, body });
   }
   return json({ ok: true, dispatchers: byDisp.size, messages });
 });
