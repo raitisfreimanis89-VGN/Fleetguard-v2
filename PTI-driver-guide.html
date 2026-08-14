@@ -644,7 +644,7 @@ a{color:var(--or-d)}
   </div>
 </section>
 
-<section>
+<section id="dispatch-section" style="display:none">
   <div class="wrap">
     <span class="snum">05 — For dispatch</span>
     <h2>Reading a driver's inspection</h2>
@@ -694,6 +694,13 @@ a{color:var(--or-d)}
   function close(){lb.classList.remove('on');lbi.src='';document.body.style.overflow='';}
   lb.addEventListener('click',close);
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&lb.classList.contains('on'))close();});
+
+  // Driver link has no query string; the in-app dispatcher nav link adds
+  // ?dispatch=1, which is the only thing that reveals this section.
+  if(new URLSearchParams(location.search).get('dispatch')==='1'){
+    var ds=document.getElementById('dispatch-section');
+    if(ds) ds.style.display='';
+  }
 })();
 </script>
 </body>
