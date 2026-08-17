@@ -122,7 +122,7 @@ const ANNUAL_CRIT_DAYS=7;    // red from here, and red once expired
 // rows makes one UPDATE move every system together.
 const SCHED_DEFAULTS={
   brake_service : {interval:42, warn:7},  // brakeOverdue >42, dueSoon >35
-  dot_inspection: {interval:60, warn:7},  // yard/periodic: serviceOverdue >60, dueSoon >53
+  dot_inspection: {interval:90, warn:7},  // yard/periodic: serviceOverdue >90, dueSoon >83
   tyre_check    : {interval:7,  warn:0},  // tyreOverdue >=7
 };
 function vehSched(vehicleId,type){
@@ -964,8 +964,8 @@ function renderDashboard(){
   if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
   tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
   html+=`</div></div>`;
-  html+=`<div class="card"><div class="card-header">🔵 Service Overdue (60-day)</div><div class="card-body">`;
-  if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 60-day service schedule</div>`;
+  html+=`<div class="card"><div class="card-header">🔵 Service Overdue (90-day)</div><div class="card-body">`;
+  if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 90-day service schedule</div>`;
   serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.serviceDays+' days since last service'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:`Service – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:`Brake ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:`Vehicle Service ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
