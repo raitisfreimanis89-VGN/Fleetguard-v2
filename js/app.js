@@ -121,7 +121,7 @@ const ANNUAL_CRIT_DAYS=7;    // red from here, and red once expired
 // in the digest and bot, tyres 7 here but 14 in the digest. Reading the global
 // rows makes one UPDATE move every system together.
 const SCHED_DEFAULTS={
-  brake_service : {interval:42, warn:7},  // brakeOverdue >42, dueSoon >35
+  brake_service : {interval:30, warn:7},  // brakeOverdue >30, dueSoon >23
   dot_inspection: {interval:90, warn:7},  // yard/periodic: serviceOverdue >90, dueSoon >83
   tyre_check    : {interval:7,  warn:0},  // tyreOverdue >=7
 };
@@ -953,7 +953,7 @@ function renderDashboard(){
   if(vicious.length>0) html+=`<div class="alert alert-warning"><div><div class="alert-title">🔄 Vicious Circle Alert</div>${vicious.map(x=>`<a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="badge badge-yellow" style="margin-right:6px">Truck #${esc(x.v.truckNumber)}</span></a>`).join('')}</div></div>`;
   html+=`<div class="two-col">`;
   html+=`<div class="card"><div class="card-header">🔴 Brake Inspection Overdue</div><div class="card-body">`;
-  if(brakeOverdue.length===0) html+=`<div class="empty">All vehicles within 42-day schedule</div>`;
+  if(brakeOverdue.length===0) html+=`<div class="empty">All vehicles within 30-day schedule</div>`;
   brakeOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--danger);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastBrake?x.s.brakeDays+' days since last test':'No test on record'}</div></div><span class="badge badge-red">OVERDUE</span></div>`;});
   html+=`</div></div>`;
   html+=`<div class="card"><div class="card-header">🟡 Brake Test Due Soon</div><div class="card-body">`;
@@ -1386,7 +1386,7 @@ function renderCalendar(){
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-    if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+42);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} brake due`,type:'brake'});}
+    if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+30);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} brake due`,type:'brake'});}
     if(maint[0]) events.push({date:maint[0].nextInspectionDate,label:`Truck #${esc(v.truckNumber)} inspection`,type:'maint'});
     // FIX: use 60-day interval and fall back to maintenance date if no service_records
     const svcRefDate=svcs[0]?.serviceDate||maint[0]?.serviceDate||null;

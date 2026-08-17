@@ -18,7 +18,7 @@ const sb = createClient(SUPABASE_URL, SERVICE_KEY);
 // Until 2026-07-29 these constants WERE the policy here, and they had drifted
 // from the dashboard — brakes 35 vs 42, tyres 14 vs 7 — so dispatchers were told
 // a truck was fine for another week after the board had flagged it.
-const BRAKE = 42, SERVICE = 90, TYRE = 7;
+const BRAKE = 30, SERVICE = 90, TYRE = 7;
 const BRAKE_W = 7, SERVICE_W = 7, TYRE_W = 2;
 
 const CLEAR: Array<(d: string, n: number) => string> = [
