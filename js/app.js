@@ -327,9 +327,11 @@ function getVehicleStatus(vid){
   const bSch=vehSched(vid,'brake_service'),sSch=vehSched(vid,'dot_inspection'),tSch=vehSched(vid,'tyre_check');
   const brakeOverdue=brakeDays>bSch.interval,brakeDueSoon=brakeDays>bSch.interval-bSch.warn&&!brakeOverdue,tyreOverdue=tyreDays>=tSch.interval;
   const serviceOverdue=serviceDays>sSch.interval,serviceDueSoon=serviceDays>sSch.interval-sSch.warn&&!serviceOverdue;
-  // nextDue warning: use maintenance nextInspectionDate if it has passed
-  const nextDue=maint[0]?.nextInspectionDate;
-  const nextDueOverdue=nextDue&&daysBetween(nextDue,now)>0;
+  // Removed 2026-08-18: the maintenance record's next_inspection_date (baked as
+  // service+60 at creation) duplicated the yard/periodic cadence and contradicted
+  // the 90-day Service pill (serviceDays vs sSch.interval), flagging green trucks
+  // as Warning. The Service pill is now the single source of truth; the stored
+  // next_inspection_date remains as info in the Service history only.
   const hasOOS=lastDot&&lastDot.result==='oos';
   const viciousCircle=maint.some(m=>!brakes.find(b=>b.testDate===m.serviceDate));
   // An unresolved pre-trip defect makes the truck critical: the driver reported
@@ -348,8 +350,8 @@ function getVehicleStatus(vid){
   const defectMinor   =!!openDefect&&openDefect.overallResult==='minor';
   // An expired annual certificate is an out-of-service item at roadside, so it
   // is critical. Approaching expiry is a warning — there is still time to book.
-  const critical=brakeOverdue||serviceOverdue||defectCritical||annualExpired,warning=brakeDueSoon||tyreOverdue||viciousCircle||nextDueOverdue||defectMinor||annualDueSoon; // OOS is a silent record now — never drives critical/red (2026-07-01)
-  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,nextDueOverdue,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now),
+  const critical=brakeOverdue||serviceOverdue||defectCritical||annualExpired,warning=brakeDueSoon||tyreOverdue||viciousCircle||defectMinor||annualDueSoon; // OOS is a silent record now — never drives critical/red (2026-07-01)
+  return{lastBrake,lastTyre,lastDot,lastService,maint:maint[0],brakeDays,tyreDays,serviceDays,brakeOverdue,brakeDueSoon,tyreOverdue,serviceOverdue,serviceDueSoon,hasOOS,viciousCircle:viciousCircle&&maint.length>0,critical,warning,lastPreTrip,preTripToday:!!(lastPreTrip&&String(lastPreTrip.submittedAt||'').split('T')[0]===now),
     brakeInterval:bSch.interval,serviceInterval:sSch.interval,tyreInterval:tSch.interval,customSchedule:bSch.custom||sSch.custom||tSch.custom,newTruck:onNewTruckLadder(vid),
     openDefect,defectCritical,defectMinor,
     annualExpiry,annualDaysLeft,annualExpired,annualDueSoon};
