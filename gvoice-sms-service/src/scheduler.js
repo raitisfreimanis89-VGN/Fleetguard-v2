@@ -168,11 +168,14 @@ function startScheduler() {
   cron.schedule(`*/${POLL_MINUTES} * * * *`, runReplyPoll);
   log.info(`Reply poller scheduled every ${POLL_MINUTES} min`);
 
-  // Reminder scan: every SCAN_MINUTES, Mon-Fri 7AM-5:59PM CST — drains the
-  // backlog in batches. The send-reminders function also hard-enforces this
-  // window, so this just avoids pointless off-hours calls.
-  cron.schedule(`*/${SCAN_MINUTES} 7-17 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
-  log.info(`Reminder scan scheduled every ${SCAN_MINUTES} min, Mon-Fri 7AM-5:59PM CST (batch of 4)`);
+  // Reminder scan: drivers are texted AFTER the 7:15 AM dispatcher digest — so
+  // the first scan is 7:30 AM, then every SCAN_MINUTES through 5:59 PM. Keeps
+  // dispatchers ahead of drivers. send-reminders also hard-enforces the
+  // 7-17:59 window server-side. (Morning slots are 7:30/7:40/7:50 on the
+  // default 10-min cadence; the 8-17 rule uses SCAN_MINUTES.)
+  cron.schedule(`30,40,50 7 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
+  cron.schedule(`*/${SCAN_MINUTES} 8-17 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
+  log.info(`Reminder scan scheduled 7:30 AM (after dispatcher digest) then every ${SCAN_MINUTES} min to 5:59 PM CST, Mon-Fri`);
 
   // PTI link drain: only active when SUPABASE_PTI_DRAIN_URL is configured
   if (DRAIN_URL) {
