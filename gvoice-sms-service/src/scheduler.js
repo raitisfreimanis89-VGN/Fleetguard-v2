@@ -21,13 +21,14 @@ const PORT          = parseInt(process.env.PORT || '3000', 10);
 // so they must never run at the same time.
 let busy = false;
 
-// ── Reminder scan — sends one batch (Edge Function caps at 4/run) ──
-// Runs at startup and repeats every SCAN_MINUTES so large backlogs
-// drain in safe chunks. Dedup guard prevents duplicate sends.
-async function runStartupScan() {
-  if (busy) { log.debug('Scan skipped — bot busy'); return; }
+// ── Reminder wave — sends one batch of the given reminder type(s) ──
+// Edge Function caps at 4/run and enforces the 7-17:59 CST window. Types are
+// kept apart across the day (tyre 7:30, yard 10, brake noon) so a driver never
+// gets tyre+yard+brake back-to-back. Dedup guard prevents duplicate sends.
+async function runReminderWave(types, label) {
+  if (busy) { log.debug(`${label} wave skipped — bot busy`); return; }
   busy = true;
-  log.info('Running reminder scan (batch)...');
+  log.info(`Running ${label} reminder wave...`);
   try {
     const res = await fetch(REMINDERS_URL, {
       method:  'POST',
@@ -36,20 +37,30 @@ async function runStartupScan() {
         'x-api-key':     SECRET,
         'Content-Type':  'application/json',
       },
-      body: '{}',
+      body: JSON.stringify({ types }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      log.info(`Reminder scan complete — sent:${data.sent} skipped:${data.skipped} (on vacation:${data.vacationSkipped ?? 0})`);
-      if (data.errors?.length) log.warn(`Scan errors: ${JSON.stringify(data.errors)}`);
+      log.info(`${label} wave complete — sent:${data.sent} skipped:${data.skipped} (on vacation:${data.vacationSkipped ?? 0})`);
+      if (data.errors?.length) log.warn(`${label} wave errors: ${JSON.stringify(data.errors)}`);
     } else {
-      log.warn(`Reminder scan returned ${res.status}: ${JSON.stringify(data)}`);
+      log.warn(`${label} wave returned ${res.status}: ${JSON.stringify(data)}`);
     }
   } catch (err) {
-    log.error(`Startup scan failed: ${err.message}`);
+    log.error(`${label} wave failed: ${err.message}`);
   } finally {
     busy = false;
   }
+}
+
+// On boot, run the wave that matches the current CST window, so a restart never
+// fires the wrong type at the wrong hour (e.g. brakes before noon).
+async function runStartupScan() {
+  const hour = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: '2-digit', hourCycle: 'h23' }).format(new Date()));
+  if (hour >= 7  && hour < 10) return runReminderWave(['tyre_check'],     'tyre/PTI (startup)');
+  if (hour >= 10 && hour < 12) return runReminderWave(['dot_inspection'], 'yard (startup)');
+  if (hour >= 12 && hour < 18) return runReminderWave(['brake_service'],  'brake (startup)');
+  log.info('Startup scan — outside reminder windows, nothing to send');
 }
 
 // ── Poll inbox and forward replies to Supabase ─────────────────
@@ -168,14 +179,18 @@ function startScheduler() {
   cron.schedule(`*/${POLL_MINUTES} * * * *`, runReplyPoll);
   log.info(`Reply poller scheduled every ${POLL_MINUTES} min`);
 
-  // Reminder scan: drivers are texted AFTER the 7:15 AM dispatcher digest — so
-  // the first scan is 7:30 AM, then every SCAN_MINUTES through 5:59 PM. Keeps
-  // dispatchers ahead of drivers. send-reminders also hard-enforces the
-  // 7-17:59 window server-side. (Morning slots are 7:30/7:40/7:50 on the
-  // default 10-min cadence; the 8-17 rule uses SCAN_MINUTES.)
-  cron.schedule(`30,40,50 7 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
-  cron.schedule(`*/${SCAN_MINUTES} 8-17 * * 1-5`, runStartupScan, { timezone: 'America/Chicago' });
-  log.info(`Reminder scan scheduled 7:30 AM (after dispatcher digest) then every ${SCAN_MINUTES} min to 5:59 PM CST, Mon-Fri`);
+  // Three separated reminder waves (Mon-Fri, America/Chicago), each sending ONE
+  // type so a driver never gets tyre+yard+brake back-to-back. Dispatcher digest
+  // fires 7:15 AM; drivers always follow. send-reminders also enforces 7-17:59.
+  //   Tyre/PTI  7:30 AM -> 9:50 AM
+  //   Yard     10:00 AM -> 11:50 AM
+  //   Brake    12:00 PM -> 5:50 PM
+  const TZ = { timezone: 'America/Chicago' };
+  cron.schedule(`30,40,50 7 * * 1-5`,           () => runReminderWave(['tyre_check'],     'tyre/PTI'), TZ);
+  cron.schedule(`*/${SCAN_MINUTES} 8-9 * * 1-5`,   () => runReminderWave(['tyre_check'],     'tyre/PTI'), TZ);
+  cron.schedule(`*/${SCAN_MINUTES} 10-11 * * 1-5`, () => runReminderWave(['dot_inspection'], 'yard'),     TZ);
+  cron.schedule(`*/${SCAN_MINUTES} 12-17 * * 1-5`, () => runReminderWave(['brake_service'],  'brake'),    TZ);
+  log.info('Reminder waves: tyre/PTI 7:30-9:50, yard 10-11:50, brake 12-17:50 CST (Mon-Fri)');
 
   // PTI link drain: only active when SUPABASE_PTI_DRAIN_URL is configured
   if (DRAIN_URL) {

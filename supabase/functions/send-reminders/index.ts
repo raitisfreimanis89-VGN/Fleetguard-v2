@@ -176,6 +176,16 @@ serve(async (req) => {
     }
   }
 
+  // A wave can request specific reminder types via { types: [...] } in the body,
+  // so the bot runs tyre-only at 7:30, yard at 10, brake at noon (kept apart so a
+  // driver never gets several texts at once). No/empty body = all types.
+  let reqBody: { types?: string[] } = {};
+  try { reqBody = await req.json(); } catch { /* empty body is fine */ }
+  const ALL_TYPES = ["dot_inspection", "brake_service", "pm_service", "tyre_check"];
+  const scanTypes = Array.isArray(reqBody.types) && reqBody.types.length
+    ? ALL_TYPES.filter((t) => reqBody.types!.includes(t))
+    : ALL_TYPES;
+
   // Send window: reminders only Mon-Fri, 7 AM-5 PM America/Chicago. No texting
   // drivers about overdue items at night or on weekends. OTP login codes and
   // PTI links live in other functions and remain available 24/7.
@@ -237,7 +247,7 @@ serve(async (req) => {
     if (!phoneRow?.phone_number) { skipped++; continue; }
     if (phoneRow.sms_hold) { skipped++; continue; }   // number on hold — do not send
 
-    for (const type of ["dot_inspection", "brake_service", "pm_service", "tyre_check"]) {
+    for (const type of scanTypes) {
       if (sent >= MAX_PER_RUN) break;   // batch limit reached
       try {
         const sched = await getSchedule(v.id, type);
