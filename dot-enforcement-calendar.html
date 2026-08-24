@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOT Enforcement Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface2:#f6f9fc;
+    --ink:#0f172a; --ink2:#475569; --ink3:#8b97a8; --line:#e3e9f0;
+    --accent:#dc2626; --accent-soft:rgba(220,38,38,.10);
+    --green:#12a565; --green-soft:rgba(18,165,101,.13); --green-line:#12a565;
+    --amber:#d98510; --amber-soft:rgba(217,133,16,.14);
+    --shadow:0 1px 3px rgba(15,23,42,.07), 0 14px 32px -16px rgba(15,23,42,.20);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f2726f; --accent-soft:rgba(242,114,111,.14);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f2726f; --accent-soft:rgba(242,114,111,.14);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);}
+
+  .hero{
+    background:
+      radial-gradient(1100px 300px at 12% -10%, rgba(220,38,38,.20), transparent 60%),
+      linear-gradient(170deg,#0d1526 0%,#131d31 100%);
+    color:#f5f8fc; padding:2.6rem 1.5rem 2.1rem; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .wrap{max-width:860px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:.55rem; font-weight:800; font-family:'Manrope',sans-serif; color:#e8eefc; font-size:.95rem;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18);}
+  .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.15rem; letter-spacing:-.02em; margin:1rem 0 0;}
+  .hero .sub{color:#adbdd6; margin:.55rem 0 0; font-size:1.02rem; max-width:60ch;}
+
+  main{max-width:860px; margin:0 auto; padding:2rem 1.5rem 1rem;}
+
+  #banner{ border-radius:14px; padding:1rem 1.2rem; margin-bottom:1.6rem; font-weight:600; border:1px solid var(--line); background:var(--surface2); box-shadow:var(--shadow); display:flex; align-items:center; gap:.7rem; font-size:1rem;}
+  #banner.active{ background:var(--accent-soft); border-color:var(--accent); color:var(--ink); }
+  #banner.upcoming{ background:var(--amber-soft); border-color:var(--amber); }
+  #banner.clear{ background:var(--green-soft); border-color:var(--green); }
+  #banner .em{font-family:'Manrope',sans-serif; font-weight:800;}
+
+  .event{ display:grid; grid-template-columns:52px 1fr; gap:1rem; background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.2rem 1.3rem; box-shadow:var(--shadow); margin-bottom:1rem; transition:border-color .15s ease;}
+  .event.is-active{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), var(--shadow); }
+  .event.is-past{ opacity:.68; }
+  .ev-icon{ font-size:30px; line-height:1; }
+  .ev-top{ display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .ev-top h2{ font-family:'Manrope',sans-serif; font-weight:800; font-size:1.18rem; margin:0; }
+  .ev-status{ font-size:.68rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; padding:.22rem .55rem; border-radius:999px; border:1px solid var(--line); color:var(--ink3); background:var(--surface2); white-space:nowrap; }
+  .ev-status.active{ color:#fff; background:var(--accent); border-color:var(--accent); }
+  .ev-status.upcoming{ color:var(--amber); background:var(--amber-soft); border-color:var(--amber); }
+  .ev-status.past{ color:var(--ink3); }
+  .ev-date{ font-family:'Manrope',sans-serif; font-weight:700; color:var(--ink2); font-size:.92rem; margin-top:.25rem; }
+  .ev-focus{ margin:.55rem 0 0; color:var(--ink); font-size:.96rem; line-height:1.5; }
+  .ev-tip{ margin:.5rem 0 0; color:var(--ink2); font-size:.9rem; line-height:1.45; }
+
+  .note{ margin-top:1.4rem; background:var(--surface2); border:1px solid var(--line); border-radius:14px; padding:1rem 1.15rem; color:var(--ink2); font-size:.9rem; line-height:1.55;}
+  .note b{color:var(--ink);}
+
+  footer{max-width:860px; margin:0 auto; padding:1.6rem 1.5rem 3rem; color:var(--ink3); font-size:.83rem;}
+  footer .rule{height:1px; background:var(--line); margin-bottom:1.1rem;}
+  footer a{color:var(--accent);}
+
+  @media (max-width:560px){ .hero h1{font-size:1.75rem;} .event{grid-template-columns:1fr;} .ev-icon{font-size:26px;} }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand">&#x1F69B; FleetGuard <span class="dot"></span></div>
+      <h1>DOT Enforcement Calendar</h1>
+      <p class="sub">CVSA inspection blitzes &mdash; know what's coming so a crackdown never catches the fleet off guard.</p>
+    </div>
+  </header>
+
+  <main>
+    <div id="banner">Loading&hellip;</div>
+
+    <div class="event" data-start="2026-05-12" data-end="2026-05-14">
+      <div class="ev-icon">&#x1F50D;</div>
+      <div class="ev-body">
+        <div class="ev-top"><h2>International Roadcheck</h2><span class="ev-status"></span></div>
+        <div class="ev-date">May 12&ndash;14, 2026 &middot; 72 hours</div>
+        <p class="ev-focus">The big one &mdash; a 72-hour, all-hands blitz of full Level I inspections across North America.</p>
+        <p class="ev-tip">&#x2705; Every truck road-ready: brakes, tires, lights, load secure, plus driver docs &amp; HOS current.</p>
+      </div>
+    </div>
+
+    <div class="event" data-start="2026-07-12" data-end="2026-07-18">
+      <div class="ev-icon">&#x1F6A6;</div>
+      <div class="ev-body">
+        <div class="ev-top"><h2>Operation Safe Driver Week</h2><span class="ev-status"></span></div>
+        <div class="ev-date">July 12&ndash;18, 2026 &middot; 7 days</div>
+        <p class="ev-focus">Targets unsafe <b>driver</b> behavior &mdash; speeding, seatbelts, phone use, following too close, reckless driving.</p>
+        <p class="ev-tip">&#x2705; Remind drivers: slow down, buckle up, phone down. These violations stick to the CDL.</p>
+      </div>
+    </div>
+
+    <div class="event" data-start="2026-08-23" data-end="2026-08-29">
+      <div class="ev-icon">&#x1F6D1;</div>
+      <div class="ev-body">
+        <div class="ev-top"><h2>Brake Safety Week</h2><span class="ev-status"></span></div>
+        <div class="ev-date">Aug 23&ndash;29, 2026 &middot; 7 days</div>
+        <p class="ev-focus">Brake systems &amp; components. Out-of-adjustment or defective brakes = out of service on the spot.</p>
+        <p class="ev-tip">&#x2705; Confirm every truck's brake inspection is current before you dispatch it.</p>
+      </div>
+    </div>
+
+    <div class="event" data-unannounced="1">
+      <div class="ev-icon">&#x26A0;&#xFE0F;</div>
+      <div class="ev-body">
+        <div class="ev-top"><h2>Brake Safety Day</h2><span class="ev-status past">Unannounced</span></div>
+        <div class="ev-date">One surprise day &mdash; sometime in 2026</div>
+        <p class="ev-focus">A one-day brake enforcement push that CVSA does <b>not</b> announce in advance.</p>
+        <p class="ev-tip">&#x2705; Keep brakes compliant year-round &mdash; this one can land on any day.</p>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Every year, same rhythm:</b> Roadcheck ~mid-May, Safe Driver Week ~mid-July, Brake Safety Week ~late August, plus an unannounced Brake Safety Day. Dates shown are the official 2026 dates; CVSA sets each year's exact dates &mdash; ask your admin to refresh this when the 2027 schedule is posted.
+    </div>
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    FleetGuard &middot; DOT enforcement reference. Source: Commercial Vehicle Safety Alliance (<a href="https://cvsa.org" target="_blank" rel="noopener">cvsa.org</a>).
+  </footer>
+
+<script>
+  (function(){
+    var today = new Date(); today.setHours(0,0,0,0);
+    var fmt = function(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+    var scheduled = [];
+    document.querySelectorAll('.event[data-start]').forEach(function(ev){
+      var start = new Date(ev.getAttribute('data-start')+'T00:00:00');
+      var end   = new Date(ev.getAttribute('data-end')+'T00:00:00');
+      var name  = ev.querySelector('h2').textContent;
+      var badge = ev.querySelector('.ev-status');
+      var status, cls;
+      if(today > end){ status='Completed'; cls='past'; ev.classList.add('is-past'); }
+      else if(today >= start && today <= end){ status='Active now'; cls='active'; ev.classList.add('is-active'); }
+      else {
+        var days = Math.ceil((start - today)/86400000);
+        status = 'In ' + days + ' day' + (days===1?'':'s'); cls='upcoming';
+      }
+      badge.textContent = status; badge.className = 'ev-status ' + cls;
+      scheduled.push({name:name, start:start, end:end, active:(cls==='active'), upcoming:(cls==='upcoming')});
+    });
+
+    var banner = document.getElementById('banner');
+    var active = scheduled.filter(function(e){return e.active;})[0];
+    var upcoming = scheduled.filter(function(e){return e.upcoming;}).sort(function(a,b){return a.start-b.start;})[0];
+    if(active){
+      banner.className='active';
+      banner.innerHTML='&#x1F534; <span><span class="em">Active now:</span> '+active.name+' &mdash; through '+fmt(active.end)+'. Make sure the fleet is buttoned up.</span>';
+    } else if(upcoming){
+      var d = Math.ceil((upcoming.start - today)/86400000);
+      banner.className='upcoming';
+      banner.innerHTML='&#x23F3; <span><span class="em">Next up:</span> '+upcoming.name+' &mdash; '+fmt(upcoming.start)+' ('+d+' day'+(d===1?'':'s')+' away).</span>';
+    } else {
+      banner.className='clear';
+      banner.innerHTML='&#x2705; <span><span class="em">All clear</span> &mdash; no scheduled blitz right now. Next cycle kicks off with International Roadcheck around mid-May.</span>';
+    }
+  })();
+</script>
+</body>
+</html>
