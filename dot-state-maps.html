@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>State DOT / 511 Maps</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface2:#f6f9fc;
+    --ink:#0f172a; --ink2:#475569; --ink3:#8b97a8; --line:#e3e9f0;
+    --accent:#2563eb; --accent-soft:rgba(37,99,235,.10);
+    --shadow:0 1px 3px rgba(15,23,42,.07), 0 14px 32px -16px rgba(15,23,42,.20);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#6aa5fb; --accent-soft:rgba(106,165,251,.13);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#6aa5fb; --accent-soft:rgba(106,165,251,.13);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+
+  .hero{
+    background:
+      radial-gradient(1100px 300px at 12% -10%, rgba(99,102,241,.22), transparent 60%),
+      linear-gradient(170deg,#0d1526 0%,#131d31 100%);
+    color:#f5f8fc; padding:2.6rem 1.5rem 2.1rem; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .wrap{max-width:1080px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:.55rem; font-weight:800; font-family:'Manrope',sans-serif; color:#e8eefc; font-size:.95rem;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18);}
+  .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.15rem; letter-spacing:-.02em; margin:1rem 0 0;}
+  .hero .sub{color:#adbdd6; margin:.55rem 0 0; font-size:1.02rem; max-width:60ch;}
+  .hero .tip{display:inline-flex; align-items:center; gap:.5rem; margin-top:1.2rem; font-size:.82rem; color:#cfe0f5; background:rgba(99,102,241,.16); border:1px solid rgba(99,102,241,.4); padding:.4rem .8rem; border-radius:999px; font-weight:600;}
+
+  main{max-width:1080px; margin:0 auto; padding:2rem 1.5rem 1rem;}
+  .regions{display:grid; grid-template-columns:repeat(2,1fr); gap:1.15rem;}
+
+  .region{background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden;}
+  .region h2{font-family:'Manrope',sans-serif; font-weight:800; font-size:.82rem; letter-spacing:.07em; text-transform:uppercase; color:#fff; background:linear-gradient(90deg,#334155,#1e293b); margin:0; padding:.7rem 1rem;}
+  :root[data-theme="dark"] .region h2, :root:not([data-theme="light"]) .region h2{ background:linear-gradient(90deg,#25324a,#1a2436); }
+
+  .state{display:flex; justify-content:space-between; align-items:baseline; gap:1rem; padding:.55rem 1rem; border-top:1px solid var(--line); text-decoration:none; color:inherit; transition:background .12s ease;}
+  .state:first-of-type{border-top:none;}
+  .state:hover{background:var(--accent-soft);}
+  .st-name{font-weight:700; color:var(--ink); font-size:.95rem;}
+  .st-url{font-family:'IBM Plex Mono',ui-monospace,monospace; font-size:.76rem; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:56%;}
+
+  .national{margin:1.4rem 0 0; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;
+    background:var(--accent-soft); border:1px solid var(--accent); border-radius:14px; padding:.9rem 1.15rem;}
+  .national b{color:var(--accent); font-family:'Manrope',sans-serif;}
+  .national a{color:var(--accent); font-weight:700; text-decoration:none; font-family:'IBM Plex Mono',monospace;}
+
+  footer{max-width:1080px; margin:0 auto; padding:1.6rem 1.5rem 3rem; color:var(--ink3); font-size:.83rem;}
+  footer .rule{height:1px; background:var(--line); margin-bottom:1.1rem;}
+
+  @media (max-width:720px){ .regions{grid-template-columns:1fr;} .hero h1{font-size:1.75rem;} .st-url{max-width:48%;} }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand">&#x1F69B; FleetGuard <span class="dot"></span></div>
+      <h1>State DOT / 511 Live Maps</h1>
+      <p class="sub">Official real-time traffic &amp; road-condition maps for all 50 states &mdash; tap a state to open it.</p>
+      <span class="tip">&#x2744;&#xFE0F; Winter tip: check the destination state before dispatching.</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="regions">
+
+      <div class="region">
+        <h2>Western States</h2>
+        <a class="state" href="https://511.alaska.gov" target="_blank" rel="noopener"><span class="st-name">Alaska</span><span class="st-url">511.alaska.gov</span></a>
+        <a class="state" href="https://az511.gov" target="_blank" rel="noopener"><span class="st-name">Arizona</span><span class="st-url">az511.gov</span></a>
+        <a class="state" href="https://quickmap.dot.ca.gov" target="_blank" rel="noopener"><span class="st-name">California</span><span class="st-url">quickmap.dot.ca.gov</span></a>
+        <a class="state" href="https://www.cotrip.org" target="_blank" rel="noopener"><span class="st-name">Colorado</span><span class="st-url">cotrip.org</span></a>
+        <a class="state" href="https://goakamai.org" target="_blank" rel="noopener"><span class="st-name">Hawaii</span><span class="st-url">goakamai.org</span></a>
+        <a class="state" href="https://511.idaho.gov" target="_blank" rel="noopener"><span class="st-name">Idaho</span><span class="st-url">511.idaho.gov</span></a>
+        <a class="state" href="https://www.mdt.mt.gov/travinfo" target="_blank" rel="noopener"><span class="st-name">Montana</span><span class="st-url">mdt.mt.gov/travinfo</span></a>
+        <a class="state" href="https://www.nvroads.com" target="_blank" rel="noopener"><span class="st-name">Nevada</span><span class="st-url">nvroads.com</span></a>
+        <a class="state" href="https://nmroads.com" target="_blank" rel="noopener"><span class="st-name">New Mexico</span><span class="st-url">nmroads.com</span></a>
+        <a class="state" href="https://www.tripcheck.com" target="_blank" rel="noopener"><span class="st-name">Oregon</span><span class="st-url">tripcheck.com</span></a>
+        <a class="state" href="https://udottraffic.utah.gov" target="_blank" rel="noopener"><span class="st-name">Utah</span><span class="st-url">udottraffic.utah.gov</span></a>
+        <a class="state" href="https://wsdot.com/traffic" target="_blank" rel="noopener"><span class="st-name">Washington</span><span class="st-url">wsdot.com/traffic</span></a>
+        <a class="state" href="https://www.wyoroad.info" target="_blank" rel="noopener"><span class="st-name">Wyoming</span><span class="st-url">wyoroad.info</span></a>
+      </div>
+
+      <div class="region">
+        <h2>Midwest</h2>
+        <a class="state" href="https://travel.dot.nd.gov" target="_blank" rel="noopener"><span class="st-name">North Dakota</span><span class="st-url">travel.dot.nd.gov</span></a>
+        <a class="state" href="https://sd511.org" target="_blank" rel="noopener"><span class="st-name">South Dakota</span><span class="st-url">sd511.org</span></a>
+        <a class="state" href="https://511.nebraska.gov" target="_blank" rel="noopener"><span class="st-name">Nebraska</span><span class="st-url">511.nebraska.gov</span></a>
+        <a class="state" href="https://kandrive.org" target="_blank" rel="noopener"><span class="st-name">Kansas</span><span class="st-url">kandrive.org</span></a>
+        <a class="state" href="https://511mn.org" target="_blank" rel="noopener"><span class="st-name">Minnesota</span><span class="st-url">511mn.org</span></a>
+        <a class="state" href="https://511ia.org" target="_blank" rel="noopener"><span class="st-name">Iowa</span><span class="st-url">511ia.org</span></a>
+        <a class="state" href="https://traveler.modot.org/map" target="_blank" rel="noopener"><span class="st-name">Missouri</span><span class="st-url">traveler.modot.org/map</span></a>
+        <a class="state" href="https://511wi.gov" target="_blank" rel="noopener"><span class="st-name">Wisconsin</span><span class="st-url">511wi.gov</span></a>
+        <a class="state" href="https://gettingaroundillinois.com" target="_blank" rel="noopener"><span class="st-name">Illinois</span><span class="st-url">gettingaroundillinois.com</span></a>
+        <a class="state" href="https://indot.carsprogram.org" target="_blank" rel="noopener"><span class="st-name">Indiana</span><span class="st-url">indot.carsprogram.org</span></a>
+        <a class="state" href="https://mdotjboss.state.mi.us/MiDrive/map" target="_blank" rel="noopener"><span class="st-name">Michigan</span><span class="st-url">MiDrive map</span></a>
+        <a class="state" href="https://ohgo.com" target="_blank" rel="noopener"><span class="st-name">Ohio</span><span class="st-url">ohgo.com</span></a>
+      </div>
+
+      <div class="region">
+        <h2>Southern States</h2>
+        <a class="state" href="https://drivetexas.org" target="_blank" rel="noopener"><span class="st-name">Texas</span><span class="st-url">drivetexas.org</span></a>
+        <a class="state" href="https://okroads.org" target="_blank" rel="noopener"><span class="st-name">Oklahoma</span><span class="st-url">okroads.org</span></a>
+        <a class="state" href="https://www.idrivearkansas.com" target="_blank" rel="noopener"><span class="st-name">Arkansas</span><span class="st-url">idrivearkansas.com</span></a>
+        <a class="state" href="https://www.511la.org" target="_blank" rel="noopener"><span class="st-name">Louisiana</span><span class="st-url">511la.org</span></a>
+        <a class="state" href="https://mdottraffic.com" target="_blank" rel="noopener"><span class="st-name">Mississippi</span><span class="st-url">mdottraffic.com</span></a>
+        <a class="state" href="https://algotraffic.com" target="_blank" rel="noopener"><span class="st-name">Alabama</span><span class="st-url">algotraffic.com</span></a>
+        <a class="state" href="https://511ga.org" target="_blank" rel="noopener"><span class="st-name">Georgia</span><span class="st-url">511ga.org</span></a>
+        <a class="state" href="https://fl511.com" target="_blank" rel="noopener"><span class="st-name">Florida</span><span class="st-url">fl511.com</span></a>
+        <a class="state" href="https://www.511sc.org" target="_blank" rel="noopener"><span class="st-name">South Carolina</span><span class="st-url">511sc.org</span></a>
+        <a class="state" href="https://www.tn.gov/tdot/traffic.html" target="_blank" rel="noopener"><span class="st-name">Tennessee</span><span class="st-url">tn.gov/tdot</span></a>
+      </div>
+
+      <div class="region">
+        <h2>Eastern States</h2>
+        <a class="state" href="https://newengland511.org" target="_blank" rel="noopener"><span class="st-name">Maine</span><span class="st-url">newengland511.org</span></a>
+        <a class="state" href="https://newengland511.org" target="_blank" rel="noopener"><span class="st-name">New Hampshire</span><span class="st-url">newengland511.org</span></a>
+        <a class="state" href="https://511.vermont.gov" target="_blank" rel="noopener"><span class="st-name">Vermont</span><span class="st-url">511.vermont.gov</span></a>
+        <a class="state" href="https://mass511.com" target="_blank" rel="noopener"><span class="st-name">Massachusetts</span><span class="st-url">mass511.com</span></a>
+        <a class="state" href="https://www.dot.ri.gov/travel" target="_blank" rel="noopener"><span class="st-name">Rhode Island</span><span class="st-url">dot.ri.gov/travel</span></a>
+        <a class="state" href="https://ctroads.org" target="_blank" rel="noopener"><span class="st-name">Connecticut</span><span class="st-url">ctroads.org</span></a>
+        <a class="state" href="https://511ny.org" target="_blank" rel="noopener"><span class="st-name">New York</span><span class="st-url">511ny.org</span></a>
+        <a class="state" href="https://511nj.org" target="_blank" rel="noopener"><span class="st-name">New Jersey</span><span class="st-url">511nj.org</span></a>
+        <a class="state" href="https://www.511pa.com" target="_blank" rel="noopener"><span class="st-name">Pennsylvania</span><span class="st-url">511pa.com</span></a>
+        <a class="state" href="https://deldot.gov/map" target="_blank" rel="noopener"><span class="st-name">Delaware</span><span class="st-url">deldot.gov/map</span></a>
+        <a class="state" href="https://chart.maryland.gov" target="_blank" rel="noopener"><span class="st-name">Maryland</span><span class="st-url">chart.maryland.gov</span></a>
+        <a class="state" href="https://511virginia.org" target="_blank" rel="noopener"><span class="st-name">Virginia</span><span class="st-url">511virginia.org</span></a>
+        <a class="state" href="https://wv511.org" target="_blank" rel="noopener"><span class="st-name">West Virginia</span><span class="st-url">wv511.org</span></a>
+      </div>
+
+    </div>
+
+    <div class="national">
+      <span><b>National 511 index</b> &mdash; every state in one place</span>
+      <a href="https://511index.com" target="_blank" rel="noopener">511index.com &#x2197;</a>
+    </div>
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    FleetGuard &middot; Dispatcher cheat sheet. Official state DOT / 511 traffic &amp; road-condition maps.
+  </footer>
+</body>
+</html>
