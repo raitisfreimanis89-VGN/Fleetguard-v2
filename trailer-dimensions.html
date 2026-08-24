@@ -80,6 +80,9 @@
 
   footer{max-width:940px; margin:0 auto; padding:0 1.5rem 3rem; color:var(--ink3); font-size:.85rem;}
   footer .rule{height:1px; background:var(--line); margin-bottom:1.1rem;}
+  .mfr-diagram{margin:1.5rem 0 0;}
+  .mfr-diagram img{width:100%; height:auto; display:block; border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow);}
+  .mfr-diagram figcaption{margin-top:.6rem; font-size:.78rem; color:var(--ink3);}
 
   @media (max-width:640px){ .highlights,.cols{grid-template-columns:1fr;} .hero h1{font-size:1.75rem;} }
 </style>
@@ -160,6 +163,10 @@
   <footer>
     <div class="rule"></div>
     FleetGuard &middot; Trailer reference. Figures are nominal for our standard 53&#39; dry van.
+    <figure class="mfr-diagram">
+      <img src="img/trailer-dimensions-diagram.png" alt="Manufacturer trailer dimension diagram: 53 ft dry van rear view with exterior and interior dimensions plus weight and capacity" loading="lazy">
+      <figcaption>Manufacturer spec diagram.</figcaption>
+    </figure>
   </footer>
 </body>
 </html>
