@@ -134,17 +134,6 @@
   .fix .move{display:inline-flex; align-items:center; gap:.4rem; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:.9rem; background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:.25rem .7rem; margin:.2rem .3rem .2rem 0;}
   .fix p{color:var(--ink2); font-size:.92rem; line-height:1.5; margin:.6rem 0 0;}
 
-  /* bridge calc */
-  .calc{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);}
-  .formula{font-family:'IBM Plex Mono',monospace; background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; font-size:.95rem; color:var(--ink); overflow-x:auto; margin:.2rem 0 1.1rem;}
-  .calc-row{display:grid; grid-template-columns:1fr 1fr auto; gap:.8rem; align-items:end;}
-  .calc .out{margin-left:auto; text-align:right;}
-  .calc .out .k{font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3);}
-  .calc .out .v{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.7rem; color:var(--accent); letter-spacing:-.01em;}
-  .chips{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem;}
-  .chip{font-size:.8rem; border:1px solid var(--line); background:var(--surface2); color:var(--ink2); border-radius:999px; padding:.3rem .7rem; cursor:pointer; transition:border-color .15s,color .15s;}
-  .chip:hover{border-color:var(--accent); color:var(--accent);}
-
   .callout{margin-top:1.4rem; background:var(--amber-soft); border:1px solid var(--amber); border-radius:14px; padding:1rem 1.15rem; color:var(--ink); font-size:.95rem; line-height:1.55;}
   .callout b{color:var(--amber);}
   .callout.blue{background:var(--accent-soft); border-color:var(--accent);}
@@ -158,8 +147,6 @@
     .limits{grid-template-columns:repeat(2,1fr);}
     .inp-row{grid-template-columns:1fr;}
     .fixes{grid-template-columns:1fr;}
-    .calc-row{grid-template-columns:1fr 1fr; }
-    .calc .out{grid-column:1 / -1; text-align:left; margin-left:0;}
     .hero h1{font-size:1.75rem;}
   }
 </style>
@@ -263,24 +250,6 @@
       </div>
     </div>
 
-    <!-- BRIDGE FORMULA -->
-    <h2 class="sec">&#x1F309; Bridge formula calculator</h2>
-    <div class="calc">
-      <p style="color:var(--ink2); font-size:.95rem; margin:0 0 .6rem;">The Federal Bridge Formula caps how much weight a group of axles can carry based on how far apart they are &mdash; it stops short wheelbases from concentrating load on a bridge.</p>
-      <div class="formula">W = 500 &times; ( (L &times; N) / (N &minus; 1) + 12N + 36 )</div>
-      <div class="calc-row">
-        <div class="fld"><label>L &mdash; outer spread (ft)</label><div class="box"><input id="c-l" type="number" inputmode="decimal" value="4"><span class="lbs">ft</span></div></div>
-        <div class="fld"><label>N &mdash; axles in group</label><div class="box"><input id="c-n" type="number" inputmode="numeric" value="2"><span class="lbs">axles</span></div></div>
-        <div class="out"><div class="k">Max weight</div><div class="v" id="c-out">34,000</div></div>
-      </div>
-      <div class="chips">
-        <span class="chip" data-l="4" data-n="2">Tandem group (4 ft, 2)</span>
-        <span class="chip" data-l="8" data-n="3">Tridem (8 ft, 3)</span>
-        <span class="chip" data-l="51" data-n="5">Full 5-axle rig (51 ft)</span>
-      </div>
-      <p style="color:var(--ink3); font-size:.82rem; margin:.9rem 0 0;">Rounded to the nearest 500 lb and capped at the 80,000 lb gross for the whole rig. L is the distance between the <em>outermost</em> axles of the group.</p>
-    </div>
-
     <div class="callout">
       &#x1F4CD; <b>State bridge law limits your slide.</b> California (and a few others) cap kingpin-to-rear-axle at <b>40 ft</b> (KP-40), so you can&#39;t slide the trailer tandems all the way back there. Check the state you&#39;re running before you slide.
     </div>
@@ -348,27 +317,7 @@
       }
     }
     ['w-steer','w-drive','w-trailer'].forEach(function(id){ document.getElementById(id).addEventListener('input', render); });
-
-    // bridge formula calculator
-    function bridge(){
-      var L=parseFloat(document.getElementById('c-l').value), N=parseInt(document.getElementById('c-n').value,10);
-      var out=document.getElementById('c-out');
-      if(isNaN(L)||isNaN(N)||N<2){ out.textContent='—'; return; }
-      var W = 500*((L*N)/(N-1) + 12*N + 36);
-      W = Math.round(W/500)*500;
-      if(W>80000) W=80000;
-      out.textContent = fmt(W);
-    }
-    document.getElementById('c-l').addEventListener('input', bridge);
-    document.getElementById('c-n').addEventListener('input', bridge);
-    document.querySelectorAll('.chip').forEach(function(c){
-      c.addEventListener('click', function(){
-        document.getElementById('c-l').value=c.getAttribute('data-l');
-        document.getElementById('c-n').value=c.getAttribute('data-n');
-        bridge();
-      });
-    });
-    render(); bridge();
+    render();
   })();
 </script>
 </body>
