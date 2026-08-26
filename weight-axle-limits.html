@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weight &amp; Axle Limits</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface2:#f6f9fc;
+    --ink:#0f172a; --ink2:#475569; --ink3:#8b97a8; --line:#e3e9f0;
+    --accent:#e2711d; --accent-soft:rgba(226,113,29,.12);
+    --green:#12a565; --green-soft:rgba(18,165,101,.14);
+    --red:#dc2626; --red-soft:rgba(220,38,38,.12);
+    --amber:#d98510; --amber-soft:rgba(217,133,16,.14);
+    --shadow:0 1px 3px rgba(15,23,42,.07), 0 14px 32px -16px rgba(15,23,42,.20);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f59e4b; --accent-soft:rgba(245,158,75,.15);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f59e4b; --accent-soft:rgba(245,158,75,.15);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+
+  .hero{
+    position:relative; overflow:hidden;
+    background:
+      radial-gradient(1100px 320px at 12% -10%, rgba(226,113,29,.26), transparent 60%),
+      radial-gradient(900px 300px at 92% -20%, rgba(217,133,16,.18), transparent 55%),
+      linear-gradient(170deg,#0d1526 0%,#131d31 100%);
+    color:#f5f8fc; padding:2.6rem 1.5rem 2.2rem; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .wrap{max-width:960px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:.55rem; font-weight:800; font-family:'Manrope',sans-serif; color:#e8eefc; font-size:.95rem;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18);}
+  .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.2rem; letter-spacing:-.02em; margin:1rem 0 0;}
+  .hero .sub{color:#adbdd6; margin:.55rem 0 0; font-size:1.02rem; max-width:60ch;}
+  .hero .wrap{position:relative;}
+
+  /* CAT Scale quick-link badge */
+  .cat-badge{
+    position:absolute; top:-.2rem; right:0; z-index:4;
+    display:inline-flex; align-items:center; gap:.6rem;
+    background:linear-gradient(180deg,#fffdf6,#fdf0cf);
+    color:#1c1408; border:1px solid rgba(0,0,0,.10); border-radius:14px;
+    padding:.5rem .85rem .5rem .7rem; text-decoration:none;
+    box-shadow:0 8px 22px -8px rgba(0,0,0,.55);
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .cat-badge:hover{ transform:translateY(-2px); box-shadow:0 12px 26px -8px rgba(0,0,0,.65); }
+  .cat-badge .cat-ic{ font-size:1.55rem; line-height:1; filter:saturate(1.1); }
+  .cat-badge .cat-txt{ display:flex; flex-direction:column; line-height:1.12; }
+  .cat-badge .cat-txt b{ font-family:'Manrope',sans-serif; font-weight:800; font-size:.98rem; letter-spacing:.02em; }
+  .cat-badge .cat-txt small{ font-size:.68rem; color:#7a6428; font-weight:700; letter-spacing:.02em; }
+  @media (max-width:560px){
+    .cat-badge{ top:-.4rem; padding:.42rem .6rem; gap:.45rem; border-radius:12px; }
+    .cat-badge .cat-ic{ font-size:1.25rem; }
+    .cat-badge .cat-txt b{ font-size:.8rem; }
+    .cat-badge .cat-txt small{ font-size:.6rem; }
+    .hero h1{ max-width:64%; }
+  }
+
+  main{max-width:960px; margin:0 auto; padding:2rem 1.5rem 3rem;}
+  h2.sec{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.01em; margin:2.4rem 0 1rem; display:flex; align-items:center; gap:.55rem;}
+  h2.sec:first-of-type{margin-top:0;}
+
+  /* limit stat cards */
+  .limits{display:grid; grid-template-columns:repeat(4,1fr); gap:.9rem;}
+  .lim{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.05rem 1.1rem; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .lim::after{content:""; position:absolute; inset:0 0 auto 0; height:3px; background:var(--accent); opacity:.85;}
+  .lim .ic{font-size:1.3rem;}
+  .lim .k{font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3); margin-top:.4rem;}
+  .lim .v{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.55rem; letter-spacing:-.01em; margin-top:.1rem;}
+  .lim .u{font-size:.78rem; color:var(--ink2);}
+
+  /* axle diagram */
+  .diagram{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.3rem 1.2rem .8rem; box-shadow:var(--shadow); margin-top:1rem;}
+  .diagram svg{width:100%; height:auto; display:block;}
+
+  /* interactive tool */
+  .tool{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);}
+  .tool .lead{color:var(--ink2); font-size:.95rem; margin:0 0 1rem;}
+  .inp-row{display:grid; grid-template-columns:repeat(3,1fr); gap:.8rem;}
+  .fld{display:flex; flex-direction:column; gap:.35rem;}
+  .fld label{font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3);}
+  .fld .box{display:flex; align-items:center; background:var(--surface2); border:1.5px solid var(--line); border-radius:12px; padding:0 .7rem; transition:border-color .15s;}
+  .fld .box:focus-within{border-color:var(--accent);}
+  .fld input{border:none; background:transparent; color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:1.15rem; padding:.65rem 0; width:100%; outline:none; -moz-appearance:textfield;}
+  .fld input::-webkit-outer-spin-button,.fld input::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  .fld .box .lbs{font-size:.78rem; color:var(--ink3); font-weight:600;}
+
+  #result{margin-top:1.3rem;}
+  .bar-row{margin:.7rem 0;}
+  .bar-top{display:flex; justify-content:space-between; align-items:baseline; font-size:.88rem; margin-bottom:.3rem;}
+  .bar-top .nm{font-weight:700; color:var(--ink);}
+  .bar-top .st{font-family:'IBM Plex Mono',monospace; font-weight:600;}
+  .track{height:14px; border-radius:8px; background:var(--surface2); border:1px solid var(--line); overflow:hidden; position:relative;}
+  .fill{height:100%; border-radius:7px 0 0 7px; transition:width .35s ease, background .2s;}
+  .track .limit-mark{position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--ink3); opacity:.55;}
+  .ok .fill{background:var(--green);} .ok .st{color:var(--green);}
+  .over .fill{background:var(--red);} .over .st{color:var(--red);}
+
+  .advice{margin-top:1.2rem; border-radius:14px; padding:1rem 1.15rem; font-size:.95rem; line-height:1.55; border:1px solid var(--line); background:var(--surface2);}
+  .advice.good{background:var(--green-soft); border-color:var(--green);}
+  .advice.warn{background:var(--red-soft); border-color:var(--red);}
+  .advice.idle{color:var(--ink3);}
+  .advice ul{margin:.5rem 0 0; padding-left:1.1rem;}
+  .advice li{margin:.35rem 0;}
+  .advice b{color:var(--ink);}
+  .advice .hdr{font-family:'Manrope',sans-serif; font-weight:800; display:flex; align-items:center; gap:.5rem;}
+
+  /* fix cards */
+  .fixes{display:grid; grid-template-columns:repeat(2,1fr); gap:1rem;}
+  .fix{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.15rem 1.25rem; box-shadow:var(--shadow);}
+  .fix h3{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.02rem; margin:0 0 .5rem; display:flex; align-items:center; gap:.5rem;}
+  .fix .move{display:inline-flex; align-items:center; gap:.4rem; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:.9rem; background:var(--accent-soft); color:var(--accent); border:1px solid var(--accent); border-radius:999px; padding:.25rem .7rem; margin:.2rem .3rem .2rem 0;}
+  .fix p{color:var(--ink2); font-size:.92rem; line-height:1.5; margin:.6rem 0 0;}
+
+  /* bridge calc */
+  .calc{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);}
+  .formula{font-family:'IBM Plex Mono',monospace; background:var(--surface2); border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; font-size:.95rem; color:var(--ink); overflow-x:auto; margin:.2rem 0 1.1rem;}
+  .calc-row{display:grid; grid-template-columns:1fr 1fr auto; gap:.8rem; align-items:end;}
+  .calc .out{margin-left:auto; text-align:right;}
+  .calc .out .k{font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3);}
+  .calc .out .v{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.7rem; color:var(--accent); letter-spacing:-.01em;}
+  .chips{display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem;}
+  .chip{font-size:.8rem; border:1px solid var(--line); background:var(--surface2); color:var(--ink2); border-radius:999px; padding:.3rem .7rem; cursor:pointer; transition:border-color .15s,color .15s;}
+  .chip:hover{border-color:var(--accent); color:var(--accent);}
+
+  .callout{margin-top:1.4rem; background:var(--amber-soft); border:1px solid var(--amber); border-radius:14px; padding:1rem 1.15rem; color:var(--ink); font-size:.95rem; line-height:1.55;}
+  .callout b{color:var(--amber);}
+  .callout.blue{background:var(--accent-soft); border-color:var(--accent);}
+  .callout.blue b{color:var(--accent);}
+  .callout a{font-weight:700;}
+
+  footer{max-width:960px; margin:0 auto; padding:0 1.5rem 3rem; color:var(--ink3); font-size:.85rem;}
+  footer .rule{height:1px; background:var(--line); margin-bottom:1.1rem;}
+
+  @media (max-width:640px){
+    .limits{grid-template-columns:repeat(2,1fr);}
+    .inp-row{grid-template-columns:1fr;}
+    .fixes{grid-template-columns:1fr;}
+    .calc-row{grid-template-columns:1fr 1fr; }
+    .calc .out{grid-column:1 / -1; text-align:left; margin-left:0;}
+    .hero h1{font-size:1.75rem;}
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <a class="cat-badge" href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener" title="Open the CAT Scale locator — find the nearest scale to weigh your load">
+        <span class="cat-ic">&#x2696;&#xFE0F;</span>
+        <span class="cat-txt"><b>CAT&nbsp;Scale</b><small>Find a scale &#x2197;</small></span>
+      </a>
+      <div class="brand">&#x1F69B; FleetGuard <span class="dot"></span></div>
+      <h1>&#x2696;&#xFE0F; Weight &amp; Axle Limits</h1>
+      <p class="sub">The federal limits, a live load checker, and exactly which way to slide the tandems or 5th wheel to legalize an axle.</p>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- LIMITS -->
+    <h2 class="sec">&#x1F4CF; The federal limits</h2>
+    <div class="limits">
+      <div class="lim"><div class="ic">&#x1F6DE;&#xFE0F;</div><div class="k">Steer axle</div><div class="v">12,000</div><div class="u">lbs (single)</div></div>
+      <div class="lim"><div class="ic">&#x2699;&#xFE0F;</div><div class="k">Drive tandem</div><div class="v">34,000</div><div class="u">lbs (2 axles)</div></div>
+      <div class="lim"><div class="ic">&#x1F69B;</div><div class="k">Trailer tandem</div><div class="v">34,000</div><div class="u">lbs (2 axles)</div></div>
+      <div class="lim"><div class="ic">&#x1F4CA;</div><div class="k">Gross combo</div><div class="v">80,000</div><div class="u">lbs total</div></div>
+    </div>
+
+    <div class="diagram">
+      <svg viewBox="0 0 720 210" role="img" aria-label="Five-axle rig with the legal weight limit for each axle group">
+        <!-- frame -->
+        <line x1="60" y1="150" x2="660" y2="150" stroke="var(--ink3)" stroke-width="3"/>
+        <!-- wheels -->
+        <g fill="var(--surface2)" stroke="var(--ink)" stroke-width="2.5">
+          <circle cx="95" cy="150" r="22"/>
+          <circle cx="250" cy="150" r="22"/><circle cx="300" cy="150" r="22"/>
+          <circle cx="560" cy="150" r="22"/><circle cx="610" cy="150" r="22"/>
+        </g>
+        <g fill="var(--ink3)"><circle cx="95" cy="150" r="7"/><circle cx="250" cy="150" r="7"/><circle cx="300" cy="150" r="7"/><circle cx="560" cy="150" r="7"/><circle cx="610" cy="150" r="7"/></g>
+        <!-- group brackets -->
+        <g stroke="var(--accent)" stroke-width="2" fill="none">
+          <path d="M78 118 L78 108 L112 108 L112 118"/>
+          <path d="M232 118 L232 108 L318 108 L318 118"/>
+          <path d="M542 118 L542 108 L628 108 L628 118"/>
+        </g>
+        <!-- group labels -->
+        <g text-anchor="middle" font-family="'Manrope',sans-serif" font-weight="800">
+          <text x="95" y="96" fill="var(--ink)" font-size="17">12,000</text>
+          <text x="95" y="192" fill="var(--ink3)" font-size="12" font-weight="700" font-family="'IBM Plex Mono',monospace">STEER</text>
+          <text x="275" y="96" fill="var(--ink)" font-size="17">34,000</text>
+          <text x="275" y="192" fill="var(--ink3)" font-size="12" font-weight="700" font-family="'IBM Plex Mono',monospace">DRIVE</text>
+          <text x="585" y="96" fill="var(--ink)" font-size="17">34,000</text>
+          <text x="585" y="192" fill="var(--ink3)" font-size="12" font-weight="700" font-family="'IBM Plex Mono',monospace">TRAILER</text>
+        </g>
+        <!-- gross bar -->
+        <line x1="95" y1="40" x2="610" y2="40" stroke="var(--ink3)" stroke-width="1.5" stroke-dasharray="4 4"/>
+        <rect x="300" y="26" width="110" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+        <text x="355" y="45" text-anchor="middle" fill="var(--accent)" font-family="'Manrope',sans-serif" font-weight="800" font-size="14">80,000 GROSS</text>
+      </svg>
+    </div>
+
+    <!-- LIVE CHECKER -->
+    <h2 class="sec">&#x1F9EE; Check your load</h2>
+    <div class="tool">
+      <p class="lead">Punch in your CAT Scale ticket. It flags every axle and the gross, then tells you which way to slide.</p>
+      <div class="inp-row">
+        <div class="fld"><label>Steer axle</label><div class="box"><input id="w-steer" type="number" inputmode="numeric" placeholder="11,800"><span class="lbs">lbs</span></div></div>
+        <div class="fld"><label>Drive tandem</label><div class="box"><input id="w-drive" type="number" inputmode="numeric" placeholder="34,600"><span class="lbs">lbs</span></div></div>
+        <div class="fld"><label>Trailer tandem</label><div class="box"><input id="w-trailer" type="number" inputmode="numeric" placeholder="33,000"><span class="lbs">lbs</span></div></div>
+      </div>
+      <div id="result">
+        <div id="bars"></div>
+        <div id="advice" class="advice idle">Enter your axle weights to see the verdict.</div>
+      </div>
+    </div>
+
+    <!-- FIX IT -->
+    <h2 class="sec">&#x1F527; Fix an overweight axle</h2>
+    <p style="color:var(--ink2); line-height:1.55; margin:.2rem 0 1rem;">Sliding <b>moves weight between axle groups</b> &mdash; it never lowers the gross. Move a couple of holes, then re-weigh (each hole &asymp; <b>250&ndash;400 lbs</b>).</p>
+    <div class="fixes">
+      <div class="fix">
+        <h3>&#x2699;&#xFE0F; Drive tandem too heavy</h3>
+        <span class="move">5th wheel &#x2192; FORWARD</span>
+        <span class="move">tandems &#x2192; FORWARD</span>
+        <p>5th wheel forward shifts weight onto the <b>steer</b>; sliding the trailer tandems forward shifts weight onto the <b>trailer</b> group. Use whichever has room.</p>
+      </div>
+      <div class="fix">
+        <h3>&#x1F69B; Trailer tandem too heavy</h3>
+        <span class="move">tandems &#x2192; BACK</span>
+        <p>Sliding the trailer tandems rearward moves weight forward onto the <b>drive</b> axles. Watch state bridge law &mdash; see the note below.</p>
+      </div>
+      <div class="fix">
+        <h3>&#x1F6DE;&#xFE0F; Steer too heavy</h3>
+        <span class="move">5th wheel &#x2192; BACK</span>
+        <p>Rare on a loaded van. Sliding the 5th wheel back moves weight off the steer and onto the <b>drives</b>. Usually caused by a very forward 5th-wheel setting.</p>
+      </div>
+      <div class="fix">
+        <h3>&#x1F4CA; Over gross (80,000)</h3>
+        <span class="move">sliding won&#39;t help</span>
+        <p>Sliding only rebalances between axles. If the <b>gross</b> is over, you must <b>remove or redistribute freight</b> (or burn/pull fuel). Reweigh before rolling.</p>
+      </div>
+    </div>
+
+    <!-- BRIDGE FORMULA -->
+    <h2 class="sec">&#x1F309; Bridge formula calculator</h2>
+    <div class="calc">
+      <p style="color:var(--ink2); font-size:.95rem; margin:0 0 .6rem;">The Federal Bridge Formula caps how much weight a group of axles can carry based on how far apart they are &mdash; it stops short wheelbases from concentrating load on a bridge.</p>
+      <div class="formula">W = 500 &times; ( (L &times; N) / (N &minus; 1) + 12N + 36 )</div>
+      <div class="calc-row">
+        <div class="fld"><label>L &mdash; outer spread (ft)</label><div class="box"><input id="c-l" type="number" inputmode="decimal" value="4"><span class="lbs">ft</span></div></div>
+        <div class="fld"><label>N &mdash; axles in group</label><div class="box"><input id="c-n" type="number" inputmode="numeric" value="2"><span class="lbs">axles</span></div></div>
+        <div class="out"><div class="k">Max weight</div><div class="v" id="c-out">34,000</div></div>
+      </div>
+      <div class="chips">
+        <span class="chip" data-l="4" data-n="2">Tandem group (4 ft, 2)</span>
+        <span class="chip" data-l="8" data-n="3">Tridem (8 ft, 3)</span>
+        <span class="chip" data-l="51" data-n="5">Full 5-axle rig (51 ft)</span>
+      </div>
+      <p style="color:var(--ink3); font-size:.82rem; margin:.9rem 0 0;">Rounded to the nearest 500 lb and capped at the 80,000 lb gross for the whole rig. L is the distance between the <em>outermost</em> axles of the group.</p>
+    </div>
+
+    <div class="callout">
+      &#x1F4CD; <b>State bridge law limits your slide.</b> California (and a few others) cap kingpin-to-rear-axle at <b>40 ft</b> (KP-40), so you can&#39;t slide the trailer tandems all the way back there. Check the state you&#39;re running before you slide.
+    </div>
+
+    <div class="callout blue">
+      &#x2696;&#xFE0F; <b>Always weigh, adjust, re-weigh.</b> Guessing a slide gets you a fine. Hit a scale first &mdash; <a href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener">find the nearest CAT Scale &#x2197;</a> &mdash; and re-weigh after each move.
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    FleetGuard &middot; Weight reference for dispatch. Federal Interstate limits (23 CFR 658) &mdash; states may set lower limits or require permits. Steer limit varies with your tire/axle rating. Quick guide only, not legal advice.
+  </footer>
+
+<script>
+  (function(){
+    var fmt = function(n){ return n.toLocaleString('en-US'); };
+    var LIM = { steer:12350, drive:34000, trailer:34000 };
+    var GROSS = 80000;
+    function num(id){ var v = parseFloat(document.getElementById(id).value); return isNaN(v)?0:Math.max(0,v); }
+
+    function render(){
+      var s=num('w-steer'), d=num('w-drive'), t=num('w-trailer');
+      var gross = s+d+t;
+      var rows = [
+        {nm:'Steer axle', w:s, lim:LIM.steer, hide:true},
+        {nm:'Drive tandem', w:d, lim:LIM.drive},
+        {nm:'Trailer tandem', w:t, lim:LIM.trailer},
+        {nm:'Gross', w:gross, lim:GROSS}
+      ];
+      var html='';
+      rows.forEach(function(r){
+        var over = r.w > r.lim;
+        var fillPct = r.lim? Math.min(112, (r.w/r.lim)*89) : 0; // 89% track = at limit
+        var st;
+        if(r.w===0){ st = '&mdash;'; }
+        else if(r.hide){ st = fmt(Math.round(r.w))+' &middot; '+(over?'Over weight':'Good'); }
+        else { st = fmt(Math.round(r.w))+' / '+fmt(r.lim)+' &middot; '+(over ? ('OVER by '+fmt(Math.round(r.w-r.lim))) : (fmt(Math.round(r.lim-r.w))+' to spare')); }
+        html += '<div class="bar-row '+(r.w===0?'':(over?'over':'ok'))+'">'
+             +   '<div class="bar-top"><span class="nm">'+r.nm+'</span><span class="st">'+st+'</span></div>'
+             +   '<div class="track"><div class="fill" style="width:'+fillPct+'%"></div><div class="limit-mark" style="left:89%"></div></div>'
+             + '</div>';
+      });
+      document.getElementById('bars').innerHTML = html;
+
+      var adv = document.getElementById('advice');
+      if(gross===0){ adv.className='advice idle'; adv.innerHTML='Enter your axle weights to see the verdict.'; return; }
+      var items=[]; var worst='good';
+      if(gross > GROSS){ worst='warn'; items.push('<li>&#x1F6D1; <b>Over gross by '+fmt(Math.round(gross-GROSS))+' lbs.</b> Sliding won&#39;t fix this &mdash; remove or redistribute freight (or pull fuel).</li>'); }
+      if(d > LIM.drive){ worst = worst==='warn'?'warn':'fix'; items.push('<li>&#x2699;&#xFE0F; <b>Drive over by '+fmt(Math.round(d-LIM.drive))+'.</b> Slide the <b>5th wheel forward</b> (&#x2192; steer) and/or the <b>trailer tandems forward</b> (&#x2192; trailer).</li>'); }
+      if(t > LIM.trailer){ worst = worst==='warn'?'warn':'fix'; items.push('<li>&#x1F69B; <b>Trailer over by '+fmt(Math.round(t-LIM.trailer))+'.</b> Slide the <b>trailer tandems back</b> (&#x2192; drives). Mind state bridge law.</li>'); }
+      if(s > LIM.steer){ worst = worst==='warn'?'warn':'fix'; items.push('<li>&#x1F6DE;&#xFE0F; <b>Steer over weight.</b> Slide the <b>5th wheel back</b> (&#x2192; drives).</li>'); }
+
+      if(items.length===0){
+        adv.className='advice good';
+        adv.innerHTML='<div class="hdr">&#x2705; Legal on every axle and gross</div><p style="margin:.4rem 0 0;color:var(--ink2)">Good to roll. Keep the scale ticket.</p>';
+      } else {
+        adv.className='advice '+(worst==='warn'?'warn':'good');
+        if(worst!=='warn') adv.className='advice';
+        adv.style.background = worst==='warn' ? 'var(--red-soft)' : 'var(--accent-soft)';
+        adv.style.borderColor = worst==='warn' ? 'var(--red)' : 'var(--accent)';
+        var hdr = worst==='warn' ? '&#x26A0;&#xFE0F; Not legal yet' : '&#x1F527; Rebalance needed';
+        adv.innerHTML='<div class="hdr">'+hdr+'</div><ul>'+items.join('')+'</ul>';
+      }
+    }
+    ['w-steer','w-drive','w-trailer'].forEach(function(id){ document.getElementById(id).addEventListener('input', render); });
+
+    // bridge formula calculator
+    function bridge(){
+      var L=parseFloat(document.getElementById('c-l').value), N=parseInt(document.getElementById('c-n').value,10);
+      var out=document.getElementById('c-out');
+      if(isNaN(L)||isNaN(N)||N<2){ out.textContent='—'; return; }
+      var W = 500*((L*N)/(N-1) + 12*N + 36);
+      W = Math.round(W/500)*500;
+      if(W>80000) W=80000;
+      out.textContent = fmt(W);
+    }
+    document.getElementById('c-l').addEventListener('input', bridge);
+    document.getElementById('c-n').addEventListener('input', bridge);
+    document.querySelectorAll('.chip').forEach(function(c){
+      c.addEventListener('click', function(){
+        document.getElementById('c-l').value=c.getAttribute('data-l');
+        document.getElementById('c-n').value=c.getAttribute('data-n');
+        bridge();
+      });
+    });
+    render(); bridge();
+  })();
+</script>
+</body>
+</html>
