@@ -56,6 +56,14 @@
   main{max-width:1080px; margin:0 auto; padding:2.2rem 1.5rem 3rem;}
   .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1.15rem;}
 
+  /* section headers */
+  .sec-head{display:flex; align-items:center; gap:.7rem; margin:2.3rem 0 1.05rem;}
+  .sec-head:first-child{margin-top:.2rem;}
+  .sec-head .s-ic{font-size:1.2rem; line-height:1;}
+  .sec-head h2{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.18rem; letter-spacing:-.01em; margin:0; white-space:nowrap;}
+  .sec-head .s-rule{flex:1; height:1px; background:var(--line);}
+  .sec-head .s-cnt{font-size:.72rem; font-weight:700; color:var(--ink3); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:.2rem .62rem; white-space:nowrap;}
+
   .card{
     position:relative; display:flex; flex-direction:column;
     background:var(--surface); border:1px solid var(--line); border-radius:18px;
@@ -118,6 +126,9 @@
   </header>
 
   <main>
+    <div class="sec-head">
+      <span class="s-ic">&#x1F4D6;</span><h2>Guides</h2><span class="s-rule"></span><span class="s-cnt">3</span>
+    </div>
     <div class="grid">
 
       <a class="card c-blue" href="PTI-driver-guide.html?dispatch=1" target="_blank" rel="noopener">
@@ -144,6 +155,13 @@
         <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
       </a>
 
+    </div>
+
+    <div class="sec-head">
+      <span class="s-ic">&#x1F9F0;</span><h2>Live Tools</h2><span class="s-rule"></span><span class="s-cnt">3</span>
+    </div>
+    <div class="grid">
+
       <a class="card c-violet" href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener">
         <div class="badge">&#x2696;&#xFE0F;</div>
         <span class="tag">Locator &middot; External</span>
@@ -167,6 +185,13 @@
         <p>Official live road, weather &amp; traffic map for every state &mdash; tap your state. Great in winter.</p>
         <span class="open">Open list <span class="arrow">&#x2192;</span></span>
       </a>
+
+    </div>
+
+    <div class="sec-head">
+      <span class="s-ic">&#x1F6E1;&#xFE0F;</span><h2>Compliance</h2><span class="s-rule"></span><span class="s-cnt">3</span>
+    </div>
+    <div class="grid">
 
       <a class="card" style="--card-accent:#dc2626;--card-soft:rgba(220,38,38,.12)" href="dot-enforcement-calendar.html" target="_blank" rel="noopener">
         <div class="badge">&#x1F4C5;</div>
@@ -194,7 +219,7 @@
 
       <div class="card soon">
         <div class="big">&#x2795;</div>
-        <p style="margin-top:.6rem;font-weight:600;">More guides coming</p>
+        <p style="margin-top:.6rem;font-weight:600;">More coming</p>
         <p>Ask your admin to add one here.</p>
       </div>
 
