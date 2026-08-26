@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Winter Chain Law</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface2:#f6f9fc;
+    --ink:#0f172a; --ink2:#475569; --ink3:#8b97a8; --line:#e3e9f0;
+    --accent:#2c9ecf; --accent-soft:rgba(44,158,207,.12);
+    --amber:#d98510; --amber-soft:rgba(217,133,16,.14);
+    --red:#dc2626; --red-soft:rgba(220,38,38,.10);
+    --green:#12a565; --green-soft:rgba(18,165,101,.13);
+    --shadow:0 1px 3px rgba(15,23,42,.07), 0 14px 32px -16px rgba(15,23,42,.20);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#5bbce8; --accent-soft:rgba(91,188,232,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.14);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#5bbce8; --accent-soft:rgba(91,188,232,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.14);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+
+  .hero{
+    background:
+      radial-gradient(1100px 300px at 12% -10%, rgba(44,158,207,.24), transparent 60%),
+      radial-gradient(800px 260px at 92% -20%, rgba(120,170,210,.14), transparent 55%),
+      linear-gradient(170deg,#0d1526 0%,#131d31 100%);
+    color:#f5f8fc; padding:2.6rem 1.5rem 2.2rem; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .wrap{max-width:940px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:.55rem; font-weight:800; font-family:'Manrope',sans-serif; color:#e8eefc; font-size:.95rem;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18);}
+  .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.2rem; letter-spacing:-.02em; margin:1rem 0 0;}
+  .hero .sub{color:#adbdd6; margin:.55rem 0 0; font-size:1.02rem; max-width:62ch;}
+
+  main{max-width:940px; margin:0 auto; padding:2rem 1.5rem 3rem;}
+
+  h2.sec{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.01em; margin:2.2rem 0 1rem; display:flex; align-items:center; gap:.55rem;}
+  h2.sec:first-of-type{margin-top:0;}
+
+  /* headline stats */
+  .highlights{display:grid; grid-template-columns:repeat(3,1fr); gap:.9rem; margin-bottom:.6rem;}
+  .hi{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.1rem 1.2rem; box-shadow:var(--shadow);}
+  .hi .k{font-size:.72rem; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3);}
+  .hi .v{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.75rem; letter-spacing:-.01em; margin-top:.15rem; color:var(--accent);}
+  .hi .s{font-size:.82rem; color:var(--ink2); margin-top:.2rem;}
+
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.3rem 1.4rem; box-shadow:var(--shadow);}
+
+  /* bag / how-many math */
+  .bagmath{display:grid; grid-template-columns:1fr 1fr; gap:1rem;}
+  .bagcard{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.2rem 1.3rem; box-shadow:var(--shadow); position:relative;}
+  .bagcard.hit{border-color:var(--green); box-shadow:0 0 0 1px var(--green), var(--shadow);}
+  .bagcard .cnt{display:flex; align-items:center; gap:.5rem; font-family:'Manrope',sans-serif; font-weight:800; font-size:1.15rem;}
+  .bagcard .bags{font-size:1.4rem; letter-spacing:.05em;}
+  .bagcard .eq{font-family:'IBM Plex Mono',monospace; color:var(--ink2); font-size:.9rem; margin:.5rem 0 .2rem;}
+  .bagcard p{margin:.4rem 0 0; color:var(--ink2); font-size:.9rem; line-height:1.45;}
+  .pill{display:inline-block; margin-top:.6rem; font-size:.7rem; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:.24rem .55rem; border-radius:999px;}
+  .pill.min{color:var(--amber); background:var(--amber-soft); border:1px solid var(--amber);}
+  .pill.ok{color:#fff; background:var(--green); border:1px solid var(--green);}
+
+  /* diagram */
+  .diagram{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);}
+  .diagram svg{width:100%; height:auto; display:block;}
+  .legend{display:flex; flex-wrap:wrap; gap:1rem 1.4rem; margin-top:1rem; font-size:.85rem; color:var(--ink2);}
+  .legend span{display:inline-flex; align-items:center; gap:.45rem;}
+  .sw{width:16px; height:16px; border-radius:4px; display:inline-block; border:1px solid var(--line);}
+
+  /* season table */
+  .tbl{width:100%; border-collapse:collapse; background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden; box-shadow:var(--shadow);}
+  .tbl th,.tbl td{text-align:left; padding:.7rem .95rem; border-top:1px solid var(--line); font-size:.92rem;}
+  .tbl thead th{background:var(--surface2); border-top:none; font-family:'Manrope',sans-serif; font-weight:800; font-size:.74rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink3);}
+  .tbl td.st{font-weight:700; white-space:nowrap;}
+  .tbl td .num{font-family:'IBM Plex Mono',monospace; font-weight:600; color:var(--accent);}
+
+  /* levels */
+  .levels{display:grid; grid-template-columns:1fr 1fr; gap:1rem;}
+  .lv{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:1.2rem 1.3rem; box-shadow:var(--shadow);}
+  .lv h3{font-family:'Manrope',sans-serif; font-weight:800; margin:0 0 .6rem; font-size:1.05rem;}
+  .lv .step{display:flex; gap:.6rem; padding:.4rem 0; border-top:1px dashed var(--line); font-size:.9rem; color:var(--ink2); line-height:1.4;}
+  .lv .step:first-of-type{border-top:none;}
+  .lv .lab{font-family:'IBM Plex Mono',monospace; font-weight:700; color:var(--accent); white-space:nowrap;}
+
+  /* state links */
+  .states{display:grid; grid-template-columns:1fr 1fr; gap:.5rem;}
+  a.state{display:flex; justify-content:space-between; align-items:center; gap:.6rem; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:.7rem .9rem; text-decoration:none; color:var(--ink); box-shadow:var(--shadow); transition:border-color .15s ease, transform .12s ease;}
+  a.state:hover{border-color:var(--accent); transform:translateY(-2px);}
+  a.state .st-name{font-weight:700; font-size:.95rem;}
+  a.state .st-go{font-size:.8rem; color:var(--accent); font-weight:700; white-space:nowrap;}
+  .grp-lbl{font-family:'Manrope',sans-serif; font-weight:800; font-size:.82rem; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3); margin:1.3rem 0 .7rem;}
+
+  .callout{margin-top:1.2rem; background:var(--amber-soft); border:1px solid var(--amber); border-radius:14px; padding:1rem 1.15rem; color:var(--ink); font-size:.95rem; line-height:1.5;}
+  .callout b{color:var(--amber);}
+  .callout.blue{background:var(--accent-soft); border-color:var(--accent);}
+  .callout.blue b{color:var(--accent);}
+  .callout a{font-weight:700;}
+
+  footer{max-width:940px; margin:0 auto; padding:0 1.5rem 3rem; color:var(--ink3); font-size:.85rem;}
+  footer .rule{height:1px; background:var(--line); margin-bottom:1.1rem;}
+  footer a{color:var(--accent);}
+
+  @media (max-width:640px){
+    .highlights,.bagmath,.levels,.states{grid-template-columns:1fr;}
+    .hero h1{font-size:1.75rem;}
+    h2.sec{font-size:1.15rem;}
+  }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <div class="brand">&#x1F69B; FleetGuard <span class="dot"></span></div>
+      <h1>&#x2744;&#xFE0F; Winter Chain Law</h1>
+      <p class="sub">When chains are required, how many to carry, and which states enforce it &mdash; a quick dispatch reference for winter routing.</p>
+    </div>
+  </header>
+
+  <main>
+
+    <div class="highlights">
+      <div class="hi"><div class="k">States with chain laws</div><div class="v">15</div><div class="s">10 western + 5 storm-triggered</div></div>
+      <div class="hi"><div class="k">Peak season</div><div class="v">Oct&ndash;Apr</div><div class="s">Colorado carries Sep 1&ndash;May 31</div></div>
+      <div class="hi"><div class="k">To be Colorado-legal</div><div class="v">4 chains</div><div class="s">= 2 of our bags per truck</div></div>
+    </div>
+
+    <!-- ── HOW MANY ─────────────────────────────────────────── -->
+    <h2 class="sec">&#x1F517; How many chains &mdash; our bags</h2>
+    <p style="color:var(--ink2); line-height:1.55; margin:.2rem 0 1rem;">
+      Our shop packs <b>2 chains in one bag</b>. Chain laws are counted by <b>drive wheels</b>, not bags &mdash; so here is what each bag actually covers on a drive axle (the dual tires that do the pulling):
+    </p>
+    <div class="bagmath">
+      <div class="bagcard">
+        <div class="cnt"><span class="bags">&#x1F45C;</span> 1 bag &middot; 2 chains</div>
+        <div class="eq">2 chains &rarr; one outer tire each side</div>
+        <p>Covers the two <b>outer</b> duals of a single drive axle. Enough for light, posted "traction advised" conditions &mdash; but <b>not</b> full Colorado compliance.</p>
+        <span class="pill min">Minimum / light</span>
+      </div>
+      <div class="bagcard hit">
+        <div class="cnt"><span class="bags">&#x1F45C;&#x1F45C;</span> 2 bags &middot; 4 chains</div>
+        <div class="eq">4 chains &rarr; all four drive wheels, one axle</div>
+        <p>Chains <b>all four</b> wheels of a drive axle. This is what <b>Colorado Level 1 &amp; 2</b> require of a truck &mdash; and the safe default for any western mountain run.</p>
+        <span class="pill ok">&#x2713; Colorado-legal</span>
+      </div>
+    </div>
+    <div class="callout blue">
+      &#x1F4E6; <b>Rule of thumb for our trucks:</b> load <b>at least 2 bags (4 chains)</b> before any Colorado / western winter run, and keep a <b>3rd bag</b> aboard as a spare or for the second drive axle. California can post conditions needing up to <b>8 chains</b>; Oregon wants <b>6</b> carried. When in doubt, carry more &mdash; you can't buy chains at 9,000 ft in a storm.
+    </div>
+
+    <!-- ── DIAGRAM ─────────────────────────────────────────── -->
+    <h2 class="sec">&#x1F6A6; Where the chains go</h2>
+    <div class="diagram">
+      <svg viewBox="0 0 820 260" role="img" aria-label="Side view of a tractor and trailer showing chains on the drive axle wheels">
+        <!-- ground -->
+        <line x1="20" y1="205" x2="800" y2="205" stroke="var(--line)" stroke-width="2"/>
+
+        <!-- trailer box -->
+        <rect x="360" y="60" width="430" height="110" rx="6" fill="var(--surface2)" stroke="var(--ink)" stroke-width="2.5"/>
+        <!-- tractor cab -->
+        <path d="M120 170 L120 90 Q120 78 132 78 L200 78 L232 120 L232 170 Z" fill="var(--surface2)" stroke="var(--ink)" stroke-width="2.5"/>
+        <!-- windshield -->
+        <path d="M138 92 L192 92 L214 118 L138 118 Z" fill="var(--accent-soft)" stroke="var(--ink)" stroke-width="1.5"/>
+        <!-- hood / chassis to fifth wheel -->
+        <rect x="232" y="140" width="150" height="30" fill="var(--surface2)" stroke="var(--ink)" stroke-width="2.5"/>
+
+        <!-- STEER wheel (no chains) -->
+        <circle cx="168" cy="180" r="26" fill="var(--ink3)" stroke="var(--ink)" stroke-width="2.5"/>
+        <circle cx="168" cy="180" r="9" fill="var(--surface)"/>
+
+        <!-- DRIVE tandem (chained) -->
+        <g>
+          <circle cx="290" cy="180" r="26" fill="var(--ink3)" stroke="var(--accent)" stroke-width="4"/>
+          <circle cx="342" cy="180" r="26" fill="var(--ink3)" stroke="var(--accent)" stroke-width="4"/>
+          <!-- chain cross-links -->
+          <g stroke="var(--accent)" stroke-width="3" stroke-linecap="round">
+            <line x1="272" y1="163" x2="308" y2="197"/>
+            <line x1="308" y1="163" x2="272" y2="197"/>
+            <line x1="290" y1="154" x2="290" y2="206"/>
+            <line x1="324" y1="163" x2="360" y2="197"/>
+            <line x1="360" y1="163" x2="324" y2="197"/>
+            <line x1="342" y1="154" x2="342" y2="206"/>
+          </g>
+        </g>
+
+        <!-- TRAILER tandem -->
+        <circle cx="690" cy="180" r="26" fill="var(--ink3)" stroke="var(--ink)" stroke-width="2.5"/>
+        <circle cx="742" cy="180" r="26" fill="var(--ink3)" stroke="var(--ink)" stroke-width="2.5"/>
+        <circle cx="690" cy="180" r="9" fill="var(--surface)"/>
+        <circle cx="742" cy="180" r="9" fill="var(--surface)"/>
+
+        <!-- labels -->
+        <text x="168" y="245" text-anchor="middle" fill="var(--ink3)" font-family="'IBM Plex Mono',monospace" font-size="13" font-weight="600">Steer &middot; no chains</text>
+        <text x="316" y="245" text-anchor="middle" fill="var(--accent)" font-family="'Manrope',sans-serif" font-size="14" font-weight="800">DRIVE &middot; chain here</text>
+        <text x="716" y="245" text-anchor="middle" fill="var(--ink3)" font-family="'IBM Plex Mono',monospace" font-size="13" font-weight="600">Trailer &middot; 1 set if posted</text>
+      </svg>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--accent)"></span> Chained wheels &mdash; the drive axle does the pulling</span>
+        <span><span class="sw" style="background:var(--ink3)"></span> Runs bare unless a sign says otherwise</span>
+      </div>
+    </div>
+    <div class="callout">
+      &#x26A0;&#xFE0F; <b>Chains always go on the drive (powered) axle first.</b> A "dual" wheel is two tires side-by-side &mdash; "four drive wheels" means chaining both tires on each side of one drive axle. That is <b>4 chains = 2 of our bags</b>. Some states also want <b>1 set on the trailer</b> when posted.
+    </div>
+
+    <!-- ── SEASON ─────────────────────────────────────────── -->
+    <h2 class="sec">&#x1F4C5; When it&#39;s in effect</h2>
+    <p style="color:var(--ink2); line-height:1.55; margin:.2rem 0 1rem;">
+      Most chain laws are <b>sign- and condition-triggered</b> &mdash; they switch on when weather hits and posted signs light up, not on a fixed calendar. But several western states set a season when you must <b>carry</b> chains regardless of weather:
+    </p>
+    <table class="tbl">
+      <thead><tr><th>State</th><th>Carry / active window</th><th>How many (commercial)</th></tr></thead>
+      <tbody>
+        <tr><td class="st">Colorado</td><td>Sep 1 &ndash; May 31 (I-70 corridor)</td><td><span class="num">4</span> drive wheels (Level 1 &amp; 2)</td></tr>
+        <tr><td class="st">California</td><td>When posted (R1 / R2 / R3)</td><td>Up to <span class="num">8</span> in severe conditions</td></tr>
+        <tr><td class="st">Oregon</td><td>Nov 1 &ndash; Mar 31 (allowed)</td><td>Carry <span class="num">6</span>; use when posted</td></tr>
+        <tr><td class="st">Washington</td><td>Nov 1 &ndash; Apr 1 (certain passes)</td><td>Chain drive axle when posted</td></tr>
+        <tr><td class="st">Utah</td><td>Oct 1 &ndash; Apr 30 (when posted)</td><td>Chain drive axle when posted</td></tr>
+        <tr><td class="st">Idaho / Montana / Nevada / Wyoming</td><td>When chain-up signs are posted</td><td>Chain drive axle when posted</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">
+      &#x1F4CC; <b>Bottom line:</b> from roughly <b>October through April</b>, any truck routed through the western mountains should already have chains aboard. Colorado is the strictest &mdash; carry chains the whole Sep&ndash;May window even on a clear day.
+    </div>
+
+    <!-- ── LEVELS ─────────────────────────────────────────── -->
+    <h2 class="sec">&#x1F6A6; Reading the sign &mdash; the two systems</h2>
+    <div class="levels">
+      <div class="lv">
+        <h3>&#x1F3D4;&#xFE0F; Colorado &mdash; Levels</h3>
+        <div class="step"><span class="lab">Level 1</span><span>Single-drive-axle trucks must chain <b>all 4 drive wheels</b>. Cables not allowed. Others need snow tires or chains.</span></div>
+        <div class="step"><span class="lab">Level 2</span><span><b>Every</b> commercial truck must chain <b>4 drive wheels</b> &mdash; single and tandem alike. Buses chain 2.</span></div>
+        <div class="step"><span class="lab">Spec</span><span>A legal chain = a loop each side of the tire joined by <b>9+</b> cross-links across the tread.</span></div>
+      </div>
+      <div class="lv">
+        <h3>&#x1F334; California &mdash; R1 / R2 / R3</h3>
+        <div class="step"><span class="lab">R1</span><span>Chains required on all vehicles <b>except</b> passenger cars / light trucks with snow tires.</span></div>
+        <div class="step"><span class="lab">R2</span><span>Chains required <b>except</b> AWD/4WD with snow tires on all four wheels (and chains aboard). Trucks: chain up.</span></div>
+        <div class="step"><span class="lab">R3</span><span>Chains on <b>all</b> vehicles, no exceptions. Rare &mdash; severe storms only.</span></div>
+      </div>
+    </div>
+
+    <!-- ── STATES ─────────────────────────────────────────── -->
+    <h2 class="sec">&#x1F5FA;&#xFE0F; The 15 chain-law states</h2>
+    <p style="color:var(--ink2); line-height:1.55; margin:.2rem 0 0;">
+      Tap a state to open its official live road / chain-control page before you route through it.
+    </p>
+
+    <div class="grp-lbl">Western &mdash; active chain-up enforcement</div>
+    <div class="states">
+      <a class="state" href="https://511.alaska.gov/" target="_blank" rel="noopener"><span class="st-name">Alaska</span><span class="st-go">511 map &#x2197;</span></a>
+      <a class="state" href="https://quickmap.dot.ca.gov/" target="_blank" rel="noopener"><span class="st-name">California</span><span class="st-go">QuickMap &#x2197;</span></a>
+      <a class="state" href="https://www.codot.gov/travel/winter-driving" target="_blank" rel="noopener"><span class="st-name">Colorado</span><span class="st-go">CDOT chain law &#x2197;</span></a>
+      <a class="state" href="https://511.idaho.gov/" target="_blank" rel="noopener"><span class="st-name">Idaho</span><span class="st-go">511 map &#x2197;</span></a>
+      <a class="state" href="https://roadreport.mdt.mt.gov/" target="_blank" rel="noopener"><span class="st-name">Montana</span><span class="st-go">MDT report &#x2197;</span></a>
+      <a class="state" href="https://www.nvroads.com/" target="_blank" rel="noopener"><span class="st-name">Nevada</span><span class="st-go">NV Roads &#x2197;</span></a>
+      <a class="state" href="https://tripcheck.com/" target="_blank" rel="noopener"><span class="st-name">Oregon</span><span class="st-go">TripCheck &#x2197;</span></a>
+      <a class="state" href="https://www.udottraffic.utah.gov/" target="_blank" rel="noopener"><span class="st-name">Utah</span><span class="st-go">UDOT traffic &#x2197;</span></a>
+      <a class="state" href="https://wsdot.com/travel/real-time/mountainpasses" target="_blank" rel="noopener"><span class="st-name">Washington</span><span class="st-go">Mountain passes &#x2197;</span></a>
+      <a class="state" href="https://www.wyoroad.info/" target="_blank" rel="noopener"><span class="st-name">Wyoming</span><span class="st-go">WYDOT &#x2197;</span></a>
+    </div>
+
+    <div class="grp-lbl">Storm-triggered &mdash; chains when declared / posted</div>
+    <div class="states">
+      <a class="state" href="https://cttravelsmart.org/" target="_blank" rel="noopener"><span class="st-name">Connecticut</span><span class="st-go">CT Travel &#x2197;</span></a>
+      <a class="state" href="https://goky.ky.gov/" target="_blank" rel="noopener"><span class="st-name">Kentucky</span><span class="st-go">GoKY &#x2197;</span></a>
+      <a class="state" href="https://mass511.com/" target="_blank" rel="noopener"><span class="st-name">Massachusetts</span><span class="st-go">Mass511 &#x2197;</span></a>
+      <a class="state" href="https://www.ohgo.com/" target="_blank" rel="noopener"><span class="st-name">Ohio</span><span class="st-go">OHGO &#x2197;</span></a>
+      <a class="state" href="https://newengland511.org/" target="_blank" rel="noopener"><span class="st-name">Vermont</span><span class="st-go">NewEngland511 &#x2197;</span></a>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="rule"></div>
+    FleetGuard &middot; Winter chain reference for dispatch. Quick guide only &mdash; always follow posted signs and the state DOT; requirements change with conditions. Chain-count rules per Colorado State Patrol / CDOT (Levels 1&ndash;2), Caltrans (R1&ndash;R3), and CVSA.
+  </footer>
+</body>
+</html>
