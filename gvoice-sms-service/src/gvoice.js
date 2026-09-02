@@ -12,6 +12,19 @@ let browserCtx = null;
 let page       = null;
 let lastPollTs = Date.now();
 
+// ── GV login state (cached) ───────────────────────────────────
+// So /health can report whether Google Voice is signed in without touching
+// the browser on every ping. Updated by ensureLoggedIn() (every real send)
+// and by verifyLogin() (the periodic watchdog). loggedIn=null until first
+// checked so a fresh boot isn't reported as "out".
+let loginState = { loggedIn: null, reason: 'not-checked-yet', checkedAt: null };
+function getLoginState() { return { ...loginState }; }
+function setLoginState(loggedIn, reason) {
+  const changed = loginState.loggedIn !== loggedIn;
+  loginState = { loggedIn, reason: reason || (loggedIn ? 'ok' : 'unknown'), checkedAt: new Date().toISOString() };
+  if (changed) log[loggedIn ? 'info' : 'error'](`GV login state -> ${loggedIn ? 'LOGGED IN' : 'LOGGED OUT'} (${loginState.reason})`);
+}
+
 // ── Boot: launch persistent browser context ───────────────────
 // GV_HEADLESS=true in .env hides the window entirely. Default stays visible:
 // Google routinely blocks sign-in from headless Chromium, and while an existing
@@ -50,7 +63,7 @@ async function initBrowser() {
 }
 
 // ── Ensure we are logged into Google Voice ────────────────────
-async function ensureLoggedIn() {
+async function ensureLoggedIn(opts = {}) {
   try {
     // The Chromium window is VISIBLE (headless:false), so a person can close it
     // and it dies with the desktop session — while this process keeps running.
@@ -82,9 +95,12 @@ async function ensureLoggedIn() {
       await initBrowser();
     }
 
-    // If already on GV, skip navigation (fast path)
-    if (page.url().includes('voice.google.com')) {
+    // If already on GV, skip navigation (fast path). The health watchdog
+    // passes { force:true } to bypass this and force a real round-trip,
+    // since a cached voice.google.com URL can outlive an expired session.
+    if (!opts.force && page.url().includes('voice.google.com')) {
       log.info('Google Voice session already active (fast path)');
+      setLoginState(true, 'ok');
       return;
     }
 
@@ -107,10 +123,27 @@ async function ensureLoggedIn() {
       throw new Error(`Unexpected URL after login: ${finalUrl}`);
     }
     log.info('Google Voice session active');
+    setLoginState(true, 'ok');
   } catch (err) {
     log.error(`ensureLoggedIn failed: ${err.message}`);
+    const first = err.message.split('\n')[0];
+    // Couldn't get past Google sign-in (2FA/captcha/blocked auto-login) = a
+    // logout a human must fix; anything else is a transient browser error.
+    setLoginState(false, /accounts\.google\.com|sign-?in|login|password|email|Unexpected URL/i.test(first)
+      ? 'signed-out (auto-login blocked)'
+      : first.slice(0, 120));
     throw err;
   }
+}
+
+// ── Active login probe for the /health watchdog ───────────────
+// Forces a fresh round-trip (no fast path) and lets ensureLoggedIn attempt
+// its normal auto-login, so loginState ends up reflecting whether a send
+// would actually work. Never throws — returns the boolean; ensureLoggedIn
+// has already recorded the reason.
+async function verifyLogin() {
+  try { await ensureLoggedIn({ force: true }); return true; }
+  catch (_) { return false; }
 }
 
 // ── Google login flow (runs only when session expires) ────────
@@ -420,4 +453,4 @@ async function closeBrowser() {
   if (browserCtx) { await browserCtx.close(); browserCtx = null; page = null; }
 }
 
-module.exports = { initBrowser, sendSMS, pollReplies, closeBrowser };
+module.exports = { initBrowser, sendSMS, pollReplies, closeBrowser, getLoginState, verifyLogin };

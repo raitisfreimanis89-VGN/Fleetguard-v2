@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express  = require('express');
 const log      = require('./logger');
-const { initBrowser, sendSMS, closeBrowser } = require('./gvoice');
+const { initBrowser, sendSMS, closeBrowser, getLoginState, verifyLogin } = require('./gvoice');
 const { enqueue, queueDepth }                 = require('./queue');
 const { runStartupScan, startScheduler }      = require('./scheduler');
 
@@ -65,13 +65,23 @@ app.post('/send', requireSecret, async (req, res) => {
   }
 });
 
-// ── GET /health — quick liveness check ───────────────────────
+// ── GET /health — quick liveness + GV login check ─────────────
+// Returns 503 (degraded) when Google Voice is signed out, so a plain uptime
+// monitor pinging this URL alerts on a GV logout as well as a bot outage.
+// gvLoggedIn: true = OK, false = signed out (needs a human re-login),
+// null = not checked yet (fresh boot). The state is refreshed on every send
+// and by the login watchdog below, so this stays cheap (no browser work here).
 app.get('/health', (req, res) => {
-  res.json({
-    status:  'ok',
-    service: 'fleetguard-gvoice',
-    queue:   queueDepth(),
-    time:    new Date().toISOString(),
+  const gv = getLoginState();
+  const gvOut = gv.loggedIn === false;
+  res.status(gvOut ? 503 : 200).json({
+    status:      gvOut ? 'degraded' : 'ok',
+    service:     'fleetguard-gvoice',
+    gvLoggedIn:  gv.loggedIn,
+    gvReason:    gv.reason,
+    gvCheckedAt: gv.checkedAt,
+    queue:       queueDepth(),
+    time:        new Date().toISOString(),
   });
 });
 
@@ -110,6 +120,18 @@ process.on('unhandledRejection', (e) => log.error(`Unhandled: ${e}`));
 
   // 5. Start reply poller
   startScheduler();
+
+  // 5b. GV login watchdog — refresh the cached login state on a timer so
+  // /health (and any uptime monitor pinging it) flags a signed-out GV, which
+  // otherwise fails sends silently. Runs through the same queue as sends, so
+  // it never races the single browser page. Seed once now, then every 10 min.
+  const LOGIN_CHECK_MS = parseInt(process.env.GV_LOGIN_CHECK_MS || '600000', 10);
+  const runLoginCheck = () =>
+    enqueue('gv-login-check', () => verifyLogin())
+      .then((ok) => log[ok ? 'debug' : 'warn'](`GV login check: ${ok ? 'logged in' : 'LOGGED OUT'}`))
+      .catch((e) => log.warn(`GV login check skipped: ${e.message}`));
+  await runLoginCheck();
+  setInterval(runLoginCheck, LOGIN_CHECK_MS);
 
   log.info('FleetGuard GVoice service fully started ✅');
   log.info(`Press Ctrl+C to stop`);
