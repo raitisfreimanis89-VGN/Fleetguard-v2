@@ -25,6 +25,22 @@ function setLoginState(loggedIn, reason) {
   if (changed) log[loggedIn ? 'info' : 'error'](`GV login state -> ${loggedIn ? 'LOGGED IN' : 'LOGGED OUT'} (${loginState.reason})`);
 }
 
+// ── Send health ───────────────────────────────────────────────
+// Catches the worst trap: process up + GV *looks* logged in, but real sends
+// keep failing until a human reboots (observed repeatedly pre-2026-08). N
+// send failures in a row flip /health to degraded even when login looks fine,
+// so the monitor alerts instead of texts vanishing silently. A single success
+// clears it; a bot restart resets it (fresh process).
+const FAIL_THRESHOLD = parseInt(process.env.GV_FAIL_THRESHOLD || '3', 10);
+let sendHealth = { consecutiveFails: 0, lastFailAt: null, lastOkAt: null };
+function recordSend(ok) {
+  if (ok) sendHealth = { consecutiveFails: 0, lastFailAt: sendHealth.lastFailAt, lastOkAt: new Date().toISOString() };
+  else    sendHealth = { consecutiveFails: sendHealth.consecutiveFails + 1, lastFailAt: new Date().toISOString(), lastOkAt: sendHealth.lastOkAt };
+}
+function getSendHealth() {
+  return { ...sendHealth, threshold: FAIL_THRESHOLD, failing: sendHealth.consecutiveFails >= FAIL_THRESHOLD };
+}
+
 // ── Boot: launch persistent browser context ───────────────────
 // GV_HEADLESS=true in .env hides the window entirely. Default stays visible:
 // Google routinely blocks sign-in from headless Chromium, and while an existing
@@ -453,4 +469,4 @@ async function closeBrowser() {
   if (browserCtx) { await browserCtx.close(); browserCtx = null; page = null; }
 }
 
-module.exports = { initBrowser, sendSMS, pollReplies, closeBrowser, getLoginState, verifyLogin };
+module.exports = { initBrowser, sendSMS, pollReplies, closeBrowser, getLoginState, verifyLogin, recordSend, getSendHealth };

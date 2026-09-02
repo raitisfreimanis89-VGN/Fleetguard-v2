@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express  = require('express');
 const log      = require('./logger');
-const { initBrowser, sendSMS, closeBrowser, getLoginState, verifyLogin } = require('./gvoice');
+const { initBrowser, sendSMS, closeBrowser, getLoginState, verifyLogin, recordSend, getSendHealth } = require('./gvoice');
 const { enqueue, queueDepth }                 = require('./queue');
 const { runStartupScan, startScheduler }      = require('./scheduler');
 
@@ -54,12 +54,15 @@ app.post('/send', requireSecret, async (req, res) => {
   try {
     // serialized: concurrent requests wait their turn for the one GV page
     await enqueue(`send→${to.slice(0, 6)}****`, () => sendSMS(to, body));
+    recordSend(true);
     res.json({ ok: true, notificationId });
   } catch (err) {
     if (err.queueFull) {
+      // backpressure, not a GV failure — don't count it against send health
       log.warn(`Send rejected — queue full (depth ${queueDepth()})`);
       return res.status(503).json({ ok: false, error: 'Send queue full — try again shortly' });
     }
+    recordSend(false);
     log.error(`sendSMS failed: ${err.message}`);
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -73,15 +76,21 @@ app.post('/send', requireSecret, async (req, res) => {
 // and by the login watchdog below, so this stays cheap (no browser work here).
 app.get('/health', (req, res) => {
   const gv = getLoginState();
-  const gvOut = gv.loggedIn === false;
-  res.status(gvOut ? 503 : 200).json({
-    status:      gvOut ? 'degraded' : 'ok',
-    service:     'fleetguard-gvoice',
-    gvLoggedIn:  gv.loggedIn,
-    gvReason:    gv.reason,
-    gvCheckedAt: gv.checkedAt,
-    queue:       queueDepth(),
-    time:        new Date().toISOString(),
+  const sh = getSendHealth();
+  // Degraded if GV is signed out OR real sends keep failing (up-but-broken).
+  const degraded = gv.loggedIn === false || sh.failing;
+  res.status(degraded ? 503 : 200).json({
+    status:           degraded ? 'degraded' : 'ok',
+    service:          'fleetguard-gvoice',
+    gvLoggedIn:       gv.loggedIn,
+    gvReason:         gv.reason,
+    gvCheckedAt:      gv.checkedAt,
+    sendsFailing:     sh.failing,
+    consecutiveFails: sh.consecutiveFails,
+    lastOkAt:         sh.lastOkAt,
+    lastFailAt:       sh.lastFailAt,
+    queue:            queueDepth(),
+    time:             new Date().toISOString(),
   });
 });
 
