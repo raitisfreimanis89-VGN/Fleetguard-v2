@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toll &amp; Route Console</title>
+<link rel="icon" type="image/png" href="img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#eef2f6; --surface:#ffffff; --surface2:#f6f9fc;
+    --ink:#0f172a; --ink2:#475569; --ink3:#8b97a8; --line:#e3e9f0;
+    --accent:#e2711d; --accent-soft:rgba(226,113,29,.12);
+    --green:#12a565; --green-soft:rgba(18,165,101,.14);
+    --red:#dc2626; --red-soft:rgba(220,38,38,.12);
+    --amber:#d98510; --amber-soft:rgba(217,133,16,.14);
+    --blue:#2563eb; --blue-soft:rgba(37,99,235,.12);
+    --shadow:0 1px 3px rgba(15,23,42,.07), 0 14px 32px -16px rgba(15,23,42,.20);
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f59e4b; --accent-soft:rgba(245,158,75,.15);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --blue:#60a5fa; --blue-soft:rgba(96,165,250,.15);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }}
+  :root[data-theme="dark"]{
+    --bg:#0a101c; --surface:#141d2e; --surface2:#1a2436;
+    --ink:#f1f5f9; --ink2:#9fb0c5; --ink3:#697d97; --line:#25324a;
+    --accent:#f59e4b; --accent-soft:rgba(245,158,75,.15);
+    --green:#38c88a; --green-soft:rgba(56,200,138,.15);
+    --red:#f2726f; --red-soft:rgba(242,114,111,.15);
+    --amber:#e8b25e; --amber-soft:rgba(232,178,94,.14);
+    --blue:#60a5fa; --blue-soft:rgba(96,165,250,.15);
+    --shadow:0 1px 3px rgba(0,0,0,.45), 0 16px 36px -16px rgba(0,0,0,.6);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif; -webkit-font-smoothing:antialiased;}
+  a{color:var(--accent);}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace; font-variant-numeric:tabular-nums;}
+
+  .hero{
+    position:relative; overflow:hidden;
+    background:
+      radial-gradient(1100px 320px at 12% -10%, rgba(226,113,29,.26), transparent 60%),
+      radial-gradient(900px 300px at 92% -20%, rgba(37,99,235,.20), transparent 55%),
+      linear-gradient(170deg,#0d1526 0%,#131d31 100%);
+    color:#f5f8fc; padding:2.6rem 1.5rem 2.2rem; border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  .wrap{max-width:1000px; margin:0 auto;}
+  .brand{display:flex; align-items:center; gap:.55rem; font-weight:800; font-family:'Manrope',sans-serif; color:#e8eefc; font-size:.95rem;}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:#34d399;box-shadow:0 0 0 4px rgba(52,211,153,.18);}
+  .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.2rem; letter-spacing:-.02em; margin:1rem 0 0;}
+  .hero .sub{color:#adbdd6; margin:.55rem 0 0; font-size:1.02rem; max-width:62ch;}
+
+  /* fixed fleet profile chips */
+  .profile{display:flex; flex-wrap:wrap; gap:.45rem; margin-top:1.15rem;}
+  .chip{display:inline-flex; align-items:center; gap:.35rem; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.12);
+        color:#dce6f5; border-radius:999px; padding:.32rem .7rem; font-size:.76rem; font-weight:600;}
+  .chip b{font-family:'IBM Plex Mono',monospace; color:#fff;}
+
+  main{max-width:1000px; margin:0 auto; padding:2rem 1.5rem 3rem;}
+  h2.sec{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.3rem; letter-spacing:-.01em; margin:2.4rem 0 1rem; display:flex; align-items:center; gap:.55rem;}
+  h2.sec:first-of-type{margin-top:0;}
+
+  .tool{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.4rem; box-shadow:var(--shadow);}
+  .lead{color:var(--ink2); font-size:.95rem; margin:0 0 1.1rem;}
+  .row{display:grid; grid-template-columns:1fr 1fr auto; gap:.8rem; align-items:end;}
+  .fld{display:flex; flex-direction:column; gap:.35rem; min-width:0;}
+  .fld label{font-size:.72rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--ink3);}
+  .fld .box{display:flex; align-items:center; background:var(--surface2); border:1.5px solid var(--line); border-radius:12px; padding:0 .8rem; transition:border-color .15s;}
+  .fld .box:focus-within{border-color:var(--accent);}
+  .fld input{border:none; background:transparent; color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:1.1rem; padding:.7rem 0; width:100%; outline:none;}
+  .fld .hint{font-size:.72rem; color:var(--ink3); min-height:1.05em;}
+  .fld .hint.ok{color:var(--green);} .fld .hint.bad{color:var(--red);}
+  .go{background:var(--accent); color:#fff; border:none; border-radius:12px; font-family:'Manrope',sans-serif; font-weight:800;
+      font-size:.95rem; padding:.82rem 1.5rem; cursor:pointer; white-space:nowrap; transition:filter .15s, transform .1s;}
+  .go:hover{filter:brightness(1.07);} .go:active{transform:scale(.985);}
+  .fuelrow{display:flex; gap:1.2rem; flex-wrap:wrap; margin-top:1rem; padding-top:1rem; border-top:1px dashed var(--line);}
+  .mini{display:flex; align-items:center; gap:.5rem; font-size:.8rem; color:var(--ink2);}
+  .mini input{width:72px; background:var(--surface2); border:1.5px solid var(--line); border-radius:9px; padding:.35rem .5rem;
+              color:var(--ink); font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:.85rem; outline:none;}
+  .mini input:focus{border-color:var(--accent);}
+
+  .recents{display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.9rem;}
+  .recents .rc{background:var(--surface2); border:1px solid var(--line); border-radius:999px; padding:.3rem .7rem;
+               font-size:.75rem; color:var(--ink2); cursor:pointer; font-family:'IBM Plex Mono',monospace; font-weight:600;}
+  .recents .rc:hover{border-color:var(--accent); color:var(--accent);}
+
+  .err{background:var(--red-soft); border:1px solid var(--red); color:var(--red); border-radius:12px; padding:.8rem 1rem; font-size:.9rem; margin-top:1.2rem;}
+
+  /* route cards */
+  .routes{display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:1.4rem;}
+  .routes.single{grid-template-columns:1fr;}
+  .rt{background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:1.25rem; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+  .rt::after{content:""; position:absolute; inset:0 0 auto 0; height:3px; background:var(--ink3);}
+  .rt.fast::after{background:var(--blue);} .rt.cheap::after{background:var(--green);}
+  .rt .rt-tag{display:inline-flex; align-items:center; gap:.35rem; font-size:.68rem; font-weight:800; letter-spacing:.07em;
+              text-transform:uppercase; padding:.25rem .6rem; border-radius:999px;}
+  .rt.fast .rt-tag{background:var(--blue-soft); color:var(--blue);}
+  .rt.cheap .rt-tag{background:var(--green-soft); color:var(--green);}
+  .rt .big{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.05rem; letter-spacing:-.02em; margin:.7rem 0 .1rem;}
+  .rt .biglbl{font-size:.75rem; color:var(--ink3); font-weight:700; letter-spacing:.05em; text-transform:uppercase;}
+  .facts{display:grid; grid-template-columns:1fr 1fr; gap:.5rem .9rem; margin:1rem 0 0; padding-top:.9rem; border-top:1px solid var(--line);}
+  .fact{display:flex; justify-content:space-between; align-items:baseline; font-size:.85rem;}
+  .fact .k{color:var(--ink3);} .fact .v{font-family:'IBM Plex Mono',monospace; font-weight:600;}
+  .brk{margin-top:1rem; padding-top:.9rem; border-top:1px solid var(--line);}
+  .brk h4{margin:0 0 .55rem; font-size:.72rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3);}
+  .brk .li{display:flex; justify-content:space-between; align-items:baseline; gap:.6rem; padding:.32rem 0; font-size:.86rem; border-bottom:1px dotted var(--line);}
+  .brk .li:last-child{border-bottom:none;}
+  .brk .li .nm{color:var(--ink); min-width:0;}
+  .brk .li .nm small{display:block; color:var(--ink3); font-size:.72rem; font-weight:500;}
+  .brk .li .amt{font-family:'IBM Plex Mono',monospace; font-weight:600; white-space:nowrap;}
+  .est{display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--amber); margin-left:.35rem; vertical-align:middle;}
+  .free{color:var(--green); font-size:.85rem; font-weight:600;}
+  .via{margin-top:.9rem; font-size:.75rem; color:var(--ink3); line-height:1.7;}
+  .via b{color:var(--ink2); font-weight:600;}
+
+  .verdict{margin-top:1.2rem; border-radius:16px; padding:1.1rem 1.2rem; border:1px solid var(--accent); background:var(--accent-soft);}
+  .verdict .hdr{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.02rem; margin-bottom:.35rem;}
+  .verdict p{margin:.3rem 0 0; color:var(--ink2); font-size:.9rem; line-height:1.6;}
+  .verdict.win{border-color:var(--green); background:var(--green-soft);}
+
+  .note{margin-top:1.4rem; background:var(--surface2); border:1px solid var(--line); border-radius:14px; padding:1rem 1.15rem; font-size:.84rem; color:var(--ink2); line-height:1.65;}
+  .note b{color:var(--ink);}
+  footer{max-width:1000px; margin:0 auto; padding:0 1.5rem 3rem; color:var(--ink3); font-size:.8rem; line-height:1.7;}
+  footer a{color:var(--ink2);}
+
+  @media (max-width:820px){
+    .routes{grid-template-columns:1fr;}
+    .row{grid-template-columns:1fr;}
+    .go{width:100%;}
+    .hero h1{font-size:1.8rem;}
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span> FleetGuard</div>
+    <h1>Toll &amp; Route Console</h1>
+    <p class="sub">Enter two ZIP codes. Get the toll cost, the fuel cost, and whether going around the toll road is actually worth it.</p>
+    <div class="profile">
+      <span class="chip">&#x1F69B; <b>80,000</b> lb</span>
+      <span class="chip">&#x2699;&#xFE0F; <b>5</b> axles</span>
+      <span class="chip">&#x26FD; <b>6.5</b> mpg</span>
+      <span class="chip">&#x1F4CD; <b>65</b> mph</span>
+      <span class="chip">&#x1F4B3; <b>I-PASS</b> / E-ZPass</span>
+    </div>
+  </div>
+</div>
+
+<main>
+  <div class="tool">
+    <p class="lead">Fleet profile is fixed above &mdash; every truck is the same, so there is nothing to configure. Type a ZIP (or a city name) for each end.</p>
+    <div class="row">
+      <div class="fld">
+        <label for="from">From</label>
+        <div class="box"><input id="from" type="text" placeholder="14201" autocomplete="off" spellcheck="false"></div>
+        <span class="hint" id="from-hint"></span>
+      </div>
+      <div class="fld">
+        <label for="to">To</label>
+        <div class="box"><input id="to" type="text" placeholder="60007" autocomplete="off" spellcheck="false"></div>
+        <span class="hint" id="to-hint"></span>
+      </div>
+      <button class="go" id="go">Calculate &#x2192;</button>
+    </div>
+
+    <div class="fuelrow">
+      <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="6.00"> $/gal</span>
+      <span class="mini">MPG <input id="mpg" type="number" step="0.1" min="1" value="6.5"></span>
+      <span class="mini" style="color:var(--ink3)">Change these only if the market moves &mdash; they are not per-truck.</span>
+    </div>
+
+    <div class="recents" id="recents"></div>
+  </div>
+
+  <div id="out"></div>
+</main>
+
+<footer>
+  <p><b>Estimate, not a bill.</b> Distances are metro-to-metro along the interstate corridors your trucks actually run, so the
+  first and last few miles are approximate. Toll rates marked <span class="est"></span> are per-mile averages; unmarked rates are
+  verified against the authority's published class-5 schedule. Rates effective <span id="reff" class="mono"></span> &mdash;
+  toll authorities raise rates every January (Indiana twice a year), so re-check before billing a customer.</p>
+  <p><b>Directional tolls.</b> The Delaware River bridges on I-80 / I-78 charge <b>westbound only</b> (into Pennsylvania).
+  This console bills them in both directions, so an eastbound-only run into New Jersey will come out roughly $18 high.
+  <b>Connecticut shows zero tolls because it genuinely has none</b> &mdash; the state removed them in 1985.</p>
+  <p>Verify exact figures at:
+    <a href="https://www.ohioturnpike.org/tolls/toll-calculator" target="_blank" rel="noopener">Ohio Turnpike</a> &middot;
+    <a href="https://www.indianatollroad.org/toll-calculator/" target="_blank" rel="noopener">Indiana Toll Road</a> &middot;
+    <a href="https://www.paturnpike.com/tolls/toll-calculator" target="_blank" rel="noopener">PA Turnpike</a> &middot;
+    <a href="https://www.thruway.ny.gov/tolls/tollcalculator/" target="_blank" rel="noopener">NY Thruway</a> &middot;
+    <a href="https://www.illinoistollway.com/tolling-information/toll-calculator" target="_blank" rel="noopener">Illinois Tollway</a>
+  </p>
+</footer>
+
+<script src="js/toll-engine.js?v=20260903a"></script>
+<script>
+(function(){
+  'use strict';
+  var E = window.TollEngine;
+  var $ = function(id){ return document.getElementById(id); };
+  document.getElementById('reff').textContent = E.RATES_EFFECTIVE;
+
+  var money = function(n){ return '$' + n.toLocaleString('en-US',{minimumFractionDigits:2, maximumFractionDigits:2}); };
+  var money0 = function(n){ return '$' + Math.round(n).toLocaleString('en-US'); };
+  var num = function(n){ return Math.round(n).toLocaleString('en-US'); };
+
+  /* live resolution hint under each field */
+  function hint(inputId, hintId){
+    var v = $(inputId).value.trim();
+    var h = $(hintId);
+    if(!v){ h.textContent=''; h.className='hint'; return; }
+    var r = E.resolve(v);
+    if(r){ h.textContent = '✓ ' + r.label; h.className = 'hint ok'; }
+    else { h.textContent = 'Not recognised — try a ZIP or a major city'; h.className = 'hint bad'; }
+  }
+  ['from','to'].forEach(function(id){
+    $(id).addEventListener('input', function(){ hint(id, id+'-hint'); });
+    $(id).addEventListener('keydown', function(e){ if(e.key==='Enter') run(); });
+  });
+
+  /* ── recent lanes (local only) ─────────────────────────────────────────── */
+  function getRecents(){
+    try { return JSON.parse(localStorage.getItem('fg_toll_recents') || '[]'); } catch(e){ return []; }
+  }
+  function pushRecent(a,b){
+    var list = getRecents().filter(function(x){ return !(x[0]===a && x[1]===b); });
+    list.unshift([a,b]);
+    try { localStorage.setItem('fg_toll_recents', JSON.stringify(list.slice(0,6))); } catch(e){}
+    drawRecents();
+  }
+  function drawRecents(){
+    var list = getRecents(), el = $('recents');
+    if(!list.length){ el.innerHTML=''; return; }
+    el.innerHTML = '<span style="font-size:.72rem;color:var(--ink3);font-weight:700;letter-spacing:.05em;text-transform:uppercase;align-self:center;margin-right:.2rem">Recent</span>'
+      + list.map(function(x,i){ return '<span class="rc" data-i="'+i+'">'+x[0]+' → '+x[1]+'</span>'; }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('.rc'), function(c){
+      c.addEventListener('click', function(){
+        var x = getRecents()[parseInt(c.getAttribute('data-i'),10)];
+        $('from').value = x[0]; $('to').value = x[1];
+        hint('from','from-hint'); hint('to','to-hint'); run();
+      });
+    });
+  }
+
+  /* ── rendering ─────────────────────────────────────────────────────────── */
+  function routeCard(r, kind, label, tag){
+    var brk = '';
+    if(r.breakdown.length){
+      brk = r.breakdown.map(function(b){
+        return '<div class="li"><span class="nm">'+b.name
+             + (b.conf==='e' ? '<span class="est" title="Estimated per-mile rate"></span>' : '')
+             + '<small>'+b.hwy+' · '+b.st+(b.flat?' · barrier toll':' · '+num(b.mi)+' mi tolled')+'</small></span>'
+             + '<span class="amt">'+money(b.cost)+'</span></div>';
+      }).join('');
+    } else {
+      brk = '<div class="free">✓ No tolls on this routing.</div>';
+    }
+    return '<div class="rt '+kind+'">'
+      + '<span class="rt-tag">'+tag+'</span>'
+      + '<div class="big">'+money(r.tolls)+'</div>'
+      + '<div class="biglbl">'+label+'</div>'
+      + '<div class="facts">'
+      +   '<div class="fact"><span class="k">Miles</span><span class="v">'+num(r.miles)+'</span></div>'
+      +   '<div class="fact"><span class="k">Drive time</span><span class="v">'+r.hours.toFixed(1)+' h</span></div>'
+      +   '<div class="fact"><span class="k">Fuel</span><span class="v">'+money0(r.fuel)+'</span></div>'
+      +   '<div class="fact"><span class="k">Days (HOS)</span><span class="v">'+r.days+'</span></div>'
+      +   '<div class="fact"><span class="k">Toll / mile</span><span class="v">'+r.tollPerMile.toFixed(3)+'</span></div>'
+      +   '<div class="fact"><span class="k">Total / mile</span><span class="v">'+r.perMile.toFixed(2)+'</span></div>'
+      + '</div>'
+      + '<div class="brk"><h4>Toll breakdown</h4>'+brk
+      +   '<div class="li" style="border-top:1px solid var(--line);margin-top:.4rem;padding-top:.5rem">'
+      +     '<span class="nm"><b>Tolls + fuel</b></span><span class="amt"><b>'+money(r.total)+'</b></span></div>'
+      + '</div>'
+      + '<div class="via"><b>Via:</b> '+r.via.join(' → ')+'</div>'
+      + '</div>';
+  }
+
+  function run(){
+    var a = $('from').value.trim(), b = $('to').value.trim();
+    var out = $('out');
+    if(!a || !b){ out.innerHTML = '<div class="err">Enter both a From and a To.</div>'; return; }
+
+    E.setFuel(parseFloat($('fuel').value), parseFloat($('mpg').value));
+
+    var q = E.quote(a,b);
+    if(q.error){ out.innerHTML = '<div class="err">'+q.error+'</div>'; return; }
+
+    var html = '<h2 class="sec">&#x1F4B0; '+q.from.label+' &rarr; '+q.to.label+'</h2>';
+
+    if(q.sameRoute){
+      html += '<div class="routes single">'
+            + routeCard(q.fast, 'cheap', 'estimated tolls', '✓ Best route · no cheaper detour')
+            + '</div>';
+    } else {
+      html += '<div class="routes">'
+            + routeCard(q.fast, 'fast', 'estimated tolls', '⚡ Fastest')
+            + routeCard(q.cheap, 'cheap', 'estimated tolls', '💲 Cheapest')
+            + '</div>';
+
+      var alt = q.alt, save = -alt.netSaving;
+      if(alt.worthIt){
+        html += '<div class="verdict win"><div class="hdr">✅ Take the cheaper routing — save '+money(save)+'</div>'
+              + '<p>Avoiding those toll roads costs you <b>'+num(alt.addedMiles)+' extra miles</b> ('
+              + (alt.addedHours*60).toFixed(0)+' min) and '+money(alt.addedMiles*E.fuelPerMile())+' more in fuel, '
+              + 'but saves <b>'+money(alt.tollSaved)+'</b> in tolls. Net <b>'+money(save)+'</b> back in your pocket.</p>'
+              + '<p style="color:var(--ink3);font-size:.82rem">Break-even is '
+              + num(alt.tollSaved / E.fuelPerMile()) + ' miles of detour — this one is '+num(alt.addedMiles)+'.</p>'
+              + '</div>';
+      } else {
+        html += '<div class="verdict"><div class="hdr">⚠️ Pay the toll — the detour loses '+money(-save)+'</div>'
+              + '<p>Going around saves '+money(alt.tollSaved)+' in tolls but adds <b>'+num(alt.addedMiles)+' miles</b> ('
+              + alt.addedHours.toFixed(1)+' h) and '+money(alt.addedMiles*E.fuelPerMile())+' in fuel. Not worth it — stay on the fast route.</p>'
+              + '</div>';
+      }
+    }
+
+    var best = q.sameRoute ? q.fast : (q.cheap.total < q.fast.total ? q.cheap : q.fast);
+    html += '<div class="note">&#x1F4A1; <b>Quoting this load?</b> Tolls + fuel come to <b>'+money(best.total)
+          + '</b> on the recommended routing — that is <b>'+money(best.perMile)+'/mile</b> before driver pay, '
+          + 'insurance and maintenance. Add your margin on top of that number, not on top of the linehaul alone.'
+          + (best.days > 1 ? ' At 65 mph this is a <b>'+best.days+'-day run</b> under HOS — plan the reset.' : '')
+          + '</div>';
+
+    out.innerHTML = html;
+    pushRecent(a,b);
+    out.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  $('go').addEventListener('click', run);
+  drawRecents();
+})();
+</script>
+</body>
+</html>
