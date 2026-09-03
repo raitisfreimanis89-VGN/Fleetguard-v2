@@ -189,10 +189,10 @@
     </div>
 
     <div class="fuelrow">
-      <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="6.00"> $/gal</span>
+      <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="5.80"> $/gal</span>
       <span class="mini">MPG <input id="mpg" type="number" step="0.1" min="1" value="6.5"></span>
       <span class="mini">Trip miles <input id="miles" type="number" step="1" min="1" placeholder="auto"></span>
-      <span class="mini" style="color:var(--ink3)">Got the miles off the rate con? Type them in and every cost below becomes exact.</span>
+      <span class="mini" id="fuel-src" style="color:var(--ink3)">Got the miles off the rate con? Type them in and every cost below becomes exact.</span>
     </div>
 
     <div class="recents" id="recents"></div>
@@ -234,7 +234,7 @@
   </p>
 </footer>
 
-<script src="js/toll-engine.js?v=20260903g"></script>
+<script src="js/toll-engine.js?v=20260903h"></script>
 <script>
 (function(){
   'use strict';
@@ -409,6 +409,34 @@
   }
 
   $('go').addEventListener('click', run);
+
+  /* ── Diesel price ────────────────────────────────────────────────────────
+     data/fuel-price.json is refreshed daily by .github/workflows/fuel-price.yml
+     from the EIA weekly national average, plus our margin. Same-origin, so no
+     CORS and no API key in this page. The hardcoded input value is the
+     fallback: if this fetch fails the console still costs loads, just at the
+     last figure baked into the HTML. */
+  (function loadFuel(){
+    fetch('data/fuel-price.json?cb=' + Date.now())
+      .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function(fp){
+        if (!(fp.price > 0)) throw new Error('bad price');
+        $('fuel').value = fp.price.toFixed(2);
+        E.setFuel(fp.price, parseFloat($('mpg').value));
+        var wk = fp.period ? new Date(fp.period + 'T00:00:00')
+              .toLocaleDateString('en-US',{month:'short', day:'numeric'}) : '';
+        $('fuel-src').innerHTML = '&#x26FD; EIA national average <b>$' + Number(fp.national).toFixed(3)
+          + '</b> + $' + Number(fp.margin).toFixed(2) + ' margin'
+          + (wk ? ' &middot; week of ' + wk : '')
+          + '. Override it above for a specific lane.';
+        if ($('out').innerHTML) run();      // re-cost anything already showing
+      })
+      .catch(function(){
+        // Stay honest — do not imply a live figure we could not fetch.
+        $('fuel-src').textContent = 'Using the fallback diesel price — live EIA figure unavailable. Override above if needed.';
+      });
+  })();
+
   drawRecents();
 })();
 </script>

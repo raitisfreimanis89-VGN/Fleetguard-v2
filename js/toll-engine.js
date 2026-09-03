@@ -21,7 +21,7 @@
   /* Fleet truck profile — same for every unit, so these are not user inputs. */
   var TRUCK = {
     gvw: 80000, axles: 5,
-    mpg: 6.5, fuelPrice: 6.00, speed: 65,
+    mpg: 6.5, fuelPrice: 5.80, speed: 65,
     transponder: 'I-PASS / E-ZPass'
   };
 

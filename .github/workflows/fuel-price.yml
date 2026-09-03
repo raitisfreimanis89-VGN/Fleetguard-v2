@@ -1,0 +1,87 @@
+name: Update diesel price
+
+# The console needs the national average diesel price kept current.
+#
+# Why a scheduled commit rather than a live fetch from the page:
+# api.eia.gov is CORS-open but REQUIRES an api key, and this is a public
+# static site — a key in the page is a leaked key. So the key lives in
+# repo secrets, this job writes the number into data/fuel-price.json, and
+# the page reads that same-origin. No key exposure, no CORS, no runtime
+# dependency, and if EIA is ever down the last good price simply stays.
+#
+# EIA publishes the weekly series Monday afternoon ET, so this runs daily
+# at 22:40 UTC (~6:40pm ET) to pick it up the same day. The number itself
+# only moves once a week — that is the series, not a bug.
+
+on:
+  schedule:
+    - cron: '40 22 * * *'
+  workflow_dispatch:        # lets you run it by hand from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch EIA weekly national diesel average
+        env:
+          EIA_API_KEY: ${{ secrets.EIA_API_KEY }}
+          MARGIN: '0.20'
+        run: |
+          set -euo pipefail
+
+          if [ -z "${EIA_API_KEY:-}" ]; then
+            echo "::error::EIA_API_KEY secret is not set — register free at https://www.eia.gov/opendata/register.php then add it under Settings > Secrets > Actions"
+            exit 1
+          fi
+
+          URL="https://api.eia.gov/v2/petroleum/pri/gnd/data/?api_key=${EIA_API_KEY}"
+          URL="${URL}&frequency=weekly&data[0]=value"
+          URL="${URL}&facets[series][]=EMD_EPD2D_PTE_NUS_DPG"
+          URL="${URL}&sort[0][column]=period&sort[0][direction]=desc&length=1"
+
+          curl -sS --fail --retry 3 --retry-delay 5 "$URL" -o /tmp/eia.json
+
+          NATIONAL=$(jq -r '.response.data[0].value' /tmp/eia.json)
+          PERIOD=$(jq -r '.response.data[0].period' /tmp/eia.json)
+
+          # Refuse to write nonsense — a bad parse must not silently reprice loads.
+          case "$NATIONAL" in
+            ''|null) echo "::error::EIA returned no value"; cat /tmp/eia.json; exit 1 ;;
+          esac
+          if ! awk -v v="$NATIONAL" 'BEGIN{exit !(v>1 && v<15)}'; then
+            echo "::error::Implausible diesel price from EIA: $NATIONAL"; exit 1
+          fi
+
+          PRICE=$(awk -v n="$NATIONAL" -v m="$MARGIN" 'BEGIN{printf "%.3f", n+m}')
+
+          mkdir -p data
+          cat > data/fuel-price.json <<JSON
+          {
+            "price": ${PRICE},
+            "national": ${NATIONAL},
+            "margin": ${MARGIN},
+            "period": "${PERIOD}",
+            "source": "EIA weekly U.S. No 2 diesel retail average (EMD_EPD2D_PTE_NUS_DPG)",
+            "fetchedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          JSON
+
+          echo "national=$NATIONAL  +$MARGIN  =>  $PRICE   (week of $PERIOD)"
+
+      - name: Commit if the price moved
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- data/fuel-price.json; then
+            echo "Price unchanged — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/fuel-price.json
+          git commit -m "Diesel price: $(jq -r '"\(.national) + \(.margin) = \(.price) (week of \(.period))"' data/fuel-price.json)"
+          git push
