@@ -29,18 +29,26 @@
      perMi = class-5 rate per mile WITH transponder (I-PASS is E-ZPass network)
      flat  = fixed barrier/bridge toll for a 5-axle combination              */
   var FACILITIES = {
-    'ny-thruway':   { n: 'NY Thruway',            st: 'NY', hwy: 'I-90/I-87',  perMi: 0.27,  conf: 'e' },
+    /* Anchored on the published NYC-Buffalo 5-axle range ($80-95 over 365 mi). */
+    'ny-thruway':   { n: 'NY Thruway',            st: 'NY', hwy: 'I-90/I-87',  perMi: 0.24,  conf: 'e' },
     'mass-pike':    { n: 'Massachusetts Turnpike',st: 'MA', hwy: 'I-90',       perMi: 0.19,  conf: 'e' },
     'oh-tpk':       { n: 'Ohio Turnpike',         st: 'OH', hwy: 'I-80/90',    perMi: 0.226, conf: 'v' },
     'in-itr':       { n: 'Indiana Toll Road',     st: 'IN', hwy: 'I-80/90',    perMi: 0.557, conf: 'v' },
     'pa-tpk':       { n: 'Pennsylvania Turnpike', st: 'PA', hwy: 'I-76',       perMi: 0.35,  conf: 'v' },
-    'il-tollway':   { n: 'Illinois Tollway',      st: 'IL', hwy: 'I-90/I-294', perMi: 0.22,  conf: 'e' },
-    'skyway':       { n: 'Chicago Skyway',        st: 'IL', hwy: 'I-90',       flat: 31.50,  conf: 'e' },
+    /* Jane Addams runs $8-15 and the Tri-State $10-18 for 5 axles on I-PASS,
+       across roughly 76-78 tolled miles each. */
+    'il-tollway':   { n: 'Illinois Tollway',      st: 'IL', hwy: 'I-90/I-294', perMi: 0.16,  conf: 'e' },
+    /* Skyway peak rate. Off-peak (10pm-6am) is $32.40 — the engine has no time
+       dimension, so it quotes peak: better a driver is never surprised. */
+    'skyway':       { n: 'Chicago Skyway',        st: 'IL', hwy: 'I-90',       flat: 45.40,  conf: 'v' },
     'nj-tpk':       { n: 'New Jersey Turnpike',   st: 'NJ', hwy: 'I-95',       perMi: 0.30,  conf: 'e' },
     'de-tpk':       { n: 'Delaware Turnpike',     st: 'DE', hwy: 'I-95',       flat: 10.50,  conf: 'e' },
     'md-jfk':       { n: 'MD JFK Memorial Hwy',   st: 'MD', hwy: 'I-95',       flat: 30.00,  conf: 'e' },
     'md-fmt':       { n: 'Fort McHenry Tunnel',   st: 'MD', hwy: 'I-95',       flat: 30.00,  conf: 'e' },
-    'hudson':       { n: 'Hudson River crossing', st: 'NY', hwy: 'GWB/Tunnel', flat: 115.00, conf: 'e' },
+    /* PANYNJ 5-axle: $113.35 E-ZPass peak, $108.35 off-peak, $128.35 by mail.
+       Collected EASTBOUND ONLY (entering New York) — a westbound run out of
+       the city crosses free. Rises again each January through 2028. */
+    'hudson':       { n: 'Hudson River crossing', st: 'NY', hwy: 'GWB/Tunnel', flat: 113.35, conf: 'v' },
     'wv-tpk':       { n: 'West Virginia Turnpike',st: 'WV', hwy: 'I-77',       flat: 47.00,  conf: 'e' },
     /* KS/OK note: these are K-TAG / PIKEPASS rates. That is a SEPARATE
        interoperability group from E-ZPass — an I-PASS transponder may not be
