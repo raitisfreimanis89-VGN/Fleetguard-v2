@@ -42,9 +42,12 @@
     'md-fmt':       { n: 'Fort McHenry Tunnel',   st: 'MD', hwy: 'I-95',       flat: 30.00,  conf: 'e' },
     'hudson':       { n: 'Hudson River crossing', st: 'NY', hwy: 'GWB/Tunnel', flat: 115.00, conf: 'e' },
     'wv-tpk':       { n: 'West Virginia Turnpike',st: 'WV', hwy: 'I-77',       flat: 47.00,  conf: 'e' },
-    'ks-tpk':       { n: 'Kansas Turnpike',       st: 'KS', hwy: 'I-35/I-70',  perMi: 0.17,  conf: 'e' },
-    'ok-turner':    { n: 'Turner Turnpike',       st: 'OK', hwy: 'I-44',       perMi: 0.16,  conf: 'e' },
-    'ok-will':      { n: 'Will Rogers Turnpike',  st: 'OK', hwy: 'I-44',       perMi: 0.16,  conf: 'e' },
+    /* KS/OK note: these are K-TAG / PIKEPASS rates. That is a SEPARATE
+       interoperability group from E-ZPass — an I-PASS transponder may not be
+       honoured here, in which case the real cost is the higher video rate. */
+    'ks-tpk':       { n: 'Kansas Turnpike',       st: 'KS', hwy: 'I-35/I-70',  perMi: 0.144, conf: 'v' },
+    'ok-turner':    { n: 'Turner Turnpike',       st: 'OK', hwy: 'I-44',       perMi: 0.188, conf: 'v' },
+    'ok-will':      { n: 'Will Rogers Turnpike',  st: 'OK', hwy: 'I-44',       perMi: 0.167, conf: 'v' },
     'fl-tpk':       { n: "Florida's Turnpike",    st: 'FL', hwy: 'FL-91',      perMi: 0.28,  conf: 'e' },
     'me-tpk':       { n: 'Maine Turnpike',        st: 'ME', hwy: 'I-95',       perMi: 0.12,  conf: 'e' },
     'nh-tpk':       { n: 'NH Turnpike',           st: 'NH', hwy: 'I-95',       flat: 12.00,  conf: 'e' },
@@ -245,8 +248,11 @@
     ['joplin','tulsa',115,'I-44 Will Rogers','ok-will',88],
     ['tulsa','oklahoma_city',105,'I-44 Turner','ok-turner',86],
     ['kansas_city','wichita',200,'I-35 KS Tpk','ks-tpk',130],
-    ['wichita','oklahoma_city',160,'I-35',null],
-    ['kansas_city','denver',600,'I-70',null],
+    /* I-35 south of Wichita stays on the Kansas Turnpike to the OK line;
+       only the Oklahoma side of I-35 is free. */
+    ['wichita','oklahoma_city',160,'I-35 KS Tpk','ks-tpk',45],
+    /* I-70 out of Kansas City runs the turnpike as far as Topeka. */
+    ['kansas_city','denver',600,'I-70 KS Tpk','ks-tpk',40],
     ['wichita','denver',520,'US-400/I-70',null],
     ['denver','cheyenne',100,'I-25',null],
     ['denver','salt_lake',520,'I-70/I-15',null],
