@@ -86,6 +86,7 @@
     detroit:{n:'Detroit',s:'MI',lat:42.33,lon:-83.05},          columbus:{n:'Columbus',s:'OH',lat:39.96,lon:-82.99},
     dayton:{n:'Dayton',s:'OH',lat:39.76,lon:-84.19},            cincinnati:{n:'Cincinnati',s:'OH',lat:39.10,lon:-84.51},
     indianapolis:{n:'Indianapolis',s:'IN',lat:39.77,lon:-86.16},louisville:{n:'Louisville',s:'KY',lat:38.25,lon:-85.76},
+    fort_wayne:{n:'Fort Wayne',s:'IN',lat:41.08,lon:-85.14},
     milwaukee:{n:'Milwaukee',s:'WI',lat:43.04,lon:-87.91},      madison:{n:'Madison',s:'WI',lat:43.07,lon:-89.40},
     minneapolis:{n:'Minneapolis',s:'MN',lat:44.98,lon:-93.27},  des_moines:{n:'Des Moines',s:'IA',lat:41.59,lon:-93.62},
     omaha:{n:'Omaha',s:'NE',lat:41.26,lon:-95.93},              kansas_city:{n:'Kansas City',s:'MO',lat:39.10,lon:-94.58},
@@ -122,10 +123,24 @@
   };
 
   /* ── Corridor edges ───────────────────────────────────────────────────────
-     [a, b, miles, highway, tollFacilityId|null, tolledMiles|null]
+     [a, b, miles, highway, tollFacilityId|null, tolledMiles|null, nn]
      tolledMiles defaults to the full edge length when omitted.
      Parallel edges (same pair, different highway) let the solver choose
-     between a toll road and its free alternative — that is the whole point. */
+     between a toll road and its free alternative — that is the whole point.
+
+     nn = National Network status for a 53' van. Omitted means 1 (legal).
+     **nn:0 means NOT VERIFIED** — federal rule is that >=53' combinations
+     stay on the National Network "to the maximum extent possible", and some
+     states enforce that outright. Routing SKIPS nn:0 edges by default; they
+     surface only as a separately-labelled "verify first" option.
+     NOTE: Ohio and Indiana explicitly allow non-OSOW combinations to travel
+     OFF the National Network, so US-20 / US-24 / US-30 across those two
+     states are legal for a 53' van and carry nn:1.
+
+     mph = planning speed for this leg, default 65. Surface US routes get 45-55
+     because that is the real cost of dodging a turnpike — traffic lights,
+     towns and lower limits, not legality. Without this the solver would think
+     US-20 is free money. */
   var EDGES = [
     /* I-90 / I-80 northern spine ------------------------------------------ */
     ['boston','albany',170,'I-90','mass-pike',138],
@@ -134,12 +149,21 @@
     ['buffalo','erie',90,'I-90','ny-thruway',68],
     ['erie','cleveland',100,'I-90',null],
     ['cleveland','toledo',115,'I-80/90 OH Tpk','oh-tpk',93],
-    ['cleveland','toledo',118,'US-20/SR-2',null],
+    /* Free surface parallels to the Ohio Turnpike / Indiana Toll Road. Legal
+       for 53' in OH and IN; the price is time, so they run at 45-52 mph. */
+    ['cleveland','toledo',118,'US-20/SR-2',null,null,1,48],
     ['toledo','oh_in_line',55,'I-80/90 OH Tpk','oh-tpk'],
     ['oh_in_line','south_bend',80,'I-80/90 ITR','in-itr'],
     ['south_bend','gary',60,'I-80/90 ITR','in-itr'],
-    ['toledo','south_bend',140,'US-20/US-6',null],
-    ['south_bend','gary',62,'US-20',null],
+    ['toledo','south_bend',140,'US-20/US-6',null,null,1,48],
+    ['south_bend','gary',62,'US-20',null,null,1,45],
+    /* US-30 corridor — the other classic toll dodge, further south. US-24 is
+       the 4-lane "Fort to Port" freight route; US-30 is largely 4-lane and
+       bypasses Fort Wayne on I-69/I-469. */
+    ['toledo','fort_wayne',95,'US-24',null,null,1,55],
+    ['fort_wayne','gary',125,'US-30',null,null,1,52],
+    ['cleveland','fort_wayne',200,'I-71/US-30',null,null,1,55],
+    ['fort_wayne','indianapolis',120,'I-69',null],
     ['gary','chicago',27,'I-90 Skyway','skyway'],
     ['gary','chicago',32,'I-80/94',null],
     ['chicago','des_moines',333,'I-80',null],
@@ -238,7 +262,7 @@
     ['missoula','spokane',200,'I-90',null],
     ['spokane','seattle',280,'I-90',null],
     ['fargo','billings',580,'I-94',null],
-    ['cheyenne','rapid_city',300,'US-85',null],
+    ['cheyenne','rapid_city',300,'US-85',null,null,0],
     ['cheyenne','casper',180,'I-25',null],
 
     /* Mississippi valley / I-55 / I-57 ------------------------------------ */
@@ -261,7 +285,7 @@
     ['wichita','oklahoma_city',160,'I-35 KS Tpk','ks-tpk',45],
     /* I-70 out of Kansas City runs the turnpike as far as Topeka. */
     ['kansas_city','denver',600,'I-70 KS Tpk','ks-tpk',40],
-    ['wichita','denver',520,'US-400/I-70',null],
+    ['wichita','denver',520,'US-400/I-70',null,null,0],
     ['denver','cheyenne',100,'I-25',null],
     ['denver','salt_lake',520,'I-70/I-15',null],
     ['denver','albuquerque',450,'I-25',null],
@@ -364,7 +388,8 @@
   var ADJ = {};
   EDGES.forEach(function (e) {
     var a = e[0], b = e[1];
-    var rec = { mi: e[2], hwy: e[3], toll: e[4] || null, tmi: (e[5] == null ? e[2] : e[5]) };
+    var rec = { mi: e[2], hwy: e[3], toll: e[4] || null, tmi: (e[5] == null ? e[2] : e[5]),
+                nn: (e[6] === 0 ? 0 : 1), mph: (e[7] > 0 ? e[7] : 0) };
     (ADJ[a] = ADJ[a] || []).push({ to: b, e: rec });
     (ADJ[b] = ADJ[b] || []).push({ to: a, e: rec });
   });
@@ -391,7 +416,7 @@
   function estMiles(corridorMi) { return corridorMi * CIRCUITY + ACCESS_MI * 2; }
 
   /* Dijkstra. mode 'fast' minimises miles; 'cheap' minimises fuel + tolls. */
-  function solve(from, to, mode) {
+  function solve(from, to, mode, allowNonNN) {
     if (!NODES[from] || !NODES[to]) return null;
     if (from === to) return { nodes: [from], legs: [], mi: 0, toll: 0 };
 
@@ -407,7 +432,13 @@
       seen[u] = true;
 
       (ADJ[u] || []).forEach(function (link) {
-        var w = mode === 'cheap' ? (link.e.mi * fpm + edgeToll(link.e)) : link.e.mi;
+        // Keep 53' combinations on the National Network unless explicitly asked.
+        if (!allowNonNN && !link.e.nn) return;
+        // 'fast' minimises TIME, not distance — a shorter surface route that
+        // crawls at 45 mph is not the fast one.
+        var w = mode === 'cheap'
+          ? (link.e.mi * fpm + edgeToll(link.e))
+          : (link.e.mi / (link.e.mph || TRUCK.speed));
         var nd = dist[u] + w;
         if (nd < dist[link.to]) { dist[link.to] = nd; prev[link.to] = { from: u, e: link.e }; }
       });
@@ -445,13 +476,19 @@
     var est   = estMiles(route.mi);
     var miles = Math.max(1, est + (adjust || 0));
     var fuel  = miles * fuelPerMile();
-    var hrs   = miles / TRUCK.speed;
+    // Time comes from each leg at its own planning speed, then scales with the
+    // mileage actually used, so a surface detour shows the hours it really costs.
+    var baseHrs = 0;
+    route.legs.forEach(function (l) { baseHrs += l.e.mi / (l.e.mph || TRUCK.speed); });
+    if (!route.legs.length) baseHrs = route.mi / TRUCK.speed;
+    var hrs = route.mi ? baseHrs * (miles / route.mi) : 0;
     return {
       miles: miles,
       estMiles: est,
       corridorMiles: route.mi,
       adjusted: !!adjust,
       hours: hrs,
+      avgMph: hrs ? miles / hrs : TRUCK.speed,
       days: Math.max(1, Math.ceil(hrs / 11)),
       tolls: route.toll,
       fuel: fuel,
@@ -461,7 +498,11 @@
       breakdown: tollBreakdown(route),
       via: route.nodes.map(function (n) { return NODES[n].n + ', ' + NODES[n].s; }),
       hwys: route.legs.map(function (l) { return l.e.hwy; })
-        .filter(function (h, i, a) { return h && a.indexOf(h) === i; })
+        .filter(function (h, i, a) { return h && a.indexOf(h) === i; }),
+      // Any leg whose 53' National Network status we have not verified.
+      nonNN: route.legs.filter(function (l) { return !l.e.nn; })
+        .map(function (l) { return l.e.hwy; })
+        .filter(function (h, i, a) { return a.indexOf(h) === i; })
     };
   }
 
@@ -510,6 +551,24 @@
     var fast   = summarise(fastR, adjust);
     var cheap  = summarise(cheapR, adjust);
 
+    /* Same search again, this time allowed onto roads whose 53' National
+       Network status we could not verify. If it beats the legal-for-sure
+       answer by real money, report it — clearly labelled as needing a route
+       check — rather than pretending the saving does not exist. It is NEVER
+       returned as the recommendation. */
+    var unverified = null;
+    var anyR = solve(a.id, b.id, 'cheap', true);
+    if (anyR) {
+      var any = summarise(anyR, adjust);
+      if (any.nonNN.length && (cheap.total - any.total) > 25) {
+        unverified = {
+          route: any,
+          saving: cheap.total - any.total,
+          roads: any.nonNN
+        };
+      }
+    }
+
     var same = Math.abs(fast.miles - cheap.miles) < 1 && Math.abs(fast.tolls - cheap.tolls) < 0.5;
     var alt = null;
     if (!same) {
@@ -517,13 +576,15 @@
       var saveToll = fast.tolls - cheap.tolls;
       alt = {
         addedMiles: addMi,
-        addedHours: addMi / TRUCK.speed,
+        // Real clock difference, including the speed penalty of surface roads.
+        addedHours: cheap.hours - fast.hours,
         tollSaved: saveToll,
         netSaving: cheap.total - fast.total,
         worthIt: cheap.total < fast.total
       };
     }
-    return { from: a, to: b, fast: fast, cheap: cheap, sameRoute: same, alt: alt };
+    return { from: a, to: b, fast: fast, cheap: cheap, sameRoute: same, alt: alt,
+             unverified: unverified };
   }
 
   global.TollEngine = {
@@ -531,6 +592,7 @@
     TRUCK: TRUCK, FACILITIES: FACILITIES, NODES: NODES,
     RATES_EFFECTIVE: RATES_EFFECTIVE,
     fuelPerMile: fuelPerMile,
+    _edges: EDGES, _adj: ADJ,   // exposed for route auditing / rate checks
     setFuel: function (price, mpg) {
       if (price > 0) TRUCK.fuelPrice = price;
       if (mpg > 0) TRUCK.mpg = mpg;

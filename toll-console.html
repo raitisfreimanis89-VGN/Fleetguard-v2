@@ -152,6 +152,7 @@
       <span class="chip">&#x26FD; <b>6.5</b> mpg</span>
       <span class="chip">&#x1F4CD; <b>65</b> mph</span>
       <span class="chip">&#x1F4B3; <b>I-PASS</b> / E-ZPass</span>
+      <span class="chip">&#x1F6E3;&#xFE0F; <b>53&#39;</b> National Network only</span>
     </div>
   </div>
 </div>
@@ -198,6 +199,13 @@
   Chicago Skyway is quoted at the <b>peak</b> rate; overnight (10pm&ndash;6am) it drops to $32.40.
   <b>Connecticut shows zero tolls because it genuinely has none</b> &mdash; the state removed them in 1985.
   Georgia, Arizona and New Mexico are the same: no truck tolls exist (Georgia bans trucks from its express lanes outright).</p>
+  <p><b>&#x1F6E3;&#xFE0F; Routing is Interstate / National Network only.</b> Every route above is one a 53&#39; van can legally
+  run &mdash; the solver will not put you on a road whose STAA designation we have not confirmed, even when that road is
+  cheaper. What this is <b>not</b> is a truck router: it does not know <b>low clearances, posted bridge weights, hazmat
+  tunnel bans, local truck-route ordinances or seasonal restrictions</b>. It answers &ldquo;what will this lane cost?&rdquo;,
+  not &ldquo;which ramp do I take?&rdquo; &mdash; keep using your routing software and the
+  <a href="low-clearance.html">Low Clearance Playbook</a> for the actual road.</p>
+
   <p><b>About the mileage.</b> The estimate sums metro to metro along the interstate corridors, then adds a local-access
   allowance at each end. It runs a few percent short of a real routed trip, so treat it as a planning figure.
   <b>When you have the real mileage, type it into &ldquo;Trip miles&rdquo;</b> &mdash; fuel, cost per mile and the day count
@@ -212,7 +220,7 @@
   </p>
 </footer>
 
-<script src="js/toll-engine.js?v=20260903d"></script>
+<script src="js/toll-engine.js?v=20260903e"></script>
 <script>
 (function(){
   'use strict';
@@ -286,7 +294,8 @@
       + '<div class="biglbl">'+label+'</div>'
       + '<div class="facts">'
       +   '<div class="fact"><span class="k">Miles'+(r.adjusted?'':' <span style="opacity:.6">(est)</span>')+'</span><span class="v">'+num(r.miles)+'</span></div>'
-      +   '<div class="fact"><span class="k">Drive time</span><span class="v">'+r.hours.toFixed(1)+' h</span></div>'
+      +   '<div class="fact"><span class="k">Drive time</span><span class="v">'+r.hours.toFixed(1)+' h'
+      +     (r.avgMph < 62 ? ' <span style="opacity:.6">@'+Math.round(r.avgMph)+'</span>' : '')+'</span></div>'
       +   '<div class="fact"><span class="k">Fuel</span><span class="v">'+money0(r.fuel)+'</span></div>'
       +   '<div class="fact"><span class="k">Days (HOS)</span><span class="v">'+r.days+'</span></div>'
       +   '<div class="fact"><span class="k">Toll / mile</span><span class="v">'+r.tollPerMile.toFixed(3)+'</span></div>'
@@ -338,6 +347,19 @@
               + alt.addedHours.toFixed(1)+' h) and '+money(alt.addedMiles*E.fuelPerMile())+' in fuel. Not worth it — stay on the fast route.</p>'
               + '</div>';
       }
+    }
+
+    if(q.unverified){
+      var u = q.unverified;
+      html += '<div class="verdict" style="border-color:var(--amber);background:var(--amber-soft)">'
+            + '<div class="hdr">&#x1F6D1; A cheaper way exists &mdash; but check the truck route first</div>'
+            + '<p>Dropping onto <b>'+u.roads.join('</b>, <b>')+'</b> would save a further <b>'+money(u.saving)
+            + '</b>. Those are <b>not</b> in the routes above because we have <b>not verified they are '
+            + 'National Network / STAA-designated for a 53&#39; van</b>. Federal rule is that a 53-footer stays on '
+            + 'the National Network to the maximum extent possible, and several states enforce that outright.</p>'
+            + '<p style="color:var(--ink3);font-size:.82rem">Treat this as a lead, not a dispatch instruction. '
+            + 'Confirm with the state DOT truck map or your routing software before you send a driver this way.</p>'
+            + '</div>';
     }
 
     var best = q.sameRoute ? q.fast : (q.cheap.total < q.fast.total ? q.cheap : q.fast);
