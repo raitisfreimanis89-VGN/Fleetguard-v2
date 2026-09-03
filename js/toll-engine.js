@@ -86,7 +86,7 @@
     detroit:{n:'Detroit',s:'MI',lat:42.33,lon:-83.05},          columbus:{n:'Columbus',s:'OH',lat:39.96,lon:-82.99},
     dayton:{n:'Dayton',s:'OH',lat:39.76,lon:-84.19},            cincinnati:{n:'Cincinnati',s:'OH',lat:39.10,lon:-84.51},
     indianapolis:{n:'Indianapolis',s:'IN',lat:39.77,lon:-86.16},louisville:{n:'Louisville',s:'KY',lat:38.25,lon:-85.76},
-    fort_wayne:{n:'Fort Wayne',s:'IN',lat:41.08,lon:-85.14},
+    fort_wayne:{n:'Fort Wayne',s:'IN',lat:41.08,lon:-85.14},   canton:{n:'Canton',s:'OH',lat:40.80,lon:-81.38},
     milwaukee:{n:'Milwaukee',s:'WI',lat:43.04,lon:-87.91},      madison:{n:'Madison',s:'WI',lat:43.07,lon:-89.40},
     minneapolis:{n:'Minneapolis',s:'MN',lat:44.98,lon:-93.27},  des_moines:{n:'Des Moines',s:'IA',lat:41.59,lon:-93.62},
     omaha:{n:'Omaha',s:'NE',lat:41.26,lon:-95.93},              kansas_city:{n:'Kansas City',s:'MO',lat:39.10,lon:-94.58},
@@ -164,6 +164,18 @@
     ['fort_wayne','gary',125,'US-30',null,null,1,52],
     ['cleveland','fort_wayne',200,'I-71/US-30',null,null,1,55],
     ['fort_wayne','indianapolis',120,'I-69',null],
+    /* US-30 eastern half, through Canton. Ohio permits off-network travel so
+       these are legal for a 53' van; they are simply slow. */
+    ['canton','fort_wayne',215,'US-30',null,null,1,55],
+    ['toledo','canton',175,'I-75/US-30',null,null,1,55],
+    ['canton','cleveland',60,'I-77',null],
+    ['canton','youngstown',50,'OH-11/I-76',null],
+    ['canton','columbus',135,'I-77/I-70',null],
+    /* US-30 west of Pittsburgh crosses PENNSYLVANIA, which restricts non-OSOW
+       combinations off the National Network — a 53' trailer is only exempt at
+       96" wide, and standard vans are 102". Gated until designation is
+       confirmed. Drivers also describe this stretch as "really ugly". */
+    ['pittsburgh','canton',100,'US-30',null,null,0,48],
     ['gary','chicago',27,'I-90 Skyway','skyway'],
     ['gary','chicago',32,'I-80/94',null],
     ['chicago','des_moines',333,'I-80',null],
@@ -175,6 +187,11 @@
 
     /* I-80 across PA — the free alternative to the PA Turnpike ------------- */
     ['youngstown','scranton',290,'I-80',null],
+    /* THE way to dodge the PA Turnpike: I-79 north out of Pittsburgh onto I-80
+       east. All interstate, so legal for a 53' van in a state that otherwise
+       locks them to the National Network. Every surface alternative across PA
+       (US-30, US-22, US-322) is both slow and of unconfirmed designation. */
+    ['pittsburgh','scranton',290,'I-79/I-80',null],
     /* I-80 east dead-ends at the GWB: there is no free way into Manhattan
        from the west, so the crossing toll rides on this edge. */
     ['scranton','nyc',120,'I-80/GWB','hudson'],
@@ -368,8 +385,14 @@
     [280,289,'charlotte'],[290,299,'columbia_sc'],[300,319,'atlanta'],[320,326,'jacksonville'],
     [327,329,'orlando'],[330,334,'miami'],[335,339,'tampa'],[340,349,'orlando'],
     [350,369,'birmingham'],[370,379,'nashville'],[380,385,'memphis'],[386,397,'jackson_ms'],
-    [398,399,'atlanta'],[400,427,'louisville'],[430,439,'columbus'],[440,449,'cleveland'],
-    [450,459,'cincinnati'],[460,469,'indianapolis'],[470,479,'indianapolis'],[480,489,'detroit'],
+    [398,399,'atlanta'],[400,427,'louisville'],
+    /* Ohio and Indiana split finely — the coarse ranges used to land Toledo,
+       Canton, Youngstown and Fort Wayne on the wrong node entirely. */
+    [430,433,'columbus'],[434,436,'toledo'],[437,438,'columbus'],[439,439,'youngstown'],
+    [440,441,'cleveland'],[442,443,'canton'],[444,445,'youngstown'],[446,447,'canton'],
+    [448,449,'canton'],[450,452,'cincinnati'],[453,455,'dayton'],[456,459,'columbus'],
+    [460,462,'indianapolis'],[463,465,'gary'],[466,466,'south_bend'],[467,468,'fort_wayne'],
+    [469,479,'indianapolis'],[480,489,'detroit'],
     [490,499,'detroit'],[500,528,'des_moines'],[530,539,'milwaukee'],[540,549,'madison'],
     [550,567,'minneapolis'],[570,577,'sioux_falls'],[580,588,'fargo'],[590,599,'billings'],
     [600,609,'chicago'],[610,629,'springfield_il'],[630,639,'st_louis'],[640,658,'kansas_city'],
