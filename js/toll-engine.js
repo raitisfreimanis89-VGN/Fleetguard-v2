@@ -520,6 +520,17 @@
       tollPerMile: miles ? route.toll / miles : 0,
       breakdown: tollBreakdown(route),
       via: route.nodes.map(function (n) { return NODES[n].n + ', ' + NODES[n].s; }),
+      /* City lists alone cannot tell two routes apart — the toll road and its
+         free parallel connect the SAME cities. Emit the roads too. */
+      steps: route.legs.map(function (l) {
+        return {
+          a: NODES[l.a].n + ', ' + NODES[l.a].s,
+          b: NODES[l.b].n + ', ' + NODES[l.b].s,
+          hwy: l.e.hwy, mi: l.e.mi,
+          mph: l.e.mph || TRUCK.speed,
+          toll: edgeToll(l.e)
+        };
+      }),
       hwys: route.legs.map(function (l) { return l.e.hwy; })
         .filter(function (h, i, a) { return h && a.indexOf(h) === i; }),
       // Any leg whose 53' National Network status we have not verified.

@@ -121,6 +121,20 @@
   .via{margin-top:.9rem; font-size:.75rem; color:var(--ink3); line-height:1.7;}
   .via b{color:var(--ink2); font-weight:600;}
 
+  /* Route path — cities AND the roads between them, because the toll road and
+     its free parallel link the same cities and are otherwise indistinguishable. */
+  .path{margin-top:.95rem; padding-top:.85rem; border-top:1px solid var(--line); line-height:2.15;}
+  .path h4{margin:0 0 .5rem; font-size:.72rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--ink3);}
+  .path .pn{font-size:.76rem; color:var(--ink); font-weight:600; white-space:nowrap;}
+  .path .pr{
+    display:inline-block; margin:0 .32rem; padding:.12rem .45rem;
+    border-radius:6px; background:var(--surface2); border:1px solid var(--line);
+    color:var(--ink2); font-family:'IBM Plex Mono',monospace; font-weight:600;
+    font-size:.68rem; white-space:nowrap;
+  }
+  .path .pr.tolled{ background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+  .path .pr .slow{ color:var(--amber); font-weight:700; }
+
   .verdict{margin-top:1.2rem; border-radius:16px; padding:1.1rem 1.2rem; border:1px solid var(--accent); background:var(--accent-soft);}
   .verdict .hdr{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.02rem; margin-bottom:.35rem;}
   .verdict p{margin:.3rem 0 0; color:var(--ink2); font-size:.9rem; line-height:1.6;}
@@ -220,7 +234,7 @@
   </p>
 </footer>
 
-<script src="js/toll-engine.js?v=20260903f"></script>
+<script src="js/toll-engine.js?v=20260903g"></script>
 <script>
 (function(){
   'use strict';
@@ -305,8 +319,22 @@
       +   '<div class="li" style="border-top:1px solid var(--line);margin-top:.4rem;padding-top:.5rem">'
       +     '<span class="nm"><b>Tolls + fuel</b></span><span class="amt"><b>'+money(r.total)+'</b></span></div>'
       + '</div>'
-      + '<div class="via"><b>Via:</b> '+r.via.join(' → ')+'</div>'
+      + pathHtml(r)
       + '</div>';
+  }
+
+  /* Renders city → ROAD → city, tolled roads highlighted, slow roads flagged. */
+  function pathHtml(r){
+    if(!r.steps || !r.steps.length) return '';
+    var h = '<div class="path"><h4>Roads</h4><span class="pn">'+r.steps[0].a+'</span>';
+    r.steps.forEach(function(s){
+      h += '<span class="pr'+(s.toll>0?' tolled':'')+'">'+s.hwy
+         + ' <span style="opacity:.65">'+num(s.mi)+'mi</span>'
+         + (s.mph < 62 ? ' <span class="slow">@'+s.mph+'</span>' : '')
+         + (s.toll > 0 ? ' <span style="opacity:.8">'+money0(s.toll)+'</span>' : '')
+         + '</span><span class="pn">'+s.b+'</span>';
+    });
+    return h + '</div>';
   }
 
   function run(){
