@@ -378,6 +378,18 @@
 
   var fuelPerMile = function () { return TRUCK.fuelPrice / TRUCK.mpg; };
 
+  /* ── Mileage model ────────────────────────────────────────────────────────
+     The graph sums metro-centre to metro-centre along the corridors, which is
+     always short of a real trip: it misses local access at both ends, and
+     interstates do not run point-to-point. Two documented allowances close
+     most of that gap. Tolls are NEVER scaled by this — they come from the
+     facilities crossed, which do not care how far the shipper is off the ramp.
+     When dispatch knows the real mileage off the rate con, the override in
+     quote() anchors to it and these become irrelevant.                       */
+  var ACCESS_MI = 12;    // local access each end (ramp to dock)
+  var CIRCUITY  = 1.02;  // interchange + ramp overhead vs. straight sums
+  function estMiles(corridorMi) { return corridorMi * CIRCUITY + ACCESS_MI * 2; }
+
   /* Dijkstra. mode 'fast' minimises miles; 'cheap' minimises fuel + tolls. */
   function solve(from, to, mode) {
     if (!NODES[from] || !NODES[to]) return null;
@@ -428,19 +440,24 @@
     return out;
   }
 
-  function summarise(route) {
+  function summarise(route, adjust) {
     if (!route) return null;
-    var fuel = route.mi * fuelPerMile();
-    var hrs = route.mi / TRUCK.speed;
+    var est   = estMiles(route.mi);
+    var miles = Math.max(1, est + (adjust || 0));
+    var fuel  = miles * fuelPerMile();
+    var hrs   = miles / TRUCK.speed;
     return {
-      miles: route.mi,
+      miles: miles,
+      estMiles: est,
+      corridorMiles: route.mi,
+      adjusted: !!adjust,
       hours: hrs,
       days: Math.max(1, Math.ceil(hrs / 11)),
       tolls: route.toll,
       fuel: fuel,
       total: route.toll + fuel,
-      perMile: route.mi ? (route.toll + fuel) / route.mi : 0,
-      tollPerMile: route.mi ? route.toll / route.mi : 0,
+      perMile: miles ? (route.toll + fuel) / miles : 0,
+      tollPerMile: miles ? route.toll / miles : 0,
       breakdown: tollBreakdown(route),
       via: route.nodes.map(function (n) { return NODES[n].n + ', ' + NODES[n].s; }),
       hwys: route.legs.map(function (l) { return l.e.hwy; })
@@ -476,15 +493,22 @@
     return { id: hit, label: NODES[hit].n + ', ' + NODES[hit].s, via: 'city', exact: true };
   }
 
-  function quote(fromInput, toInput) {
+  function quote(fromInput, toInput, overrideMiles) {
     var a = resolve(fromInput), b = resolve(toInput);
     if (!a) return { error: 'Could not place origin "' + fromInput + '".' };
     if (!b) return { error: 'Could not place destination "' + toInput + '".' };
     if (a.id === b.id) return { error: 'Origin and destination resolve to the same metro (' + a.label + ').' };
 
-    var fast = summarise(solve(a.id, b.id, 'fast'));
-    var cheap = summarise(solve(a.id, b.id, 'cheap'));
-    if (!fast) return { error: 'No corridor route found between those points.' };
+    var fastR  = solve(a.id, b.id, 'fast');
+    var cheapR = solve(a.id, b.id, 'cheap');
+    if (!fastR) return { error: 'No corridor route found between those points.' };
+
+    /* Dispatch usually knows the real mileage off the rate confirmation. Anchor
+       on the route the driver would actually run, then carry the SAME correction
+       onto the alternative so the two stay comparable. */
+    var adjust = (overrideMiles > 0) ? (overrideMiles - estMiles(fastR.mi)) : 0;
+    var fast   = summarise(fastR, adjust);
+    var cheap  = summarise(cheapR, adjust);
 
     var same = Math.abs(fast.miles - cheap.miles) < 1 && Math.abs(fast.tolls - cheap.tolls) < 0.5;
     var alt = null;

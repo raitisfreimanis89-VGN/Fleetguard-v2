@@ -176,7 +176,8 @@
     <div class="fuelrow">
       <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="6.00"> $/gal</span>
       <span class="mini">MPG <input id="mpg" type="number" step="0.1" min="1" value="6.5"></span>
-      <span class="mini" style="color:var(--ink3)">Change these only if the market moves &mdash; they are not per-truck.</span>
+      <span class="mini">Trip miles <input id="miles" type="number" step="1" min="1" placeholder="auto"></span>
+      <span class="mini" style="color:var(--ink3)">Got the miles off the rate con? Type them in and every cost below becomes exact.</span>
     </div>
 
     <div class="recents" id="recents"></div>
@@ -197,10 +198,11 @@
   Chicago Skyway is quoted at the <b>peak</b> rate; overnight (10pm&ndash;6am) it drops to $32.40.
   <b>Connecticut shows zero tolls because it genuinely has none</b> &mdash; the state removed them in 1985.
   Georgia, Arizona and New Mexico are the same: no truck tolls exist (Georgia bans trucks from its express lanes outright).</p>
-  <p><b>&#x26A0;&#xFE0F; Your I-PASS may not cover Kansas or Oklahoma.</b> Those states run on K-TAG / PIKEPASS, a different
-  interoperability group from E-ZPass. Kansas and Oklahoma figures here are transponder rates &mdash; if your tag is not
-  honoured there you will pay the higher video rate instead. Worth confirming with your I-PASS account before relying on
-  these two states.</p>
+  <p><b>About the mileage.</b> The estimate sums metro to metro along the interstate corridors, then adds a local-access
+  allowance at each end. It runs a few percent short of a real routed trip, so treat it as a planning figure.
+  <b>When you have the real mileage, type it into &ldquo;Trip miles&rdquo;</b> &mdash; fuel, cost per mile and the day count
+  all recalculate off your number, while the tolls stay driven by the roads crossed. Tolls never scale with mileage:
+  they depend on which facilities you cross, not how far the shipper sits off the ramp.</p>
   <p>Verify exact figures at:
     <a href="https://www.ohioturnpike.org/tolls/toll-calculator" target="_blank" rel="noopener">Ohio Turnpike</a> &middot;
     <a href="https://www.indianatollroad.org/toll-calculator/" target="_blank" rel="noopener">Indiana Toll Road</a> &middot;
@@ -210,7 +212,7 @@
   </p>
 </footer>
 
-<script src="js/toll-engine.js?v=20260903c"></script>
+<script src="js/toll-engine.js?v=20260903d"></script>
 <script>
 (function(){
   'use strict';
@@ -234,6 +236,11 @@
   ['from','to'].forEach(function(id){
     $(id).addEventListener('input', function(){ hint(id, id+'-hint'); });
     $(id).addEventListener('keydown', function(e){ if(e.key==='Enter') run(); });
+  });
+  // Re-cost immediately when the numbers change, but only once a lane is up.
+  ['miles','fuel','mpg'].forEach(function(id){
+    $(id).addEventListener('keydown', function(e){ if(e.key==='Enter') run(); });
+    $(id).addEventListener('change', function(){ if($('out').innerHTML) run(); });
   });
 
   /* ── recent lanes (local only) ─────────────────────────────────────────── */
@@ -278,7 +285,7 @@
       + '<div class="big">'+money(r.tolls)+'</div>'
       + '<div class="biglbl">'+label+'</div>'
       + '<div class="facts">'
-      +   '<div class="fact"><span class="k">Miles</span><span class="v">'+num(r.miles)+'</span></div>'
+      +   '<div class="fact"><span class="k">Miles'+(r.adjusted?'':' <span style="opacity:.6">(est)</span>')+'</span><span class="v">'+num(r.miles)+'</span></div>'
       +   '<div class="fact"><span class="k">Drive time</span><span class="v">'+r.hours.toFixed(1)+' h</span></div>'
       +   '<div class="fact"><span class="k">Fuel</span><span class="v">'+money0(r.fuel)+'</span></div>'
       +   '<div class="fact"><span class="k">Days (HOS)</span><span class="v">'+r.days+'</span></div>'
@@ -300,7 +307,8 @@
 
     E.setFuel(parseFloat($('fuel').value), parseFloat($('mpg').value));
 
-    var q = E.quote(a,b);
+    var override = parseFloat($('miles').value);
+    var q = E.quote(a, b, override > 0 ? override : 0);
     if(q.error){ out.innerHTML = '<div class="err">'+q.error+'</div>'; return; }
 
     var html = '<h2 class="sec">&#x1F4B0; '+q.from.label+' &rarr; '+q.to.label+'</h2>';
@@ -337,6 +345,12 @@
           + '</b> on the recommended routing — that is <b>'+money(best.perMile)+'/mile</b> before driver pay, '
           + 'insurance and maintenance. Add your margin on top of that number, not on top of the linehaul alone.'
           + (best.days > 1 ? ' At 65 mph this is a <b>'+best.days+'-day run</b> under HOS — plan the reset.' : '')
+          + (best.adjusted
+              ? ' Costed on <b>'+num(best.miles)+' miles</b>'
+                + (Math.abs(best.miles - override) > 1
+                    ? ' — the '+num(override)+' you entered, plus '+num(best.miles-override)+' for the cheaper routing.'
+                    : ', the figure you entered.')
+              : ' Costed on our <b>'+num(best.miles)+'-mile estimate</b> — enter the real miles above to make it exact.')
           + '</div>';
 
     out.innerHTML = html;
