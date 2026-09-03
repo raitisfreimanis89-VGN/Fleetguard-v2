@@ -443,11 +443,53 @@
     if (e.key === 'Escape' && document.activeElement === q){ q.value = ''; term = ''; apply(); q.blur(); }
   });
 
-  /* 511 wiring point — left deliberately unconnected.
+  /* ── 511 wiring point — still deliberately unconnected ──────────────────
      When a real feed exists, call setRoadFeed(text) with data actually
      fetched from it. Until then the strip keeps saying it is not connected:
      a compliance page telling a driver a pass is clear, on no evidence,
-     is worse than saying nothing at all. */
+     is worse than saying nothing at all.
+
+     *** UNITED STATES ONLY. Canadian data is never requested or shown. ***
+     This fleet does not run Canada, so every feed added here MUST pass
+     through usOnly() below. Two independent guards, because one is not
+     enough:
+       1. Requests are clamped to the CONUS bounding box, so cross-border
+          data is not even asked for.
+       2. Results are filtered against an ALLOW-list of US jurisdictions
+          built at runtime from the provider's own country field. An
+          allow-list, not a deny-list — if a provider adds a new Canadian
+          province tomorrow it is excluded by default rather than leaking
+          through until someone notices.
+
+     TRAP, do not remove: road511 uses the code "CA" for CALIFORNIA.
+     Canada is identified by country:"CA", never by the jurisdiction code.
+     Filtering on the bare string "CA" silently drops California — a state
+     this fleet very much does run. Filter on country, never on the code.
+     "OSM-NA" is excluded too: its country is "NA" (North America), so it
+     cannot be guaranteed US-only.                                        */
+  var US_BBOX = '-125,24,-66.5,49.4';        // continental US
+  var _usCodes = null;                        // allow-list, cached per load
+
+  async function usJurisdictions(){
+    if (_usCodes) return _usCodes;
+    var r = await fetch('https://map.road511.com/api/v1/jurisdictions');
+    var all = await r.json();
+    _usCodes = new Set(all.filter(function(j){ return j.country === 'US'; })
+                          .map(function(j){ return j.code; }));
+    return _usCodes;
+  }
+
+  // Every feed result must go through this before it can reach the DOM.
+  async function usOnly(items){
+    var ok = await usJurisdictions();
+    return (items || []).filter(function(e){
+      var j = e.jurisdiction || e.source;
+      return j && ok.has(j);            // unknown jurisdiction => dropped
+    });
+  }
+  window.usOnly = usOnly;
+  window.US_BBOX = US_BBOX;
+
   window.setRoadFeed = function(text){
     if (!text) return;
     document.getElementById('feed-msg').textContent = text;
