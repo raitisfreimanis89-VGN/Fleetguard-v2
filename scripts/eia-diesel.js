@@ -71,6 +71,19 @@ const [mm, dd, yy] = mmddyy.split('/');
 const period = '20' + yy + '-' + mm + '-' + dd;
 const price = Math.round((national + MARGIN) * 1000) / 1000;
 
+/* Leave the file untouched when nothing meaningful moved. fetchedAt changes
+   on every run, so writing unconditionally would produce a commit and a
+   Pages redeploy every single day for a figure that only moves weekly. */
+if (fs.existsSync(OUT)) {
+  try {
+    const prev = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+    if (prev.national === national && prev.margin === MARGIN && prev.period === period) {
+      console.log(`unchanged: ${national} + ${MARGIN} = ${price} (week of ${period})`);
+      process.exit(0);
+    }
+  } catch (e) { /* unreadable previous file — fall through and rewrite it */ }
+}
+
 fs.mkdirSync('data', { recursive: true });
 fs.writeFileSync(OUT, JSON.stringify({
   price, national, margin: MARGIN, period,
