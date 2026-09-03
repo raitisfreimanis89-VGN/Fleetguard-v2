@@ -72,9 +72,31 @@
   }
   .feed .f-dot{width:6px; height:6px; border-radius:50%; background:#8b97a8;}
   .feed[data-state="live"] .f-dot{background:#34d399; box-shadow:0 0 6px #34d399;}
+  .feed[data-state="alert"] .f-dot{background:#f2726f; box-shadow:0 0 6px #f2726f;}
   .feed .f-msg{font-size:.83rem; color:#adbdd6; flex:1; min-width:12rem;}
-  .feed a{color:#f0a868; font-weight:600; font-size:.83rem; white-space:nowrap;}
-  .feed a:hover{text-decoration:underline;}
+  .feed a, .feed .f-btn{color:#f0a868; font-weight:600; font-size:.83rem; white-space:nowrap;}
+  .feed a:hover, .feed .f-btn:hover{text-decoration:underline;}
+  .feed .f-btn{background:none; border:0; padding:0; cursor:pointer; font-family:inherit;}
+
+  /* Active NWS alerts, grouped by event type. */
+  .alerts{margin-top:.5rem; display:flex; flex-direction:column; gap:.3rem;}
+  .alerts .a-row{
+    display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
+    padding:.45rem .7rem; border-radius:10px;
+    background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+    font-size:.8rem; color:#cdd9ea;
+  }
+  .alerts .a-row.extreme{background:rgba(242,114,111,.13); border-color:rgba(242,114,111,.4);}
+  .alerts .a-row.severe {background:rgba(245,158,75,.11); border-color:rgba(245,158,75,.32);}
+  .alerts .a-ic{font-size:.95rem; line-height:1;}
+  .alerts .a-ev{font-weight:700; color:#f0f5ff;}
+  .alerts .a-n{
+    font-family:'IBM Plex Mono',monospace; font-size:.68rem; font-weight:600;
+    background:rgba(255,255,255,.09); padding:.05rem .38rem; border-radius:999px;
+  }
+  .alerts .a-st{font-family:'IBM Plex Mono',monospace; font-size:.72rem; color:#9fb0c9;}
+  .alerts .a-when{margin-left:auto; font-size:.72rem; color:#8797ad; white-space:nowrap;}
+  .alerts .a-src{font-size:.7rem; color:#66788f; padding:.2rem .2rem 0;}
 
   /* filter / search bar */
   .bar{
@@ -232,10 +254,12 @@
       <span class="count">&#x1F4DA; 10 guides available</span>
 
       <div class="feed" id="road-feed" data-state="offline">
-        <span class="f-tag"><span class="f-dot"></span> 511 Feed</span>
-        <span class="f-msg" id="feed-msg">Not connected yet &mdash; open the live 511 map for current road and pass conditions.</span>
+        <span class="f-tag"><span class="f-dot"></span> NWS Alerts</span>
+        <span class="f-msg" id="feed-msg">Checking the National Weather Service&hellip;</span>
+        <button class="f-btn" id="feed-toggle" hidden>Show all</button>
         <a href="https://map.road511.com/" target="_blank" rel="noopener">Open 511 map &#x2197;</a>
       </div>
+      <div class="alerts" id="alerts" hidden></div>
     </div>
   </header>
 
@@ -495,6 +519,125 @@
     document.getElementById('feed-msg').textContent = text;
     document.getElementById('road-feed').setAttribute('data-state', 'live');
   };
+
+  /* ── NWS active alerts ──────────────────────────────────────────────────
+     api.weather.gov is an official US government API: no key, no
+     registration, CORS open, and it is not going to disappear. It is US-only
+     by definition, so the Canada guard above does not apply to it.
+
+     Filtering by EVENT TYPE nationwide rather than by state keeps the
+     payload tiny — blizzards and tornadoes are rare, so a quiet day is a
+     few KB. Filtering by state would pull every heat advisory in the
+     country and cost 100x more for less relevance. */
+  var NWS_EVENTS = [
+    'Tornado Warning','Tornado Watch','Blizzard Warning','Ice Storm Warning',
+    'Winter Storm Warning','Winter Storm Watch','High Wind Warning',
+    'Dust Storm Warning','Blowing Dust Advisory','Freezing Rain Advisory',
+    'Winter Weather Advisory','Extreme Cold Warning'
+  ];
+  var SEV_RANK = { Extreme:0, Severe:1, Moderate:2, Minor:3, Unknown:4 };
+  var feedEl = document.getElementById('road-feed');
+  var msgEl  = document.getElementById('feed-msg');
+  var listEl = document.getElementById('alerts');
+  var togEl  = document.getElementById('feed-toggle');
+  var expanded = false, groups = [];
+
+  function iconFor(ev){
+    if (/Tornado/i.test(ev)) return '🌪️';
+    if (/Wind|Dust/i.test(ev)) return '💨';
+    return '❄️';
+  }
+  // Zone ids look like .../zones/forecast/WYZ278 or .../county/KSC009
+  function statesOf(p){
+    var out = {};
+    (p.affectedZones || []).forEach(function(z){
+      var m = z.match(/\/([A-Z]{2})[ZC]\d+$/);
+      if (m) out[m[1]] = 1;
+    });
+    return Object.keys(out);
+  }
+  function fmtEnd(iso){
+    if (!iso) return '';
+    var d = new Date(iso), now = new Date();
+    if (isNaN(d)) return '';
+    var sameDay = d.toDateString() === now.toDateString();
+    var t = d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    return 'until ' + (sameDay ? t : d.toLocaleDateString('en-US',{weekday:'short'}) + ' ' + t);
+  }
+
+  function renderAlerts(){
+    if (!groups.length){ listEl.hidden = true; return; }
+    var show = expanded ? groups : groups.slice(0, 3);
+    listEl.innerHTML = show.map(function(g){
+      var cls = g.sev === 'Extreme' ? ' extreme' : (g.sev === 'Severe' ? ' severe' : '');
+      return '<div class="a-row' + cls + '">'
+        + '<span class="a-ic">' + iconFor(g.event) + '</span>'
+        + '<span class="a-ev">' + g.event + '</span>'
+        + '<span class="a-n">' + g.n + '</span>'
+        + '<span class="a-st">' + (g.states.join(' ') || '—') + '</span>'
+        + '<span class="a-when">' + fmtEnd(g.ends) + '</span>'
+        + '</div>';
+    }).join('') + '<div class="a-src">Source: National Weather Service &middot; api.weather.gov</div>';
+    listEl.hidden = false;
+  }
+
+  async function loadAlerts(){
+    try {
+      var url = 'https://api.weather.gov/alerts/active?status=actual&event='
+              + NWS_EVENTS.map(encodeURIComponent).join(',');
+      var r = await fetch(url, { headers: { 'Accept':'application/geo+json' } });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var j = await r.json();
+      var feats = j.features || [];
+
+      var by = {};
+      feats.forEach(function(f){
+        var p = f.properties, k = p.event;
+        if (!by[k]) by[k] = { event:k, n:0, states:{}, sev:'Unknown', ends:null };
+        var g = by[k];
+        g.n++;
+        statesOf(p).forEach(function(s){ g.states[s] = 1; });
+        if ((SEV_RANK[p.severity] ?? 4) < (SEV_RANK[g.sev] ?? 4)) g.sev = p.severity;
+        if (p.ends && (!g.ends || new Date(p.ends) < new Date(g.ends))) g.ends = p.ends;
+      });
+      groups = Object.keys(by).map(function(k){
+        by[k].states = Object.keys(by[k].states).sort();
+        return by[k];
+      }).sort(function(a,b){
+        return (SEV_RANK[a.sev] ?? 4) - (SEV_RANK[b.sev] ?? 4) || b.n - a.n;
+      });
+
+      if (!feats.length){
+        feedEl.setAttribute('data-state','live');
+        msgEl.textContent = 'No severe weather alerts active nationwide.';
+        togEl.hidden = true; listEl.hidden = true;
+        return;
+      }
+      var states = {};
+      groups.forEach(function(g){ g.states.forEach(function(s){ states[s] = 1; }); });
+      var nStates = Object.keys(states).length;
+      feedEl.setAttribute('data-state', groups[0].sev === 'Extreme' ? 'alert' : 'live');
+      msgEl.textContent = feats.length + ' active ' + (feats.length === 1 ? 'alert' : 'alerts')
+        + ' across ' + nStates + ' ' + (nStates === 1 ? 'state' : 'states') + '.';
+      togEl.hidden = groups.length <= 3;
+      togEl.textContent = 'Show all ' + groups.length;
+      renderAlerts();
+    } catch (e){
+      // Stay honest: never imply conditions were checked when they were not.
+      feedEl.setAttribute('data-state','offline');
+      msgEl.textContent = 'Could not reach the National Weather Service — open the 511 map for conditions.';
+      togEl.hidden = true; listEl.hidden = true;
+    }
+  }
+
+  togEl.addEventListener('click', function(){
+    expanded = !expanded;
+    togEl.textContent = expanded ? 'Show less' : ('Show all ' + groups.length);
+    renderAlerts();
+  });
+
+  loadAlerts();
+  setInterval(loadAlerts, 5 * 60 * 1000);   // refresh every 5 minutes
 
   apply();
 })();
