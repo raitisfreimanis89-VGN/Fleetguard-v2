@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Guides & Playbooks  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/guides.html          Production route: /guides.html (untouched)
+
+     This file is additive. It does not import, extend or override anything in
+     the production path — not css/styles.css, not js/app.js, not guides.html.
+     Its only dependencies outside v2/ are the shared brand image and the same
+     Google Fonts the production pages already request.
+
+     Sections, in order: shell (sidebar + topbar) · hero status widgets ·
+     filter bar · Essential Tools · Live Maps · Compliance · Documents.
+
+     All ten resources, their copy, hrefs and search keywords come from the
+     production guides.html. Anything that differs from it, or from the
+     mockup, is commented at the point it differs and says why.
+
+     Live data: js/v2-guides.js polls api.weather.gov for the weather tile.
+     Everything else on the page is static.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Staging: keep this out of search results even if the branch ever lands on main. -->
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Guides — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://images.unsplash.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Inter only, per the design system. Dropping Manrope and IBM Plex Mono
+     removes two families from the critical path; tabular figures come from
+     Inter font-variant-numeric rather than a separate mono face. -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────────────────────
+       Cosmetic shell, per the approved decision. This page is public and
+       unauthenticated, so the dashboard destinations below point at
+       ../index.html (the login entry) rather than pretending to route inside
+       the authenticated SPA. No auth call, no app.js, no Supabase.
+       ───────────────────────────────────────────────────────────────────── -->
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Fleet operations">
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Overview
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v8a2 2 0 0 1-1 1.73l-7 4a2 2 0 0 1-2 0l-7-4A2 2 0 0 1 3 16V8a2 2 0 0 1 1-1.73l7-4a2 2 0 0 1 2 0l7 4A2 2 0 0 1 21 8Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+        Loads
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+        Maintenance
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Alerts
+        <!-- HARDCODED per approved mockup — no data source. Wire before cutover. -->
+        <span class="v2-nav-badge">2</span>
+      </a>
+    </nav>
+
+    <div>
+      <div class="v2-nav-group">Resources</div>
+      <nav class="v2-nav" aria-label="Resources">
+        <a class="v2-nav-item is-active" href="guides.html" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+          Guides &amp; Playbooks
+        </a>
+        <!-- In-page anchors: these sections are built in steps 4-6. -->
+        <a class="v2-nav-item" href="#tools">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>
+          Tools
+        </a>
+        <a class="v2-nav-item" href="#maps">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 3-6 3v15l6-3 6 3 6-3V3l-6 3Z"/><path d="M9 3v15M15 6v15"/></svg>
+          Live Maps
+        </a>
+        <a class="v2-nav-item" href="#compliance">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/></svg>
+          Compliance
+        </a>
+        <a class="v2-nav-item" href="#documents">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><path d="M8 13h8M8 17h6"/></svg>
+          Documents
+        </a>
+      </nav>
+    </div>
+
+    <div class="v2-sidebar-foot">
+      <!-- HARDCODED per approved mockup. This page has no session to read from —
+           it is public and loads no auth. Wire to the real profile at cutover,
+           or drop the chip if Guides stays unauthenticated. -->
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="v2-tools-sep"></span>
+        <!-- Theme toggle is inert in step 1: v2 is dark-only per the mockup. -->
+        <button class="v2-icon-btn" type="button" aria-label="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <!-- ── Main column ─────────────────────────────────────────────────────── -->
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search guides, laws, limits</label>
+        <!-- Wired to the card grid in step 3, once there is something to filter. -->
+        <input id="v2-q" type="text" placeholder="Search guides, laws, limits..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <!-- HARDCODED per approved mockup — no notification source exists. -->
+          <span class="v2-bell-badge">5</span>
+        </button>
+
+        <!-- HARDCODED per approved mockup — nothing checks system health.
+             Note this contradicts the honesty rule commented in the production
+             guides.html ("never imply conditions were checked when they were
+             not"). Kept by explicit decision; wire or remove before cutover. -->
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Guides &amp; Playbooks</h1>
+        <p>Your central hub for fleet operations &mdash; calculators, live maps, compliance references, and step-by-step playbooks.</p>
+      </div>
+
+      <!-- ══ Hero status widgets ═══════════════════════════════════════════
+           Tile 1 is live: js/v2-guides.js drives its value, sub-line and
+           colour from api.weather.gov, and leaves it grey saying so if the
+           feed cannot be reached. Tiles 2 and 3 are static — see their
+           comments.
+           ══════════════════════════════════════════════════════════════ -->
+      <section class="v2-hero-row" aria-label="Fleet status">
+
+        <!-- Tile 1 · Weather Alerts — LIVE -->
+        <div class="v2-tile" id="v2-wx" data-state="loading">
+          <span class="v2-tile-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 17a4.5 4.5 0 0 0 0-9h-1.3A7 7 0 1 0 5 15.7"/><path d="m12 12-2.5 4.5h4L11 21"/></svg>
+          </span>
+          <div class="v2-tile-body">
+            <span class="v2-tile-label">Weather Alerts</span>
+            <span class="v2-tile-value" id="v2-wx-value">Checking&hellip;</span>
+            <span class="v2-tile-sub" id="v2-wx-sub">Contacting the National Weather Service.</span>
+            <a class="v2-tile-link" href="https://map.road511.com/" target="_blank" rel="noopener">
+              View on Map <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Tile 2 · System Status — STATIC.
+             "All Systems Operational" is hardcoded per the approved mockup;
+             nothing checks service health. The sub-line underneath it IS real:
+             it reports when the NWS poll last succeeded, which is the only
+             health signal this page actually has. No "View Status" link — no
+             status page exists to point at, and a dead link is worse than
+             none. Wire or remove all of this before cutover. -->
+        <div class="v2-tile v2-accent-green">
+          <span class="v2-tile-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></svg>
+          </span>
+          <div class="v2-tile-body">
+            <span class="v2-tile-label">System Status</span>
+            <span class="v2-tile-value"><span class="v2-tile-dot"></span>All Systems Operational</span>
+            <span class="v2-tile-sub" id="v2-sys-updated">Awaiting first check</span>
+          </div>
+        </div>
+
+        <!-- Tile 3 · DOT News & Updates — STATIC, but points somewhere real.
+             The mockup's headline was "2024 Brake Safety Week dates
+             announced", which is two years stale and has no feed behind it.
+             This links to the DOT enforcement calendar page that already
+             exists in the repo instead. -->
+        <div class="v2-tile v2-accent-blue">
+          <span class="v2-tile-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><path d="M8 13h8M8 17h5"/></svg>
+          </span>
+          <div class="v2-tile-body">
+            <span class="v2-tile-label">DOT News &amp; Updates</span>
+            <span class="v2-tile-value">CVSA Inspection Calendar</span>
+            <span class="v2-tile-sub">Roadcheck, Brake Safety Week and Safe Driver Week enforcement dates.</span>
+            <a class="v2-tile-link" href="../dot-enforcement-calendar.html" target="_blank" rel="noopener">
+              View Calendar <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+            </a>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Grouped NWS detail. Both stay hidden until the feed returns rows. -->
+      <div class="v2-alerts" id="v2-alerts" hidden></div>
+      <div class="v2-alert-foot" id="v2-alerts-foot" hidden>
+        <span>Source: National Weather Service &middot; api.weather.gov</span>
+        <button class="v2-alert-toggle" id="v2-wx-toggle" type="button" hidden></button>
+      </div>
+
+      <!-- ══ Filter bar ════════════════════════════════════════════════════
+           Counts are left empty here on purpose — v2-guides.js fills them by
+           counting the cards actually in the page, and disables any category
+           that has none yet. Compliance and Documents light up on their own
+           when step 5 adds those sections; no number here needs editing.
+           ══════════════════════════════════════════════════════════════ -->
+      <div class="v2-filterbar">
+        <div class="v2-tabs" id="v2-tabs" role="tablist" aria-label="Filter resources by category">
+          <button class="v2-tab is-active" type="button" role="tab" aria-selected="true" data-cat="all">
+            All Resources <span class="v2-tab-n"></span>
+          </button>
+          <button class="v2-tab" type="button" role="tab" aria-selected="false" data-cat="tools">
+            Tools <span class="v2-tab-n"></span>
+          </button>
+          <button class="v2-tab" type="button" role="tab" aria-selected="false" data-cat="maps">
+            Live Maps <span class="v2-tab-n"></span>
+          </button>
+          <button class="v2-tab" type="button" role="tab" aria-selected="false" data-cat="compliance">
+            Compliance <span class="v2-tab-n"></span>
+          </button>
+          <button class="v2-tab" type="button" role="tab" aria-selected="false" data-cat="documents">
+            Documents <span class="v2-tab-n"></span>
+          </button>
+        </div>
+
+        <!-- The mockup's "Most Popular" needs view counts, which nothing in
+             this app records. These three sort on data the page actually has. -->
+        <label class="v2-sort" for="v2-sort">
+          <span>Sort by</span>
+          <span class="v2-sort-field">
+            <select id="v2-sort">
+              <option value="default">Category</option>
+              <option value="az">A &ndash; Z</option>
+              <option value="za">Z &ndash; A</option>
+            </select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </span>
+        </label>
+      </div>
+
+      <div id="v2-sections">
+
+        <!-- ══ Essential Tools ══════════════════════════════════════════════
+             Card copy, hrefs and the DOT PART 396 reference are carried over
+             verbatim from the production guides.html "Tools" section, so the
+             cutover is a route swap with no content re-authoring.
+
+             The three usage-style figures are NOT carried over — see the
+             comments on each. They come from the mockup, not from the app.
+             ════════════════════════════════════════════════════════════ -->
+        <section class="v2-section v2-accent-amber" id="tools" data-section="tools">
+
+          <div class="v2-section-head">
+            <span class="v2-section-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+            </span>
+            <div class="v2-section-title">
+              <h2>Essential Tools</h2>
+              <p>Interactive tools and calculators for daily operations.</p>
+            </div>
+            <!-- Becomes the Tools filter once the filter bar exists (step 3). -->
+            <a class="v2-section-link" href="#tools">View All Tools <span class="v2-arrow" aria-hidden="true">&#8594;</span></a>
+          </div>
+
+          <div class="v2-tool-grid">
+
+            <!-- ── Card 1 · PTI Driver Guide ─────────────────────────────── -->
+            <article class="v2-tool-card v2-accent-amber" data-cat="tools"
+                     data-title="pti driver guide pre trip inspection tyres photos dot part 396">
+              <div class="v2-tool-art v2-art-pti" aria-hidden="true" style="--art-lift: 1.35"></div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">Inspections</span>
+                <h3>PTI Driver Guide</h3>
+                <p>Step-by-step pre-trip inspection &mdash; how a driver completes every PTI, tyres and photos included.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/></svg>
+                      DOT PART 396
+                    </span>
+                  </div>
+                  <a class="v2-btn" href="../PTI-driver-guide.html?dispatch=1" target="_blank" rel="noopener">
+                    Open Guide <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── Card 2 · Toll &amp; Route Console ──────────────────────── -->
+            <article class="v2-tool-card v2-accent-cyan" data-cat="tools"
+                     data-title="toll route console zip code toll cost fuel cost ipass 80k 5 axle calculator turnpike">
+              <div class="v2-tool-art v2-art-toll" aria-hidden="true" style="--art-lift: 1.45">
+                <svg viewBox="0 0 260 200" preserveAspectRatio="xMaxYMid slice" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="v2RouteLine" x1="0" y1="1" x2="1" y2="0">
+                      <stop offset="0" stop-color="#0e7490"/><stop offset=".45" stop-color="#22d3ee"/><stop offset="1" stop-color="#a5f3fc"/>
+                    </linearGradient>
+                    <radialGradient id="v2RouteGlow" cx=".5" cy=".5" r=".5">
+                      <stop offset="0" stop-color="#22d3ee" stop-opacity=".55"/><stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+                    </radialGradient>
+                    <filter id="v2RouteSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="5"/></filter>
+                  </defs>
+
+
+                  <g stroke="#22d3ee" stroke-opacity=".09" stroke-width="1">
+                    <path d="M0 30h260M0 60h260M0 90h260M0 120h260M0 150h260M0 180h260"/>
+                    <path d="M30 0v200M60 0v200M90 0v200M120 0v200M150 0v200M180 0v200M210 0v200M240 0v200"/>
+                  </g>
+                  <g stroke="#67e8f9" stroke-opacity=".18" stroke-width="1.6" stroke-linecap="round">
+                    <path d="M0 98c40 8 60-16 96-14s54 22 88 14"/>
+                    <path d="M26 0c16 34 6 56 28 74s58 10 76 32"/>
+                    <path d="M118 200c8-30 30-38 40-62"/>
+                  </g>
+
+                  <path d="M28 172C64 160 58 124 94 112s58 6 84-22 34-42 56-48"
+                        stroke="#22d3ee" stroke-opacity=".6" stroke-width="10" stroke-linecap="round" filter="url(#v2RouteSoft)"/>
+                  <path d="M28 172C64 160 58 124 94 112s58 6 84-22 34-42 56-48"
+                        stroke="url(#v2RouteLine)" stroke-width="3.6" stroke-linecap="round"/>
+
+                  <circle cx="28" cy="172" r="11" fill="url(#v2RouteGlow)"/>
+                  <circle cx="28" cy="172" r="5.5" fill="#0a1420" stroke="#22d3ee" stroke-width="2.4"/>
+
+                  <g transform="translate(122,94)">
+                    <circle r="14" fill="url(#v2RouteGlow)"/>
+                    <rect x="-7.5" y="-7.5" width="15" height="15" rx="3.5" fill="#0a1420" stroke="#f5a524" stroke-width="1.8"/>
+                    <path d="M-3.4 0h6.8M0 -3.4v6.8" stroke="#f5a524" stroke-width="1.7" stroke-linecap="round"/>
+                  </g>
+
+                  <circle cx="234" cy="42" r="16" fill="url(#v2RouteGlow)"/>
+                  <circle cx="234" cy="42" r="10" fill="none" stroke="#67e8f9" stroke-opacity=".55" stroke-width="2"/>
+                  <circle cx="234" cy="42" r="5.5" fill="#a5f3fc"/>
+                </svg>
+              </div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">Calculator</span>
+                <h3>Toll &amp; Route Console</h3>
+                <p>Two ZIP codes in &mdash; toll cost, fuel cost, and whether going around the toll road actually pays.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <!-- The rig the console prices for: 80,000 lb gross on a
+                         5-axle tractor-trailer, tolled at the I-PASS rate.
+                         Carried over from production guides.html. -->
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+                      80K / 5-Axle
+                    </span>
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 12.6 12 21.2l-8.5-8.5a4.8 4.8 0 0 1-1.4-3.4V4.4A2.4 2.4 0 0 1 4.5 2h4.9a4.8 4.8 0 0 1 3.4 1.4l7.8 7.8a1 1 0 0 1 0 1.4Z"/><path d="M7 7h.01"/></svg>
+                      I-PASS
+                    </span>
+                  </div>
+                  <a class="v2-btn" href="../toll-console.html" target="_blank" rel="noopener">
+                    Open Console <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── Card 3 · Weight &amp; Axle Limits ───────────────────────── -->
+            <article class="v2-tool-card v2-accent-amber" data-cat="tools"
+                     data-title="weight axle limits federal gross tandem 5th wheel slide scale ticket kingpin kp-40">
+              <div class="v2-tool-art v2-art-axle" aria-hidden="true"></div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">Reference Tool</span>
+                <h3>Weight &amp; Axle Limits</h3>
+                <p>Federal limits + a live load checker &mdash; type your scale ticket and it says which way to slide the tandems / 5th wheel.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <!-- The federal limits a driver reads off a scale ticket:
+                         12,000 lb steer, 34,000 lb per tandem, and the 40 ft
+                         kingpin rule. Carried over from production
+                         guides.html — do not replace these with usage counts. -->
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20"/><circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M9 9h6M12 6v6"/><path d="m10 7 2-2 2 2"/></svg>
+                      12K / 34K / 34K
+                    </span>
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h18v8H3z"/><path d="M7 8v3M11 8v3M15 8v3M19 8v3"/></svg>
+                      KP-40
+                    </span>
+                  </div>
+                  <a class="v2-btn" href="../weight-axle-limits.html" target="_blank" rel="noopener">
+                    Open Tool <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- ══ Live Maps ═════════════════════════════════════════════════════
+             Copy, hrefs and tags carried over verbatim from the production
+             "Live Maps" section.
+
+             Arrow convention, and it is load-bearing: ↗ means "this leaves
+             FleetGuard". Cards 1 and 2 go to catscale.com and map.road511.com
+             and get ↗. Card 3 goes to our own dot-state-maps.html and gets →.
+             Production already does exactly this; putting ↗ on card 3 would
+             tell a driver they are leaving the site when they are not.
+             ══════════════════════════════════════════════════════════════ -->
+        <section class="v2-section v2-accent-green" id="maps" data-section="maps">
+
+          <div class="v2-section-head">
+            <span class="v2-section-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            </span>
+            <div class="v2-section-title">
+              <h2>Live Maps</h2>
+              <p>Real-time maps and conditions to keep you moving.</p>
+            </div>
+            <a class="v2-section-link" href="#maps">View All Maps <span class="v2-arrow" aria-hidden="true">&#8594;</span></a>
+          </div>
+
+          <div class="v2-tool-grid">
+
+            <!-- ── Card 1 · CAT Scale Locator ────────────────────────────── -->
+            <article class="v2-tool-card v2-accent-green" data-cat="maps"
+                     data-title="cat scale locator weigh load nearest certified scale catscale">
+              <div class="v2-tool-art v2-art-scale" aria-hidden="true" style="--art-lift: 1.4"></div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">Locator &middot; External</span>
+                <h3>CAT Scale Locator</h3>
+                <p>Find the nearest CAT Scale to weigh your load &mdash; opens the live locator map on catscale.com.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <!-- MOCKUP FIGURE. Nothing in this repo records how many
+                         CAT Scale sites exist, and the real number changes as
+                         they open and close, so this cannot be verified here.
+                         Either confirm it against catscale.com before cutover
+                         or drop the pill — the tag already says "Locator". -->
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                      4,200+ Locations
+                    </span>
+                  </div>
+                  <a class="v2-btn" href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener">
+                    Open Locator <span class="v2-arrow" aria-hidden="true">&#8599;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── Card 2 · Road Conditions &amp; Traffic ─────────────────── -->
+            <article class="v2-tool-card v2-accent-green" data-cat="maps"
+                     data-title="road conditions traffic 511 map weather accidents construction live national">
+              <div class="v2-tool-art v2-art-traffic" aria-hidden="true" style="--art-lift: 1.7"></div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">Live Map &middot; External</span>
+                <h3>Road Conditions &amp; Traffic</h3>
+                <p>Live weather, traffic, accidents &amp; construction across the country &mdash; opens the 511 map.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <!-- "Live" describes the destination, which genuinely is a
+                         live map. The mockup's "Updated 2 min ago" is dropped:
+                         this page never polls road511, so it cannot know. -->
+                    <span class="v2-meta-pill is-live">
+                      <span class="v2-live-dot" aria-hidden="true"></span>
+                      Live &middot; 511
+                    </span>
+                  </div>
+                  <a class="v2-btn" href="https://map.road511.com/" target="_blank" rel="noopener">
+                    Open Map <span class="v2-arrow" aria-hidden="true">&#8599;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── Card 3 · State DOT / 511 Maps ─────────────────────────── -->
+            <article class="v2-tool-card v2-accent-green" data-cat="maps"
+                     data-title="state dot 511 maps by state road weather winter pass cameras closures">
+              <div class="v2-tool-art v2-art-states" aria-hidden="true" style="--art-lift: 1.2">
+                <svg viewBox="0 0 260 200" preserveAspectRatio="xMaxYMid slice" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs>
+                    <linearGradient id="v2StateFill" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stop-color="#1d4a35"/><stop offset="1" stop-color="#12261f"/>
+                    </linearGradient>
+                    <linearGradient id="v2StateLive" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stop-color="#86efac"/><stop offset="1" stop-color="#22c55e"/>
+                    </linearGradient>
+                    <radialGradient id="v2StateGlow" cx=".5" cy=".5" r=".5">
+                      <stop offset="0" stop-color="#4ade80" stop-opacity=".55"/><stop offset="1" stop-color="#4ade80" stop-opacity="0"/>
+                    </radialGradient>
+                    <filter id="v2StateSoft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+                  </defs>
+
+
+                  <!-- Stylised contiguous-US block map: west column tall, midwest
+                       square, east narrow — enough to read as the country at a
+                       glance without shipping a full topology. -->
+                  <g fill="url(#v2StateFill)" stroke="#4ade80" stroke-opacity=".3" stroke-width="1.1" stroke-linejoin="round">
+                    <path d="M22 56h30v40H22zM22 96h30v42H22z"/>
+                    <path d="M52 52h28v34H52zM52 86h28v36H52zM52 122h28v30H52z"/>
+                    <path d="M80 50h30v30H80zM80 80h30v34H80zM80 114h30v42H80z"/>
+                    <path d="M110 52h32v28h-32zM110 80h32v32h-32zM110 112h32v34h-32z"/>
+                    <path d="M142 56h28v26h-28zM142 82h28v30h-28zM142 112h28v26h-28z"/>
+                    <path d="M170 60h24v24h-24zM170 84h24v26h-24zM170 110h20v22h-20z"/>
+                    <path d="M194 66h20v22h-20zM194 88h18v22h-18z"/>
+                  </g>
+
+                  <!-- one state lit, with its 511 pin -->
+                  <path d="M110 80h32v32h-32z" fill="url(#v2StateLive)" fill-opacity=".9"/>
+                  <path d="M110 80h32v32h-32z" fill="none" stroke="#86efac" stroke-width="1.6"/>
+                  <g transform="translate(126,90)">
+                    <circle r="20" fill="url(#v2StateGlow)"/>
+                    <path d="M10 0a10 10 0 1 0-20 0c0 7.4 10 17.5 10 17.5S10 7.4 10 0Z" fill="#08150f" stroke="#86efac" stroke-width="1.8"/>
+                    <circle cy="-1" r="3.4" fill="#86efac"/>
+                  </g>
+
+                  <path d="M14 172h232" stroke="#4ade80" stroke-opacity=".26" stroke-width="2.4" filter="url(#v2StateSoft)"/>
+                </svg>
+              </div>
+              <div class="v2-tool-body">
+                <span class="v2-tag">By State</span>
+                <h3>State DOT / 511 Maps</h3>
+                <p>Official live road, weather &amp; traffic map for every state &mdash; tap your state. Great in winter.</p>
+                <div class="v2-tool-foot">
+                  <div class="v2-meta">
+                    <!-- 50 is now accurate. This page listed only 48 until
+                         Kentucky (goky.ky.gov) and North Carolina (drivenc.gov)
+                         were added to dot-state-maps.html — both major freight
+                         corridors that were silently missing. Recount before
+                         changing this number. -->
+                    <span class="v2-meta-pill">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><path d="M9 3v15M15 6v15"/></svg>
+                      50 States
+                    </span>
+                  </div>
+                  <!-- Internal page: straight arrow, not ↗. -->
+                  <a class="v2-btn" href="../dot-state-maps.html" target="_blank" rel="noopener">
+                    Open List <span class="v2-arrow" aria-hidden="true">&#8594;</span>
+                  </a>
+                </div>
+              </div>
+            </article>
+
+          </div>
+        </section>
+
+        <!-- ══ Compliance ════════════════════════════════════════════════════
+             Production keeps all four of these in one "Reference & Compliance"
+             category. The v2 tabs split them 2/2: laws and enforcement here,
+             reference material below. Copy, hrefs, tags and meta are carried
+             over verbatim — only the grouping is new.
+
+             "15 States" is checked, not copied: winter-chain-law.html lists
+             exactly 15 (AK CA CO CT ID KY MA MT NV OH OR UT VT WA WY).
+             ══════════════════════════════════════════════════════════════ -->
+        <section class="v2-section v2-accent-red" id="compliance" data-section="compliance">
+
+          <div class="v2-section-head">
+            <span class="v2-section-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
+            </span>
+            <div class="v2-section-title">
+              <h2>Compliance</h2>
+              <p>Laws and enforcement dates that carry a penalty if you get them wrong.</p>
+            </div>
+            <a class="v2-section-link" href="#compliance">View All <span class="v2-arrow" aria-hidden="true">&#8594;</span></a>
+          </div>
+
+          <div class="v2-row-grid">
+
+            <a class="v2-row" data-cat="compliance"
+               data-title="winter chain law snow chains required states bags tyres traction"
+               href="../winter-chain-law.html" target="_blank" rel="noopener">
+              <span class="v2-row-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="4.5" opacity=".5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/></svg>
+              </span>
+              <span class="v2-row-main">
+                <span class="v2-row-title">Winter Chain Law</span>
+                <span class="v2-row-sub">When chains are required, by state</span>
+              </span>
+              <span class="v2-row-meta">15 STATES</span>
+              <span class="v2-row-fmt">HTML</span>
+              <span class="v2-row-cta"><span>Open</span> <span class="v2-arrow" aria-hidden="true">&#8594;</span></span>
+            </a>
+
+            <a class="v2-row" data-cat="compliance"
+               data-title="dot enforcement calendar cvsa inspection blitz roadcheck safe driver brake safety week"
+               href="../dot-enforcement-calendar.html" target="_blank" rel="noopener">
+              <span class="v2-row-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v3M8 2v3M3 9h18" opacity=".6"/><path d="m12 12.5 1.5 2.5 2.5.5-2 1.8.5 2.7-2.5-1.4-2.5 1.4.5-2.7-2-1.8 2.5-.5Z"/></svg>
+              </span>
+              <span class="v2-row-main">
+                <span class="v2-row-title">DOT Enforcement Calendar</span>
+                <span class="v2-row-sub">CVSA blitz dates, auto-updated</span>
+              </span>
+              <span class="v2-row-meta">BLITZ DATES</span>
+              <span class="v2-row-fmt">HTML</span>
+              <span class="v2-row-cta"><span>Open</span> <span class="v2-arrow" aria-hidden="true">&#8594;</span></span>
+            </a>
+
+          </div>
+        </section>
+
+        <!-- ══ Documents ═════════════════════════════════════════════════════
+             Reference material. The mockup drew these as PDF downloads with
+             file sizes — they are neither. Both are HTML pages in this repo,
+             so the chip says HTML and the action says Open, not Download.
+             ══════════════════════════════════════════════════════════════ -->
+        <section class="v2-section v2-accent-red" id="documents" data-section="documents">
+
+          <div class="v2-section-head">
+            <span class="v2-section-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><path d="M8 13h8M8 17h5"/></svg>
+            </span>
+            <div class="v2-section-title">
+              <h2>Documents</h2>
+              <p>Reference material for the equipment you are actually driving.</p>
+            </div>
+            <a class="v2-section-link" href="#documents">View All <span class="v2-arrow" aria-hidden="true">&#8594;</span></a>
+          </div>
+
+          <div class="v2-row-grid">
+
+            <a class="v2-row" data-cat="documents"
+               data-title="low clearance playbook bridge strike height avoid strike"
+               href="../low-clearance-playbook.html" target="_blank" rel="noopener">
+              <span class="v2-row-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18" opacity=".6"/><path d="M5 5v14M19 5v14"/><rect x="7" y="7" width="10" height="10" rx="2"/><path d="M2 20h20"/></svg>
+              </span>
+              <span class="v2-row-main">
+                <span class="v2-row-title">Low Clearance Playbook</span>
+                <span class="v2-row-sub">Spot a low bridge, stop safely</span>
+              </span>
+              <span class="v2-row-meta">13&#39;6&quot; RULE</span>
+              <span class="v2-row-fmt">HTML</span>
+              <span class="v2-row-cta"><span>Open</span> <span class="v2-arrow" aria-hidden="true">&#8594;</span></span>
+            </a>
+
+            <a class="v2-row" data-cat="documents"
+               data-title="trailer dimensions 53 dry van exterior interior cubic capacity tare weight pallets"
+               href="../trailer-dimensions.html" target="_blank" rel="noopener">
+              <span class="v2-row-ic" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="15" height="12" rx="1.5"/><path d="M17 9h3.5a1.5 1.5 0 0 1 1.5 1.5V16h-5V9Z"/><circle cx="6" cy="18" r="2"/><circle cx="14" cy="18" r="2"/><circle cx="19" cy="18" r="2"/></svg>
+              </span>
+              <span class="v2-row-main">
+                <span class="v2-row-title">Trailer Dimensions</span>
+                <span class="v2-row-sub">Our 53&#39; dry van, inside and out</span>
+              </span>
+              <span class="v2-row-meta">53&#39; &times; 102&quot;</span>
+              <span class="v2-row-fmt">HTML</span>
+              <span class="v2-row-cta"><span>Open</span> <span class="v2-arrow" aria-hidden="true">&#8594;</span></span>
+            </a>
+
+          </div>
+        </section>
+
+        <!-- Shown by v2-guides.js when a filter or search matches nothing. -->
+        <div class="v2-empty" id="v2-empty" hidden>
+          <span class="v2-empty-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M8.5 11h5"/></svg>
+          </span>
+          <strong>No matches</strong>
+          <span id="v2-empty-msg">Nothing here matches that search.</span>
+          <button type="button" id="v2-reset">Clear search</button>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+<script src="js/v2-guides.js" defer></script>
+</body>
+</html>

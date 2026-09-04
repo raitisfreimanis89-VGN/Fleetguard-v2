@@ -1,0 +1,203 @@
+/* ==========================================================================
+   FleetGuard v2 — hero status widgets
+   --------------------------------------------------------------------------
+   STAGING ONLY. The three tiles below the page header, plus the grouped
+   alert detail strip that appears under them when the NWS feed returns
+   something.
+
+   Tile 1 recolours itself from live data via [data-state], so the tile
+   never says "warning amber" on a quiet day or "all clear green" when the
+   feed is unreachable. The states are:
+
+     loading  neutral  — request in flight, nothing claimed yet
+     calm     green    — feed answered, zero active alerts
+     alert    amber    — active alerts, worst severity below Extreme
+     extreme  red      — at least one Extreme alert
+     offline  neutral  — feed unreachable; copy says so and claims nothing
+
+   Reuses the .v2-accent-* sets from v2-cards.css.
+   ========================================================================== */
+
+.v2-hero-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(272px, 1fr));
+  gap: var(--v2-s6);
+  margin-bottom: var(--v2-s12);
+}
+/* When the detail strip is showing, pull it up close to the tile it belongs
+   to. Browsers without :has() just keep the roomier default. */
+.v2-hero-row:has(+ .v2-alerts:not([hidden])) { margin-bottom: var(--v2-s3); }
+
+.v2-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex; align-items: flex-start; gap: var(--v2-s4);
+  padding: var(--v2-s6);
+  background:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--v2-surface) 92%, #ffffff) 0%,
+      var(--v2-surface) 48%,
+      color-mix(in srgb, var(--v2-surface) 94%, #000000) 100%);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+  transition: border-color var(--v2-t-base), box-shadow var(--v2-t-base), transform var(--v2-t-base);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .v2-tile { background: var(--v2-surface); }
+}
+.v2-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--tc-ring);
+  box-shadow: var(--v2-shadow-hover), 0 14px 36px -20px var(--tc);
+}
+/* Accent bloom, top-right — stronger than the cards' because a tile has no
+   artwork of its own to carry the colour. */
+.v2-tile::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(340px 180px at 84% -28%, var(--tc-soft), transparent 68%);
+}
+/* Accent hairline along the top edge — the tile's status colour, read at a
+   glance without looking at the icon. */
+.v2-tile::after {
+  content: ''; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--tc-ring) 22%, var(--tc-ring) 78%, transparent);
+}
+
+.v2-tile-ic {
+  width: 44px; height: 44px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-lg);
+  background: linear-gradient(150deg, var(--tc-soft), rgba(0, 0, 0, .22));
+  color: var(--tc);
+  border: 1px solid var(--tc-ring);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 6px 18px -10px var(--tc);
+}
+.v2-tile-ic svg { width: 22px; height: 22px; }
+
+/* Label / value / sub is a three-step hierarchy in one block: caption in the
+   muted tone, H2 in full-strength ink, body in the single secondary tone. */
+.v2-tile-body { min-width: 0; display: flex; flex-direction: column; }
+
+.v2-tile-label {
+  /* Caption: 11/16 Medium. */
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+  margin-bottom: var(--v2-s2);
+}
+.v2-tile-value {
+  /* H2: 20/28 SemiBold. */
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  color: var(--v2-ink);
+  margin-bottom: var(--v2-s1);
+}
+.v2-tile-sub {
+  /* Body 2: 12/16 Regular. */
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-2);
+}
+.v2-tile-link {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  margin-top: var(--v2-s4);
+  padding: var(--v2-s2) var(--v2-s3);
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft);
+  border: 1px solid var(--tc-ring);
+  color: var(--tc);
+  font-size: var(--v2-fs-xs); font-weight: 600;
+  transition: background var(--v2-t-fast);
+}
+.v2-tile-link:hover { background: var(--tc-ring); }
+.v2-tile-link .v2-arrow { transition: transform var(--v2-t-fast); }
+.v2-tile-link:hover .v2-arrow { transform: translateX(2px); }
+
+/* Live dot for the system-status tile. */
+.v2-tile-dot {
+  display: inline-block;
+  width: 7px; height: 7px; margin-right: .4rem;
+  border-radius: var(--v2-r-pill);
+  background: var(--tc);
+  box-shadow: 0 0 0 3px var(--tc-soft);
+  vertical-align: middle;
+}
+
+/* ── Weather tile: colour follows the feed ───────────────────────────────── */
+
+.v2-tile[data-state="loading"],
+.v2-tile[data-state="offline"] {
+  --tc: var(--v2-ink-3);
+  --tc-hi: var(--v2-ink-2);
+  --tc-soft: rgba(255, 255, 255, .05);
+  --tc-ring: var(--v2-line);
+}
+.v2-tile[data-state="calm"] {
+  --tc: var(--v2-green); --tc-hi: var(--v2-green-hi);
+  --tc-soft: var(--v2-green-soft); --tc-ring: var(--v2-green-ring);
+}
+.v2-tile[data-state="alert"] {
+  --tc: var(--v2-amber); --tc-hi: var(--v2-amber-hi);
+  --tc-soft: var(--v2-amber-soft); --tc-ring: var(--v2-amber-ring);
+}
+.v2-tile[data-state="extreme"] {
+  --tc: var(--v2-red); --tc-hi: var(--v2-red-hi);
+  --tc-soft: var(--v2-red-soft); --tc-ring: var(--v2-red-ring);
+}
+
+/* ── Grouped alert detail ────────────────────────────────────────────────── */
+
+.v2-alerts {
+  display: flex; flex-direction: column; gap: var(--v2-s2);
+  margin-bottom: var(--v2-s2);
+}
+
+.v2-alert-row {
+  display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap;
+  padding: .5rem .75rem;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  font-size: var(--v2-fs-xs);
+  color: var(--v2-ink-2);
+}
+.v2-alert-row.is-severe  { background: var(--v2-amber-soft); border-color: var(--v2-amber-ring); }
+.v2-alert-row.is-extreme { background: var(--v2-red-soft);   border-color: var(--v2-red-ring);   }
+
+.v2-alert-ic { font-size: var(--v2-fs-md); line-height: 1; }
+.v2-alert-ev { font-weight: var(--v2-fw-semibold); color: var(--v2-ink); }
+.v2-alert-n {
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  background: rgba(255, 255, 255, .09);
+  padding: 1px var(--v2-s2); border-radius: var(--v2-r-pill);
+  color: var(--v2-ink);
+}
+.v2-alert-st {
+  font-size: var(--v2-fs-micro); letter-spacing: var(--v2-track-micro);
+  color: var(--v2-ink-3); word-break: break-word;
+}
+.v2-alert-when { margin-left: auto; color: var(--v2-ink-3); white-space: nowrap; }
+
+.v2-alert-foot {
+  display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap;
+  margin-bottom: var(--v2-s8);
+  font-size: var(--v2-fs-micro); color: var(--v2-ink-3);
+  padding: 0 .2rem;
+}
+.v2-alert-toggle {
+  background: none; border: 0; padding: 0;
+  color: var(--v2-amber); font: inherit; font-weight: 600;
+  cursor: pointer;
+}
+.v2-alert-toggle:hover { text-decoration: underline; }
+
+@media (max-width: 620px) {
+  .v2-hero-row { grid-template-columns: minmax(0, 1fr); }
+  .v2-alert-when { margin-left: 0; }
+}
