@@ -1071,68 +1071,125 @@ function renderDashboard(){
 // detail page instead (PTI link under the PTI tab, PM/oil under Service):
 // the card is too narrow for them and they duplicated what detail already had.
 function renderVehicles(){
-  let html='';
+  // v2 components against live data. Styles: v2-tokens + v2-bridge +
+  // v2-vehicles.css, loaded by index.html. v2-shell.css stays out — see the
+  // note in v2-bridge.css for why.
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    radio:'<path d="M4.9 19.1a10 10 0 0 1 0-14.2M19.1 4.9a10 10 0 0 1 0 14.2"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4M16.2 7.8a6 6 0 0 1 0 8.4"/><circle cx="12" cy="12" r="2"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+    pencil:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    trash:'<path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  };
+  // Mirrors annualPill() exactly — same ANNUAL_AVAILABLE gate, same
+  // ANNUAL_CRIT_DAYS / ANNUAL_WARN_DAYS thresholds, same EXPIRED wording —
+  // but emits a v2 pill instead of a production .status-pill so it does not
+  // sit in a v2 card wearing the old skin.
+  const _annual=s=>{
+    if(!ANNUAL_AVAILABLE) return '';
+    if(!s.annualExpiry) return '<span class="v2-pill is-none" title="Annual DOT inspection expiry not recorded">Annual not set</span>';
+    const d=s.annualDaysLeft;
+    const t=s.annualExpired||d<=ANNUAL_CRIT_DAYS?'is-crit':d<=ANNUAL_WARN_DAYS?'is-warn':'is-ok';
+    const txt=s.annualExpired?'EXPIRED '+Math.abs(d)+'d':d+'d';
+    return '<span class="v2-pill '+t+'" title="Annual DOT inspection expires '+fmtDate(s.annualExpiry)+'">Annual '+txt+'</span>';
+  };
+
+  let html='<div class="v2-region">';
+
   if(isAdmin()){
-    html+=`<div class="card mb-4" style="margin-bottom:20px;max-width:640px"><div class="card-header">🚛 Add Vehicle</div><div class="card-body">
-      <div class="form-grid form-grid-3" style="margin-bottom:12px">
-        <div><label>Truck Number</label><input type="text" id="v-truck" placeholder="e.g. T001"/></div>
-        <div><label>Trailer Number</label><input type="text" id="v-trailer" placeholder="e.g. TR001"/></div>
-        <div><label>Assign Driver</label><select id="v-driver"><option value="">— optional —</option>${DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select></div>
-        <div><label>Assign Dispatcher</label><input type="text" id="v-dispatcher" placeholder="Dispatcher name"/></div>
-        ${ANNUAL_AVAILABLE?`<div><label>Annual DOT expiry</label><input type="date" id="v-annual" title="Expiry date on the truck's annual DOT inspection certificate"/></div>`:''}
-      </div>
-      <button class="btn btn-primary" onclick="doAddVehicle()">+ Add Vehicle</button>
-    </div></div>`;
-  } else { html+=dispatcherNotice(); }
-  html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
-  if(VEHICLES.length===0) html+=`<div class="empty" style="grid-column:1/-1;padding:40px">No vehicles yet${isAdmin()?' — add one above.':'.'}</div>`;
+    html+='<section class="v2-form-card v2-accent-primary" aria-label="Add vehicle">'
+      +'<div class="v2-form-head"><span class="v2-form-ic">'+_sv(_IC.truck)+'</span>'
+      +'<h2>Add vehicle</h2><span class="v2-form-note">Admin only</span></div>'
+      +'<div class="v2-form-body"><div class="v2-form-grid">'
+      +'<div class="v2-field"><label for="v-truck">Truck number <span class="v2-field-req">*</span></label>'
+      +'<input class="v2-input" id="v-truck" type="text" placeholder="e.g. T001"></div>'
+      +'<div class="v2-field"><label for="v-trailer">Trailer number <span class="v2-field-req">*</span></label>'
+      +'<input class="v2-input" id="v-trailer" type="text" placeholder="e.g. TR001"></div>'
+      +'<div class="v2-field"><label for="v-driver">Assign driver</label><span class="v2-select-wrap">'
+      +'<select class="v2-select" id="v-driver"><option value="">&mdash; optional &mdash;</option>'
+      +DRIVERS.map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join('')
+      +'</select>'+_sv('<path d="m6 9 6 6 6-6"/>','1.8')+'</span></div>'
+      +'<div class="v2-field"><label for="v-dispatcher">Assign dispatcher</label>'
+      +'<input class="v2-input" id="v-dispatcher" type="text" placeholder="Dispatcher name"></div>'
+      +(ANNUAL_AVAILABLE?'<div class="v2-field"><label for="v-annual">Annual DOT expiry</label>'
+        +'<input class="v2-input" id="v-annual" type="date" title="Expiry date on the truck\'s annual DOT inspection certificate"></div>':'')
+      +'</div>'
+      +'<button class="v2-btn-primary" type="button" onclick="doAddVehicle()">'+_sv(_IC.plus,'2')+'Add vehicle</button>'
+      +'<p class="v2-form-hint">Truck and trailer numbers are required.</p>'
+      +'</div></section>';
+  } else {
+    html+='<div class="v2-form-card v2-accent-blue" style="margin-bottom:var(--v2-s6)">'
+      +'<div class="v2-form-head"><span class="v2-form-ic">'+_sv(_IC.eye)+'</span>'
+      +'<h2>View only</h2><span class="v2-form-note">Contact an admin to make changes</span></div></div>';
+  }
+
+  html+='<div class="v2-fleet-grid">';
+  if(VEHICLES.length===0){
+    html+='<div class="v2-form-card" style="grid-column:1/-1"><div class="v2-form-body" style="color:var(--v2-ink-3)">'
+      +'No vehicles yet'+(isAdmin()?' &mdash; add one above.':'.')+'</div></div>';
+  }
   VEHICLES.forEach(v=>{
     const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
     const s=getVehicleStatus(v.id);
-    const sb2=s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">OK</span>`;
-    html+=`<div class="card${s.newTruck?' has-watermark':''}" id="vcard-${v.id}">
-      ${s.newTruck?`<span class="card-watermark" aria-hidden="true">NEW TRUCK</span>`:''}
-      <!-- VIEW MODE -->
-      <div id="vview-${v.id}" class="card-body" style="padding:16px">
-        <div class="flex-between mb-4" style="margin-bottom:10px">
-          <div onclick="navigate('vehicle','${v.id}')" style="cursor:pointer;flex:1">
-            <div class="fw-600" style="font-size:15px">Truck #${esc(v.truckNumber)}</div>
-            <div class="text-sm">Trailer #${esc(v.trailerNumber)}</div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center">
-            ${sb2}
-            ${isAdmin()?`<button class="btn btn-ghost btn-sm" onclick="startEditVehicle('${v.id}')" title="Edit">✏️</button><button class="btn btn-ghost btn-sm btn-icon" onclick="event.stopPropagation();doDeleteVehicle('${v.id}','${v.truckNumber}')" title="Delete">🗑</button>`:''}
-          </div>
-        </div>
-        ${driver?`<div class="text-sm">👤 ${esc(driver.name)}</div>`:''}
-        ${v.assignedDispatcher?`<div class="text-sm">📡 ${esc(v.assignedDispatcher)}</div>`:''}
-        <div class="status-row" style="margin-top:10px">
-          <span class="status-pill ${s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green'}">🔧 Brakes ${s.lastBrake?s.brakeDays+'d':'None'}</span>
-          <span class="status-pill ${s.tyreOverdue?'badge-yellow':'badge-green'}">⭕ Tyres ${s.lastTyre?s.tyreDays+'d':'None'}</span>
-          <span class="status-pill ${s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green'}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
-          <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 Pre-trip ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
-          ${annualPill(s)}
-          ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
-        </div>
-      </div>
-      <!-- EDIT MODE -->
-      <div id="vedit-${v.id}" style="display:none" class="card-body" style="padding:16px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:10px">✏️ Edit Vehicle</div>
-        <div class="form-grid" style="margin-bottom:10px">
-          <div><label>Truck #</label><input type="text" id="ve-truck-${v.id}" value="${esc(v.truckNumber)}"/></div>
-          <div><label>Trailer #</label><input type="text" id="ve-trailer-${v.id}" value="${esc(v.trailerNumber)}"/></div>
-          <div><label>Driver</label><select id="ve-driver-${v.id}"><option value="">— none —</option>${DRIVERS.map(d=>`<option value="${d.id}"${v.assignedDriverId===d.id?' selected':''}>${esc(d.name)}</option>`).join('')}</select></div>
-          <div><label>Dispatcher</label><input type="text" id="ve-dispatcher-${v.id}" value="${esc(v.assignedDispatcher||'')}"/></div>
-          ${ANNUAL_AVAILABLE?`<div><label>Annual DOT expiry</label><input type="date" id="ve-annual-${v.id}" value="${esc(v.annualExpiry||'')}"/></div>`:''}
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="doSaveVehicle('${v.id}')">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelEditVehicle('${v.id}')">Cancel</button>
-        </div>
-      </div>
-    </div>`;
+    const accent=s.critical?'v2-accent-red':s.warning?'v2-accent-amber':'v2-accent-green';
+    const statusTone=s.critical?'is-crit':s.warning?'is-warn':'is-ok';
+    const statusText=s.critical?'Critical':s.warning?'Warning':'OK';
+    html+='<article class="v2-veh '+accent+'" id="vcard-'+v.id+'">'
+      +(s.newTruck?'<span class="v2-veh-mark" aria-hidden="true">NEW TRUCK</span>':'')
+      // ── view mode ──
+      +'<div id="vview-'+v.id+'">'
+        +'<div class="v2-veh-head">'
+          +'<span class="v2-veh-id" onclick="navigate(\'vehicle\',\''+v.id+'\')" style="cursor:pointer">'
+            +'<span class="v2-veh-truck">Truck #'+esc(v.truckNumber)+'</span>'
+            +'<span class="v2-veh-trailer">Trailer #'+esc(v.trailerNumber)+'</span>'
+          +'</span>'
+          +'<span class="v2-veh-status '+statusTone+'">'+statusText+'</span>'
+          +(isAdmin()?'<span style="display:flex;gap:var(--v2-s1);flex-shrink:0">'
+            +'<button class="v2-icon-btn" type="button" title="Edit" aria-label="Edit vehicle" onclick="startEditVehicle(\''+v.id+'\')">'+_sv(_IC.pencil,'1.8')+'</button>'
+            +'<button class="v2-icon-btn" type="button" title="Delete" aria-label="Delete vehicle" onclick="event.stopPropagation();doDeleteVehicle(\''+v.id+'\',\''+esc(v.truckNumber)+'\')">'+_sv(_IC.trash,'1.8')+'</button>'
+            +'</span>':'')
+        +'</div>'
+        +((driver||v.assignedDispatcher)?'<div class="v2-veh-people">'
+          +(driver?'<span class="v2-veh-person">'+_sv(_IC.user)+'<span>'+esc(driver.name)+'</span></span>':'')
+          +(v.assignedDispatcher?'<span class="v2-veh-person">'+_sv(_IC.radio)+'<span>'+esc(v.assignedDispatcher)+'</span></span>':'')
+          +'</div>':'')
+        +'<div class="v2-pills">'
+          +'<span class="v2-pill '+(s.brakeOverdue?'is-crit':s.brakeDueSoon?'is-warn':'is-ok')+'">Brakes '+(s.lastBrake?s.brakeDays+'d':'None')+'</span>'
+          +'<span class="v2-pill '+(s.tyreOverdue?'is-warn':'is-ok')+'">Tyres '+(s.lastTyre?s.tyreDays+'d':'None')+'</span>'
+          +'<span class="v2-pill '+(s.serviceOverdue?'is-crit':s.serviceDueSoon?'is-warn':'is-ok')+'">Service '+(s.serviceDays!==null?s.serviceDays+'d':'None')+'</span>'
+          +'<span class="v2-pill '+(s.preTripToday?'is-ok':'is-none')+'">Pre-trip '+(s.preTripToday?'&check; today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none'))+'</span>'
+          +_annual(s)
+          +(s.openDefect?'<span class="v2-pill '+(s.defectCritical?'is-crit':'is-warn')+'">'+(s.defectCritical?'DEFECT':'Minor')+' unrepaired</span>':'')
+        +'</div>'
+      +'</div>'
+      // ── edit mode (toggled by startEditVehicle / cancelEditVehicle) ──
+      +'<div id="vedit-'+v.id+'" style="display:none">'
+        +'<div class="v2-form-head" style="padding-bottom:var(--v2-s3)"><span class="v2-form-ic">'+_sv(_IC.pencil)+'</span><h2>Edit vehicle</h2></div>'
+        +'<div class="v2-form-grid" style="margin-bottom:var(--v2-s4)">'
+          +'<div class="v2-field"><label for="ve-truck-'+v.id+'">Truck #</label>'
+          +'<input class="v2-input" type="text" id="ve-truck-'+v.id+'" value="'+esc(v.truckNumber)+'"></div>'
+          +'<div class="v2-field"><label for="ve-trailer-'+v.id+'">Trailer #</label>'
+          +'<input class="v2-input" type="text" id="ve-trailer-'+v.id+'" value="'+esc(v.trailerNumber)+'"></div>'
+          +'<div class="v2-field"><label for="ve-driver-'+v.id+'">Driver</label><span class="v2-select-wrap">'
+          +'<select class="v2-select" id="ve-driver-'+v.id+'"><option value="">&mdash; none &mdash;</option>'
+          +DRIVERS.map(d=>'<option value="'+d.id+'"'+(v.assignedDriverId===d.id?' selected':'')+'>'+esc(d.name)+'</option>').join('')
+          +'</select>'+_sv('<path d="m6 9 6 6 6-6"/>','1.8')+'</span></div>'
+          +'<div class="v2-field"><label for="ve-dispatcher-'+v.id+'">Dispatcher</label>'
+          +'<input class="v2-input" type="text" id="ve-dispatcher-'+v.id+'" value="'+esc(v.assignedDispatcher||'')+'"></div>'
+          +(ANNUAL_AVAILABLE?'<div class="v2-field"><label for="ve-annual-'+v.id+'">Annual DOT expiry</label>'
+            +'<input class="v2-input" type="date" id="ve-annual-'+v.id+'" value="'+esc(v.annualExpiry||'')+'"></div>':'')
+        +'</div>'
+        +'<div style="display:flex;gap:var(--v2-s2)">'
+          +'<button class="v2-btn-primary" type="button" onclick="doSaveVehicle(\''+v.id+'\')">Save</button>'
+          +'<button class="v2-btn-ghost" type="button" onclick="cancelEditVehicle(\''+v.id+'\')">Cancel</button>'
+        +'</div>'
+      +'</div>'
+    +'</article>';
   });
-  html+=`</div>`;
+  html+='</div></div>';
   return html;
 }
 

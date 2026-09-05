@@ -84,3 +84,35 @@
   outline-offset: 2px;
   border-radius: var(--v2-r-sm);
 }
+
+/* ── Shared controls ──────────────────────────────────────────────────────
+   Two generic controls the ported pages need that happen to live in sheets
+   this app does not load: .v2-icon-btn is defined in v2-shell.css (excluded
+   above) and .v2-btn-ghost in v2-inspections.css. Reproduced here so a page
+   port never has to pull in a whole unrelated sheet for one button. Both are
+   .v2- prefixed and cannot touch production's own .btn rules. */
+
+.v2-icon-btn {
+  display: grid; place-items: center;
+  width: 32px; height: 32px;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink-3); cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-icon-btn:hover { background: var(--v2-surface-2); color: var(--v2-ink); }
+.v2-icon-btn svg { width: 17px; height: 17px; }
+
+.v2-btn-ghost {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: transparent;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-2);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-btn-ghost:hover { background: var(--v2-surface-2); border-color: var(--v2-line-glass-hi); color: var(--v2-ink); }
