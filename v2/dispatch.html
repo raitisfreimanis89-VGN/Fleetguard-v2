@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Dispatch Board  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/dispatch.html   Production: the Dispatch Board view inside
+     /index.html, rendered by renderDispatcherBoard() in js/app.js (untouched).
+
+     Eighth page of the v2 redesign. This is production's BOARD VIEW — every
+     dispatcher at once. Production also has a FILTERED VIEW (one dispatcher,
+     full-size truck cards) reached by clicking a card; "View fleet" is where
+     that would go.
+
+     SAMPLE DATA. Trucks, drivers and day counts are invented. The arithmetic
+     is not: counts, percentages, bar colours and chips are all derived by
+     re-implementing getVehicleStatus() and the board maths in the generator,
+     so what is on screen is what production's rules would actually produce.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Dispatch Board — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+<link rel="stylesheet" href="css/v2-drivers.css">
+<link rel="stylesheet" href="css/v2-reminders.css">
+<link rel="stylesheet" href="css/v2-calendar.css">
+<link rel="stylesheet" href="css/v2-dispatch.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item is-active" href="dispatch.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="drivers.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="calendar.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="reports.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="inspections.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="reminders.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg></button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search the fleet</label>
+        <input id="v2-q" type="text" placeholder="Search trucks, drivers..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Dispatch Board</h1>
+        <p>Who is running which truck, and whether any of them should be rolling.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> Invented trucks, drivers and day counts &mdash; not connected to the fleet database. Every count, percentage and colour on this page is computed from those numbers using production's own thresholds.</span>
+      </div>
+
+      <!-- ══ Search + status filter ════════════════════════════════════════
+           Chips count RATED trucks — those with a computed status. Vacation
+           trucks are excluded from the status maths entirely (production
+           freezes them), and unassigned trucks belong to no dispatcher, so
+           Good + Warn + Critical is 42, not 45. The meta line spells
+           the difference out rather than leaving the numbers not adding up.
+           ══════════════════════════════════════════════════════════════════ -->
+      <div class="v2-filterbar">
+        <div class="v2-disp-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <label class="v2-sr-only" for="v2-disp-q">Filter by dispatcher or driver</label>
+          <input id="v2-disp-q" type="text" placeholder="Dispatcher or driver name" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="v2-tabs" role="group" aria-label="Filter by status">
+          <button class="v2-tab is-active" type="button">All <span class="v2-tab-n">42</span></button>
+          <button class="v2-tab" type="button">Good <span class="v2-tab-n">34</span></button>
+          <button class="v2-tab" type="button">Warning <span class="v2-tab-n">6</span></button>
+          <button class="v2-tab" type="button">Critical <span class="v2-tab-n">2</span></button>
+        </div>
+      </div>
+
+      <!-- ══ Legend ════════════════════════════════════════════════════════
+           Production labels the pills with emoji alone and prints a bare
+           "34d", which reads like a countdown next to the Calendar's "5d"
+           badges — it is the opposite, days ELAPSED since the last event.
+           Saying so once here costs one line and removes the ambiguity.
+           ══════════════════════════════════════════════════════════════════ -->
+      <div class="v2-legend">
+        <span class="v2-legend-lead">Days since last</span>
+        <span class="v2-legend-item"><span class="v2-legend-key">B</span>Brake test &middot; 30d</span>
+        <span class="v2-legend-item"><span class="v2-legend-key">T</span>Tyre check &middot; 7d</span>
+        <span class="v2-legend-item"><span class="v2-legend-key">S</span>Yard service &middot; 90d</span>
+        <span class="v2-legend-item"><span class="v2-legend-key">P</span>Pre-trip today</span>
+        <span class="v2-legend-tail">42 rated &middot; 2 frozen on vacation &middot; 1 unassigned &middot; 45 total</span>
+      </div>
+
+      <!-- ══ Board ═════════════════════════════════════════════════════════
+           One card per dispatcher, names sorted A–Z as production sorts them.
+           Health is ok / active, where active excludes vacationing drivers'
+           trucks — Andy and Dom both read 100% on four trucks because one of
+           each is parked. Critical wins over warning, so no truck is counted
+           twice and the three chips always sum to the active count.
+           ══════════════════════════════════════════════════════════════════ -->
+      <div class="v2-board">
+        <article class="v2-disp-card is-crit" data-name="alex" data-crit="1" data-warn="1" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">A</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Alex</span>
+              <span class="v2-disp-meta">5 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-warn">1 Warn</span><span class="v2-disp-chip is-crit">1 Critical</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" aria-label="Alex fleet health">
+                <div class="v2-health-fill" style="width:60%"></div>
+              </div>
+              <span class="v2-health-pct">60%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25086</span>
+                <span class="v2-truck-sub">Marcus Webb</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 12 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">12d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 34 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">34d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row is-crit">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25141</span>
+                <span class="v2-truck-sub">Ray Osei</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 9 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">9d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-crit" title="Service — 94 days since last yard visit, 90-day interval: OVERDUE — yard visit"><span class="v2-sp-k">S</span><span class="v2-sp-v">94d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26016</span>
+                <span class="v2-truck-sub">Dana Kroll</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 14 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">14d</span></span><span class="v2-sp is-warn" title="Tyres — 8 days since last check, 7-day interval: OVERDUE"><span class="v2-sp-k">T</span><span class="v2-sp-v">8d</span></span><span class="v2-sp is-ok" title="Service — 41 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">41d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25940</span>
+                <span class="v2-truck-sub">Ivan Petrov</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 6 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">6d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 22 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">22d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26102</span>
+                <span class="v2-truck-sub">Sam Ortiz</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 18 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">18d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 58 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">58d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-ok" data-name="andy" data-crit="0" data-warn="0" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">A</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Andy</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-vac">1 Vacation</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Andy fleet health">
+                <div class="v2-health-fill" style="width:100%"></div>
+              </div>
+              <span class="v2-health-pct">100%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25004</span>
+                <span class="v2-truck-sub">Hector Diaz</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 11 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">11d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 27 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">27d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25873</span>
+                <span class="v2-truck-sub">Nina Alvarez</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 16 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">16d</span></span><span class="v2-sp is-ok" title="Tyres — 5 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Service — 63 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">63d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26041</span>
+                <span class="v2-truck-sub">Terrence Boyd</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 7 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">7d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 12 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">12d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row is-vac">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25046</span>
+                <span class="v2-truck-sub">Priya Raman</span>
+              </span>
+              <span class="v2-vac-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></svg>Vacation</span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-warn" data-name="arthur" data-crit="0" data-warn="1" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">A</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Arthur</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-warn">1 Warn</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" aria-label="Arthur fleet health">
+                <div class="v2-health-fill" style="width:75%"></div>
+              </div>
+              <span class="v2-health-pct">75%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25094</span>
+                <span class="v2-truck-sub">Luis Ferrer</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-warn" title="Brakes — 25 days since last test, 30-day interval: due soon"><span class="v2-sp-k">B</span><span class="v2-sp-v">25d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 48 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">48d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26127</span>
+                <span class="v2-truck-sub">Owen Blake</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 13 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">13d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 31 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">31d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25612</span>
+                <span class="v2-truck-sub">Colin Mabe</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 5 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 19 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">19d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26057</span>
+                <span class="v2-truck-sub">Josie Hart</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 19 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">19d</span></span><span class="v2-sp is-ok" title="Tyres — 6 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">6d</span></span><span class="v2-sp is-ok" title="Service — 70 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">70d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-crit" data-name="carl" data-crit="1" data-warn="1" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">C</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Carl</span>
+              <span class="v2-disp-meta">5 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-warn">1 Warn</span><span class="v2-disp-chip is-crit">1 Critical</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" aria-label="Carl fleet health">
+                <div class="v2-health-fill" style="width:60%"></div>
+              </div>
+              <span class="v2-health-pct">60%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row is-crit">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25218</span>
+                <span class="v2-truck-sub">Andre Kalu <span class="v2-truck-reason is-crit">Unrepaired defect</span></span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 10 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">10d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 25 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">25d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25455</span>
+                <span class="v2-truck-sub">Bea Nowak <span class="v2-truck-reason is-warn">Annual in 18d</span></span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 8 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">8d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 52 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">52d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26073</span>
+                <span class="v2-truck-sub">Kofi Mensah</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 15 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">15d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 37 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">37d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25709</span>
+                <span class="v2-truck-sub">Dmitri Volkov</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 20 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">20d</span></span><span class="v2-sp is-ok" title="Tyres — 5 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Service — 66 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">66d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26088</span>
+                <span class="v2-truck-sub">Talia Reyes</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 4 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 8 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">8d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-ok" data-name="cody" data-crit="0" data-warn="0" data-ok="4">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">C</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Cody</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">4 Good</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Cody fleet health">
+                <div class="v2-health-fill" style="width:100%"></div>
+              </div>
+              <span class="v2-health-pct">100%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25330</span>
+                <span class="v2-truck-sub">Miguel Sosa</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 12 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">12d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 44 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">44d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25887</span>
+                <span class="v2-truck-sub">Grace Otieno</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 17 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">17d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 29 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">29d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26011</span>
+                <span class="v2-truck-sub">Ben Harlow</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 6 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">6d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 15 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">15d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26140</span>
+                <span class="v2-truck-sub">Ana Cardoso</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 21 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">21d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 61 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">61d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-warn" data-name="david" data-crit="0" data-warn="1" data-ok="4">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">D</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">David</span>
+              <span class="v2-disp-meta">5 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">4 Good</span><span class="v2-disp-chip is-warn">1 Warn</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100" aria-label="David fleet health">
+                <div class="v2-health-fill" style="width:80%"></div>
+              </div>
+              <span class="v2-health-pct">80%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25162</span>
+                <span class="v2-truck-sub">Peter Nagy</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 9 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">9d</span></span><span class="v2-sp is-warn" title="Tyres — 9 days since last check, 7-day interval: OVERDUE"><span class="v2-sp-k">T</span><span class="v2-sp-v">9d</span></span><span class="v2-sp is-ok" title="Service — 39 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">39d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25501</span>
+                <span class="v2-truck-sub">Yusuf Demir</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 14 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">14d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 55 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">55d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25963</span>
+                <span class="v2-truck-sub">Lena Fischer</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 3 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 11 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">11d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26030</span>
+                <span class="v2-truck-sub">Omar Haddad</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 18 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">18d</span></span><span class="v2-sp is-ok" title="Tyres — 5 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Service — 72 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">72d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26115</span>
+                <span class="v2-truck-sub">Ruth Kimani</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 11 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">11d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 33 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">33d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-ok" data-name="dom" data-crit="0" data-warn="0" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">D</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Dom</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-vac">1 Vacation</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Dom fleet health">
+                <div class="v2-health-fill" style="width:100%"></div>
+              </div>
+              <span class="v2-health-pct">100%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25277</span>
+                <span class="v2-truck-sub">Victor Cruz</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 13 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">13d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 46 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">46d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25822</span>
+                <span class="v2-truck-sub">Femi Adeyemi</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 7 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">7d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 23 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">23d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26064</span>
+                <span class="v2-truck-sub">Iris Lindqvist</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 16 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">16d</span></span><span class="v2-sp is-ok" title="Tyres — 6 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">6d</span></span><span class="v2-sp is-ok" title="Service — 68 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">68d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+            <div class="v2-truck-row is-vac">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25389</span>
+                <span class="v2-truck-sub">Sasha Ivanova</span>
+              </span>
+              <span class="v2-vac-tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M6.3 17.7l-1.4 1.4M19.1 4.9l-1.4 1.4"/></svg>Vacation</span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-warn" data-name="g-sde" data-crit="0" data-warn="1" data-ok="3">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">G</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">G-SDE</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">3 Good</span><span class="v2-disp-chip is-warn">1 Warn</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" aria-label="G-SDE fleet health">
+                <div class="v2-health-fill" style="width:75%"></div>
+              </div>
+              <span class="v2-health-pct">75%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25058</span>
+                <span class="v2-truck-sub">Caleb Whit <span class="v2-truck-reason is-warn">Minor defect open</span></span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 10 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">10d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 36 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">36d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25744</span>
+                <span class="v2-truck-sub">Noor Rahman</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 5 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 17 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">17d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26099</span>
+                <span class="v2-truck-sub">Julio Barros</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 19 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">19d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 59 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">59d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26152</span>
+                <span class="v2-truck-sub">Mei Tanaka</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 12 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">12d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 42 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">42d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-ok" data-name="jacob" data-crit="0" data-warn="0" data-ok="4">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">J</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Jacob</span>
+              <span class="v2-disp-meta">4 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">4 Good</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Jacob fleet health">
+                <div class="v2-health-fill" style="width:100%"></div>
+              </div>
+              <span class="v2-health-pct">100%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25196</span>
+                <span class="v2-truck-sub">Silas Novak</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 8 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">8d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 28 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">28d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25650</span>
+                <span class="v2-truck-sub">Aida Sow</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 15 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">15d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 50 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">50d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26022</span>
+                <span class="v2-truck-sub">Rory Quinn</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 4 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Tyres — 5 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Service — 14 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">14d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26134</span>
+                <span class="v2-truck-sub">Elena Rossi</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 20 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">20d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 64 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">64d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-warn" data-name="john" data-crit="0" data-warn="1" data-ok="4">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar" aria-hidden="true">J</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">John</span>
+              <span class="v2-disp-meta">5 trucks</span>
+            </span>
+            <a class="v2-disp-link" href="#">View fleet
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </a>
+          </header>
+          <div class="v2-disp-stats">
+            <div class="v2-disp-chips"><span class="v2-disp-chip is-ok">4 Good</span><span class="v2-disp-chip is-warn">1 Warn</span></div>
+            <div class="v2-health">
+              <div class="v2-health-track" role="progressbar" aria-valuenow="80" aria-valuemin="0" aria-valuemax="100" aria-label="John fleet health">
+                <div class="v2-health-fill" style="width:80%"></div>
+              </div>
+              <span class="v2-health-pct">80%</span>
+            </div>
+          </div>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row is-warn">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25113</span>
+                <span class="v2-truck-sub">Duncan Frye</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-warn" title="Brakes — 26 days since last test, 30-day interval: due soon"><span class="v2-sp-k">B</span><span class="v2-sp-v">26d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 43 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">43d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25573</span>
+                <span class="v2-truck-sub">Halima Yusuf</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 11 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">11d</span></span><span class="v2-sp is-ok" title="Tyres — 4 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">4d</span></span><span class="v2-sp is-ok" title="Service — 57 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">57d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25901</span>
+                <span class="v2-truck-sub">Tomas Vargas</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 6 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">6d</span></span><span class="v2-sp is-ok" title="Tyres — 1 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">1d</span></span><span class="v2-sp is-ok" title="Service — 20 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">20d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26048</span>
+                <span class="v2-truck-sub">Greta Lang</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 17 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">17d</span></span><span class="v2-sp is-ok" title="Tyres — 3 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">3d</span></span><span class="v2-sp is-ok" title="Service — 38 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">38d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#26146</span>
+                <span class="v2-truck-sub">Aaron Beck</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 13 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">13d</span></span><span class="v2-sp is-ok" title="Tyres — 5 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">5d</span></span><span class="v2-sp is-ok" title="Service — 62 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">62d</span></span><span class="v2-sp is-ok" title="Pre-trip inspection filed today"><span class="v2-sp-k">P</span><span class="v2-sp-v">&check;</span></span></span>
+            </div>
+          </div>
+        </article>
+        <article class="v2-disp-card is-unassigned">
+          <header class="v2-disp-head">
+            <span class="v2-disp-avatar is-none" aria-hidden="true">?</span>
+            <span class="v2-disp-id">
+              <span class="v2-disp-name">Unassigned</span>
+              <span class="v2-disp-meta">1 truck &middot; no dispatcher</span>
+            </span>
+          </header>
+          <div class="v2-fleet-list">
+            <div class="v2-truck-row">
+              <span class="v2-truck-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+              <span class="v2-truck-main">
+                <span class="v2-truck-no">#25999</span>
+                <span class="v2-truck-sub is-none">No driver assigned</span>
+              </span>
+              <span class="v2-strip"><span class="v2-sp is-ok" title="Brakes — 9 days since last test, 30-day interval: in date"><span class="v2-sp-k">B</span><span class="v2-sp-v">9d</span></span><span class="v2-sp is-ok" title="Tyres — 2 days since last check, 7-day interval: in date"><span class="v2-sp-k">T</span><span class="v2-sp-v">2d</span></span><span class="v2-sp is-ok" title="Service — 30 days since last yard visit, 90-day interval: in date"><span class="v2-sp-k">S</span><span class="v2-sp-v">30d</span></span><span class="v2-sp is-idle" title="No pre-trip inspection today (does not affect status)"><span class="v2-sp-k">P</span><span class="v2-sp-v">&mdash;</span></span></span>
+            </div>
+          </div>
+        </article>
+      </div>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

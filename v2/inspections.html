@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Pre-Trip Inspections  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/inspections.html   Production: the Inspections view inside
+     /index.html, rendered by renderInspections() in js/app.js (untouched).
+
+     Fourth page of the v2 redesign. Shares the token, shell and accent layers;
+     adds css/v2-inspections.css only.
+
+     SAMPLE DATA. Every inspection, driver, duration and reference below is
+     invented for layout review — nothing reads Supabase. The COLUMNS, the
+     chip rules and the defect logic are taken from renderInspections(),
+     isOpenDefect(), inspDur() and inspDT().
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Pre-Trip Inspections — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="dispatch.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="drivers.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="calendar.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="reports.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item is-active" href="inspections.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="reminders.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search inspections</label>
+        <input id="v2-q" type="text" placeholder="Search by truck, driver, reference..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Pre-Trip Inspections</h1>
+        <p>Driver walk-around submissions, and the defects still waiting on a repair.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> Invented submissions and references &mdash; not connected to the fleet database. Columns, chip rules and defect logic match production.</span>
+      </div>
+
+      <!-- ══ Tier 1 · pulse + send console ═════════════════════════════════ -->
+      <section class="v2-console-row" aria-label="Inspection console">
+
+        <!-- Counters mirror the four badges renderInspections() emits. Note
+             "unrepaired" and "with defects" are different measures: a defect
+             stays counted forever, but only counts as unrepaired while its
+             repair_status is open. -->
+        <article class="v2-console v2-accent-cyan">
+          <div class="v2-console-head">
+            <span class="v2-console-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg>
+            </span>
+            <h2>Live inspection pulse</h2>
+          </div>
+          <div class="v2-console-body">
+            <div class="v2-pulse-grid">
+              <div class="v2-pulse-stat v2-accent-cyan">
+                <span class="v2-pulse-num">210</span>
+                <span class="v2-pulse-label">Total</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-green">
+                <span class="v2-pulse-num">1</span>
+                <span class="v2-pulse-label"><span class="v2-pulse-live"></span>Today</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-red">
+                <span class="v2-pulse-num">2</span>
+                <span class="v2-pulse-label">Unrepaired</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-amber">
+                <span class="v2-pulse-num">6</span>
+                <span class="v2-pulse-label">With defects</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Production only offers trucks that HAVE an assigned driver — there
+             is nobody to text otherwise — and the whole block is admin-only. -->
+        <article class="v2-console v2-accent-amber">
+          <div class="v2-console-head">
+            <span class="v2-console-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+            </span>
+            <h2>Send PTI link</h2>
+            <span class="v2-console-note">Admin only</span>
+          </div>
+          <div class="v2-console-body">
+            <div class="v2-send-row">
+              <div class="v2-field">
+                <label for="sl-vehicle">Send pre-trip link to a driver</label>
+                <span class="v2-select-wrap">
+                  <select class="v2-select" id="sl-vehicle">
+                    <option value="">&mdash; select truck &mdash;</option>
+                    <option>Truck #25940 &middot; P. Ostrowski</option>
+                    <option>Truck #26016 &middot; M. Webb</option>
+                    <option>Truck #26041 &middot; D. Kowalski</option>
+                    <option>Truck #25873 &middot; A. Ferreira</option>
+                    <option>Truck #26102 &middot; J. Brennan</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </div>
+              <button class="v2-btn-send" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                Send link
+              </button>
+            </div>
+
+            <button class="v2-btn-ghost" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z"/></svg>
+              Send PTI link to all drivers
+            </button>
+
+            <p class="v2-send-notice">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span>Links are sent only when you click here &mdash; never automatically. Bulk sends go out in waves of 5 every 5 minutes.</span>
+            </p>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══ Tier 2 · open defects ═════════════════════════════════════════
+           isOpenDefect() is deliberately conservative: a NULL repair_status
+           reads as OPEN, because rows written before migration 011 — and every
+           new submission — have no status yet, and treating those as resolved
+           would silently hide live defects.
+
+           The whole section also disappears when REPAIRS_AVAILABLE is false
+           (migration 011 not applied), rather than marking every historical
+           defect red with no way to clear it.
+           ══════════════════════════════════════════════════════════════ -->
+      <section class="v2-defect-grid" aria-label="Open defects">
+
+        <article class="v2-defect v2-accent-red">
+          <div class="v2-defect-head">
+            <span class="v2-defect-id">
+              <span class="v2-defect-truck">Truck #25046</span>
+              <span class="v2-defect-when">Reported 03 Sep 19:22</span>
+            </span>
+            <span class="v2-chip-status is-defect">Defect</span>
+          </div>
+          <div class="v2-defect-meta">
+            <span class="v2-defect-line">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              A. Ferreira
+            </span>
+            <span class="v2-defect-line">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/></svg>
+              <span class="v2-defect-issues">1 tyre</span>
+            </span>
+          </div>
+          <div class="v2-defect-foot">
+            <button class="v2-btn-repair" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Mark repaired
+            </button>
+            <span class="v2-chip-status is-flag">2d open</span>
+          </div>
+        </article>
+
+        <article class="v2-defect v2-accent-amber">
+          <div class="v2-defect-head">
+            <span class="v2-defect-id">
+              <span class="v2-defect-truck">Truck #25141</span>
+              <span class="v2-defect-when">Reported 28 Aug 07:15</span>
+            </span>
+            <span class="v2-chip-status is-minor">Minor</span>
+          </div>
+          <div class="v2-defect-meta">
+            <span class="v2-defect-line">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              J. Brennan
+            </span>
+            <span class="v2-defect-line">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+              <span class="v2-defect-issues">2 checks</span>
+            </span>
+          </div>
+          <div class="v2-defect-foot">
+            <button class="v2-btn-repair" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Mark repaired
+            </button>
+            <span class="v2-chip-status is-flag">8d open</span>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══ Tier 3 · submission history ═══════════════════════════════════
+           Same eight columns production renders, in the same order. Rows are
+           clickable in production and open the full inspection modal.
+
+           Walk-around under 120 seconds carries a warning glyph: too quick to
+           be a real walk-around.
+           ══════════════════════════════════════════════════════════════ -->
+      <section class="v2-table-card" aria-label="Inspection history">
+        <div class="v2-table-wrap">
+          <table class="v2-table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Truck</th>
+                <th>Driver</th>
+                <th>Result</th>
+                <th>Tyres</th>
+                <th>Checks</th>
+                <th>Walk-around</th>
+                <th>Ref</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="v2-td-when">05 Sep 06:42</td>
+                <td class="v2-td-truck">#25940</td>
+                <td class="v2-td-driver">P. Ostrowski</td>
+                <td><span class="v2-chip-status is-pass">Roadworthy</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">6m 18s</span></td>
+                <td class="v2-td-ref">PTI-9F2A41</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">04 Sep 17:05</td>
+                <td class="v2-td-truck">#26102</td>
+                <td class="v2-td-driver">J. Brennan</td>
+                <td><span class="v2-chip-status is-pass">Roadworthy</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">5m 09s</span></td>
+                <td class="v2-td-ref">PTI-9F1C08</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">04 Sep 06:15</td>
+                <td class="v2-td-truck">#26016</td>
+                <td class="v2-td-driver">M. Webb</td>
+                <td><span class="v2-chip-status is-pass">Roadworthy</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">5m 44s</span></td>
+                <td class="v2-td-ref">PTI-9F0B77</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">03 Sep 19:22</td>
+                <td class="v2-td-truck">#25046</td>
+                <td class="v2-td-driver">A. Ferreira</td>
+                <td><span class="v2-chip-status is-defect">Defect</span></td>
+                <td><span class="v2-chip-status is-flag">1 flagged</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">7m 31s</span></td>
+                <td class="v2-td-ref">PTI-9E9D53</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">03 Sep 06:08</td>
+                <td class="v2-td-truck">#26041</td>
+                <td class="v2-td-driver">D. Kowalski</td>
+                <td><span class="v2-chip-status is-pass">Roadworthy</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur">
+                  <span class="v2-chip-status is-dur is-quick" title="Completed very quickly">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+                    1m 12s
+                  </span>
+                </td>
+                <td class="v2-td-ref">PTI-9E8A20</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">02 Sep 05:58</td>
+                <td class="v2-td-truck">#25873</td>
+                <td class="v2-td-driver">A. Ferreira</td>
+                <td><span class="v2-chip-status is-minor">Minor</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-flag">1 failed</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">4m 55s</span></td>
+                <td class="v2-td-ref">PTI-9E60FF</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">01 Sep 18:30</td>
+                <td class="v2-td-truck">#25940</td>
+                <td class="v2-td-driver">P. Ostrowski</td>
+                <td><span class="v2-chip-status is-pass">Roadworthy</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">6m 02s</span></td>
+                <td class="v2-td-ref">PTI-9E4C19</td>
+              </tr>
+              <tr>
+                <td class="v2-td-when">28 Aug 07:15</td>
+                <td class="v2-td-truck">#25141</td>
+                <td class="v2-td-driver">J. Brennan</td>
+                <td><span class="v2-chip-status is-minor">Minor</span></td>
+                <td><span class="v2-chip-status is-ok">OK</span></td>
+                <td><span class="v2-chip-status is-flag">2 failed</span></td>
+                <td class="v2-td-dur"><span class="v2-chip-status is-dur">4m 02s</span></td>
+                <td class="v2-td-ref">PTI-9DF831</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

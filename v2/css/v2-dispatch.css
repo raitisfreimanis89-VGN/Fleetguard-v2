@@ -1,0 +1,347 @@
+/* ==========================================================================
+   FleetGuard v2 — Dispatch Board
+   --------------------------------------------------------------------------
+   STAGING ONLY. Filter bar search field, the pill legend, the dispatcher card
+   grid, and the compact truck rows inside each card.
+
+   Mirrors renderDispatcherBoard() in js/app.js. Production's board is a fixed
+   two-column grid of .card elements with inline styles and emoji pills; this
+   is the same information on the v2 token layer.
+   ========================================================================== */
+
+/* ── Search field in the filter bar ───────────────────────────────────────── */
+
+.v2-disp-search {
+  position: relative;
+  display: flex; align-items: center;
+  flex: 0 1 320px; min-width: 200px;
+}
+.v2-disp-search svg {
+  position: absolute; left: var(--v2-s3);
+  width: 15px; height: 15px;
+  color: var(--v2-ink-3);
+  pointer-events: none;
+}
+.v2-disp-search input {
+  width: 100%;
+  padding: var(--v2-s2) var(--v2-s3) var(--v2-s2) var(--v2-s8);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink);
+  font: inherit; font-size: var(--v2-fs-base);
+  transition: border-color var(--v2-t-fast), background var(--v2-t-fast);
+}
+.v2-disp-search input::placeholder { color: var(--v2-ink-3); }
+.v2-disp-search input:hover { border-color: var(--v2-line-strong); }
+.v2-disp-search input:focus {
+  outline: none;
+  background: var(--v2-surface-3);
+  border-color: var(--v2-cyan-ring);
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────────── */
+
+.v2-legend {
+  display: flex; align-items: center; gap: var(--v2-s4); flex-wrap: wrap;
+  margin: calc(var(--v2-s10) * -1 + var(--v2-s2)) 0 var(--v2-s6);
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-2);
+}
+.v2-legend-lead {
+  font-size: var(--v2-fs-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+.v2-legend-item { display: inline-flex; align-items: center; gap: var(--v2-s2); white-space: nowrap; }
+.v2-legend-key {
+  display: grid; place-items: center;
+  width: 18px; height: 18px;
+  background: var(--v2-surface-3);
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-bold);
+  color: var(--v2-ink-2);
+}
+.v2-legend-tail {
+  margin-left: auto;
+  font-size: var(--v2-fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+/* ── Board grid ───────────────────────────────────────────────────────────── */
+
+/* Production hardcodes two columns at every width above 720px, which wastes
+   half the screen on a 1440 dispatch monitor. auto-fill lets the board run
+   three up when there is room and fall to one on a laptop. */
+.v2-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(378px, 1fr));
+  gap: var(--v2-s5);
+  align-items: start;
+}
+
+.v2-disp-card {
+  overflow: hidden;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+  transition: border-color var(--v2-t-fast), box-shadow var(--v2-t-fast), transform var(--v2-t-fast);
+}
+.v2-disp-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--v2-line-glass-hi);
+  box-shadow: var(--v2-shadow-hover);
+}
+
+/* The card's worst truck sets a 3px top rule — the board's status is legible
+   from across the room before any text is read. */
+.v2-disp-card { border-top: 3px solid var(--v2-line-strong); }
+.v2-disp-card.is-ok   { border-top-color: var(--v2-green); }
+.v2-disp-card.is-warn { border-top-color: var(--v2-amber); }
+.v2-disp-card.is-crit { border-top-color: var(--v2-red); }
+
+/* ── Card header ──────────────────────────────────────────────────────────── */
+
+.v2-disp-head {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s4) var(--v2-s5) var(--v2-s3);
+}
+
+.v2-disp-avatar {
+  display: grid; place-items: center;
+  width: 42px; height: 42px; flex-shrink: 0;
+  border-radius: var(--v2-r-pill);
+  background: linear-gradient(135deg, var(--v2-amber), var(--v2-amber-deep));
+  color: var(--v2-ink-on-accent);
+  font-size: var(--v2-fs-md); font-weight: var(--v2-fw-bold);
+  letter-spacing: var(--v2-track-snug);
+  box-shadow: 0 0 16px -4px var(--v2-amber-ring);
+}
+/* --v2-ink-3 lands at 4.49:1 on --v2-surface-3 — a hair under AA, the same
+   trap the Reminders "Custom" chip fell into. --v2-ink-2 clears it at 6.5:1. */
+.v2-disp-avatar.is-none {
+  background: var(--v2-surface-3);
+  color: var(--v2-ink-2);
+  box-shadow: none;
+}
+
+.v2-disp-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.v2-disp-name {
+  font-size: var(--v2-fs-md); line-height: var(--v2-lh-md);
+  font-weight: var(--v2-fw-bold);
+  letter-spacing: var(--v2-track-snug);
+  color: var(--v2-ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2-disp-meta {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-3);
+}
+
+.v2-disp-link {
+  display: inline-flex; align-items: center; gap: var(--v2-s1);
+  flex-shrink: 0;
+  padding: var(--v2-s1) var(--v2-s2);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-amber-hi);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--v2-t-fast);
+}
+.v2-disp-link svg { width: 13px; height: 13px; transition: transform var(--v2-t-fast); }
+.v2-disp-link:hover { background: var(--v2-amber-soft); }
+.v2-disp-card:hover .v2-disp-link svg { transform: translateX(2px); }
+
+/* ── Health summary ───────────────────────────────────────────────────────── */
+
+.v2-disp-stats {
+  display: flex; flex-direction: column; gap: var(--v2-s2);
+  padding: 0 var(--v2-s5) var(--v2-s4);
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.v2-disp-chips { display: flex; align-items: center; gap: var(--v2-s2); flex-wrap: wrap; }
+.v2-disp-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px var(--v2-s2);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-disp-chip.is-ok   { background: var(--v2-green-soft); color: var(--v2-green-hi); }
+.v2-disp-chip.is-warn { background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+.v2-disp-chip.is-crit { background: var(--v2-red-soft);   color: var(--v2-red-hi);   }
+.v2-disp-chip.is-vac  { background: var(--v2-blue-soft);  color: var(--v2-blue-hi);  }
+
+.v2-health { display: flex; align-items: center; gap: var(--v2-s3); }
+.v2-health-track {
+  flex: 1; min-width: 40px;
+  height: 5px;
+  background: var(--v2-surface-3);
+  border-radius: var(--v2-r-pill);
+  overflow: hidden;
+}
+.v2-health-fill {
+  height: 100%;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-green);
+  transition: width var(--v2-t-base);
+}
+.v2-disp-card.is-warn .v2-health-fill { background: var(--v2-amber); }
+.v2-disp-card.is-crit .v2-health-fill { background: var(--v2-red); }
+
+/* Production draws the bar and nothing else, so the exact figure is
+   unreadable — 78% and 82% are the same handful of pixels. */
+.v2-health-pct {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: right;
+  font-size: var(--v2-fs-micro);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-2);
+}
+
+/* ── Truck rows ───────────────────────────────────────────────────────────── */
+
+/* NOT .v2-truck-list — v2-drivers.css already owns that name for its wrapping
+   chip container, and every page loads both sheets. The collision leaked
+   flex-wrap:wrap and an 8px gap into these rows, which are meant to sit flush
+   and be separated by their own hairline borders. */
+.v2-fleet-list { display: flex; flex-direction: column; }
+
+.v2-truck-row {
+  position: relative;
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s2) var(--v2-s5);
+  border-bottom: 1px solid var(--v2-line);
+  transition: background var(--v2-t-fast);
+}
+.v2-truck-row:last-child { border-bottom: 0; }
+.v2-truck-row:hover { background: var(--v2-surface-2); }
+
+/* Severity rail. Production animates these; a pulsing bar per troubled truck
+   on a board of 45 is a lot of motion for a screen someone watches all day,
+   so the rail is static and the colour does the work. */
+.v2-truck-row::before {
+  content: '';
+  position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: transparent;
+}
+.v2-truck-row.is-warn::before { background: var(--v2-amber); }
+.v2-truck-row.is-crit::before { background: var(--v2-red); }
+
+.v2-truck-ic {
+  display: grid; place-items: center;
+  width: 28px; height: 28px; flex-shrink: 0;
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-3);
+}
+.v2-truck-ic svg { width: 15px; height: 15px; }
+.v2-truck-row.is-warn .v2-truck-ic { border-color: var(--v2-amber-ring); color: var(--v2-amber); }
+.v2-truck-row.is-crit .v2-truck-ic { border-color: var(--v2-red-ring);   color: var(--v2-red);   }
+
+.v2-truck-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.v2-truck-no {
+  font-size: var(--v2-fs-sm); line-height: var(--v2-lh-sm);
+  font-weight: var(--v2-fw-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-truck-sub {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.v2-truck-sub.is-none { color: var(--v2-ink-3); font-style: italic; }
+
+/* Why the rail is lit, when the four pills do not say so — an unrepaired
+   defect or an annual certificate makes a truck critical with every interval
+   pill still green. */
+.v2-truck-reason { font-weight: var(--v2-fw-semibold); }
+.v2-truck-reason::before { content: '\00b7'; margin: 0 var(--v2-s1) 0 0; color: var(--v2-ink-3); }
+.v2-truck-reason.is-warn { color: var(--v2-amber-hi); }
+.v2-truck-reason.is-crit { color: var(--v2-red-hi); }
+
+/* ── Status pill strip ────────────────────────────────────────────────────── */
+
+/* Fixed-width cells so the four pills line up column-wise down the card —
+   a dispatcher scans the S column for red, not each row in turn. */
+.v2-strip { display: flex; gap: var(--v2-s1); flex-shrink: 0; }
+
+.v2-sp {
+  display: inline-flex; align-items: center; gap: 3px;
+  min-width: 46px;
+  padding: 2px var(--v2-s2);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+.v2-sp-k { font-weight: var(--v2-fw-bold); opacity: .72; }
+.v2-sp-v { flex: 1; text-align: right; }
+
+.v2-sp.is-ok   { background: var(--v2-green-soft); color: var(--v2-green-hi); }
+.v2-sp.is-warn { background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+.v2-sp.is-crit { background: var(--v2-red-soft);   color: var(--v2-red-hi);   }
+/* Missing pre-trip is not a status in production — it never feeds critical or
+   warning — so it stays neutral rather than borrowing an alert colour. */
+.v2-sp.is-idle { background: var(--v2-surface-2); color: var(--v2-ink-3); }
+
+/* ── Vacation ─────────────────────────────────────────────────────────────── */
+
+.v2-truck-row.is-vac { opacity: .58; }
+.v2-truck-row.is-vac .v2-truck-no { color: var(--v2-ink-2); }
+.v2-truck-row.is-vac:hover { opacity: .78; }
+
+.v2-vac-tag {
+  display: inline-flex; align-items: center; gap: var(--v2-s1);
+  flex-shrink: 0;
+  padding: 2px var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-blue-soft);
+  color: var(--v2-blue-hi);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+}
+.v2-vac-tag svg { width: 11px; height: 11px; }
+
+/* ── Unassigned ───────────────────────────────────────────────────────────── */
+
+.v2-disp-card.is-unassigned { border-top-color: var(--v2-line-strong); }
+.v2-disp-card.is-unassigned .v2-disp-name { color: var(--v2-ink-2); }
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1180px) {
+  .v2-board { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+}
+@media (max-width: 820px) {
+  .v2-board { grid-template-columns: 1fr; }
+  .v2-legend-tail { margin-left: 0; width: 100%; }
+  .v2-disp-search { flex: 1 1 100%; }
+}
+@media (max-width: 560px) {
+  /* Below this the strip and the truck name fight for the same row; the
+     strip wraps under the name instead of squeezing both. */
+  .v2-truck-row { flex-wrap: wrap; }
+  .v2-strip { width: 100%; padding-left: calc(28px + var(--v2-s3)); }
+}

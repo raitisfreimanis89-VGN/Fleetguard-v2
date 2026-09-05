@@ -1,0 +1,505 @@
+/* ==========================================================================
+   FleetGuard v2 — section headers & rich tool cards
+   --------------------------------------------------------------------------
+   STAGING ONLY. Step 2: the "Essential Tools" hero cards. The section-header
+   and accent machinery here is deliberately generic — Live Maps (step 4) and
+   Compliance & Documents (step 5) reuse .v2-section / .v2-section-head with a
+   different accent, and only need their own body styles.
+
+   Accent handling: each card sets three local properties (--tc, --tc-soft,
+   --tc-ring) from one .v2-accent-* class. Tag, ring, glow, button and hover
+   all read those, so recolouring a card is a one-class change and no accent
+   value is repeated down the file.
+   ========================================================================== */
+
+/* ── Section scaffold ────────────────────────────────────────────────────── */
+
+.v2-section {
+  margin-bottom: var(--v2-s14);
+  /* Anchor jumps from the sidebar must clear the sticky topbar. */
+  scroll-margin-top: calc(var(--v2-topbar-h) + var(--v2-s6));
+}
+.v2-section:last-child { margin-bottom: 0; }
+
+/* Icon is optically centred against the H2's cap height, not the block's top
+   edge — hence the 1px nudge rather than align-items:flex-start alone. */
+.v2-section-head {
+  display: flex; align-items: center; gap: var(--v2-s4);
+  margin-bottom: var(--v2-s6);
+}
+
+.v2-section-ic {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-md);
+  background: var(--tc-soft); color: var(--tc);
+  border: 1px solid var(--tc-ring);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.v2-section-ic svg { width: 20px; height: 20px; }
+
+.v2-section-title { min-width: 0; }
+.v2-section-title h2 {
+  margin: 0;
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  color: var(--v2-ink);
+}
+.v2-section-title p {
+  margin: 2px 0 0;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-3);
+}
+
+.v2-section-link {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s3);
+  border-radius: var(--v2-r-sm);
+  color: var(--tc);
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  font-weight: var(--v2-fw-semibold);
+  transition: background var(--v2-t-fast);
+}
+.v2-section-link:hover { background: var(--tc-soft); }
+.v2-section-link .v2-arrow { transition: transform var(--v2-t-fast); }
+.v2-section-link:hover .v2-arrow { transform: translateX(2px); }
+
+/* ── Accent sets ─────────────────────────────────────────────────────────── */
+
+.v2-accent-amber { --tc: var(--v2-amber);  --tc-hi: var(--v2-amber-hi); --tc-soft: var(--v2-amber-soft); --tc-ring: var(--v2-amber-ring); }
+.v2-accent-cyan  { --tc: var(--v2-cyan);   --tc-hi: var(--v2-cyan-hi);  --tc-soft: var(--v2-cyan-soft);  --tc-ring: var(--v2-cyan-ring);  }
+.v2-accent-green { --tc: var(--v2-green);  --tc-hi: var(--v2-green-hi); --tc-soft: var(--v2-green-soft); --tc-ring: var(--v2-green-ring); }
+.v2-accent-red   { --tc: var(--v2-red);    --tc-hi: var(--v2-red-hi);   --tc-soft: var(--v2-red-soft);   --tc-ring: var(--v2-red-ring);   }
+.v2-accent-blue  { --tc: var(--v2-blue);   --tc-hi: var(--v2-blue-hi);  --tc-soft: var(--v2-blue-soft);  --tc-ring: var(--v2-blue-ring);  }
+
+/* ── Tool grid ───────────────────────────────────────────────────────────── */
+
+/* 288px, not 310: at a 1280 laptop width the content box is ~980px and the
+   scrollbar takes ~15 of it, which was just enough to break the row to 2-up.
+   288 keeps all three across from 1280 upward. */
+.v2-tool-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(288px, 1fr));
+  gap: var(--v2-s6);
+}
+
+.v2-tool-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  min-height: 268px;
+  padding: var(--v2-s6);
+  /* Slight vertical lift in the surface itself — the top edge catches light,
+     the bottom settles into the page. Flat fills are what read as "dim". */
+  background:
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--v2-surface) 92%, #ffffff) 0%,
+      var(--v2-surface) 46%,
+      color-mix(in srgb, var(--v2-surface) 94%, #000000) 100%);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+  transition: transform var(--v2-t-base), box-shadow var(--v2-t-base), border-color var(--v2-t-base);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .v2-tool-card { background: var(--v2-surface); }
+}
+.v2-tool-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--tc-ring);
+  /* Ambient depth plus a coloured bloom in the card's own accent. */
+  box-shadow:
+    var(--v2-shadow-hover),
+    0 0 0 1px var(--tc-ring),
+    0 18px 44px -20px var(--tc);
+}
+/* Accent bloom behind the artwork, top-right. */
+.v2-tool-card::before {
+  content: ''; position: absolute; inset: 0; z-index: -2;
+  background: radial-gradient(460px 240px at 86% -20%, var(--tc-soft), transparent 64%);
+  opacity: .8;
+  transition: opacity var(--v2-t-base);
+}
+.v2-tool-card:hover::before { opacity: 1; }
+
+/* ── Card artwork ────────────────────────────────────────────────────────── */
+
+/* ── Card artwork: photograph + overlay + optional vector ────────────────────
+   Three stacked layers inside .v2-tool-art:
+
+     ::before   the photograph, set per card via --art on the element
+     ::after    the darkening overlay (z-index 1)
+     svg        vector that must stay bright — a route line, a US map —
+                deliberately ABOVE the overlay (z-index 2)
+
+   Only two cards still carry an svg, and both draw something a photograph
+   cannot: the plotted route with its toll gantry, and the state map with a
+   lit state. Everything else is photographic.
+
+   Photos are hotlinked from images.unsplash.com. That is a third-party
+   dependency on a page drivers open in bad signal, and the CSP on
+   index.html (img-src 'self' data: <supabase>) would block it if that policy
+   is ever extended to this page. Download them into img/ before cutover and
+   only --art needs to change.                                              */
+
+.v2-tool-art { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+
+.v2-tool-art::before {
+  content: ''; position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center right;
+  /* These photographs measure 20-53 mean brightness out of 255, so they need
+     lifting, not dimming — the overlay below does the darkening where it is
+     actually needed. Per-card tuning via --art-lift where one runs dark. */
+  filter: saturate(.8) contrast(1.06) brightness(var(--art-lift, 1.14));
+  transform: scale(1.02);
+  transition: transform var(--v2-t-base), filter var(--v2-t-base);
+}
+/* ── Per-card artwork ─────────────────────────────────────────────────────
+   These MUST come after .v2-tool-art::before above. Both are one class plus a
+   pseudo-element, so they carry identical specificity and the later rule wins.
+   While this block sat before the base rule, every background-position here
+   was silently overridden by the base right-anchor — including the PTI card,
+   whose `center` had never once taken effect despite the reasoning beside it.
+   Adding a card below the base rule is the only safe place to put it.        */
+
+/* Image URLs live here, not in a --art custom property on the element.
+   A relative url() inside a custom property resolves against the stylesheet
+   that CONSUMES it, not the document that declares it — so "../img/x.jpg"
+   written in guides.html resolved from v2/css/ and 404'd. Declaring it in
+   this file makes the base unambiguous: paths are relative to v2/css/.
+   A root-absolute "/img/..." is not an option either, since GitHub Pages
+   serves the site under /Fleetguard-v2/. */
+/* Plain cover, deliberately. This crop is 1.31:1 against a ~1.5:1 card, so
+   cover fits the full width and trims top/bottom — the whole rig stays in
+   frame. Zooming past cover to push the cab rightward cut the tractor's nose
+   off entirely (it sits in the first 20% of the image), which is worse: the
+   nose is the part that reads as a truck at card size. */
+/* NO VERTICAL OVERLAY AT ALL — every vertical stop is zero, so the only
+   darkening is the left-to-right ramp, and it reaches nothing past 80%.
+   Photograph visible across 59.1% of the card, up from 29.1%.
+
+   Measured behind this card's copy the photograph has a MEAN luminance of
+   0.011: it is already almost black there, so most of the old gradient was
+   darkening nothing. Only a specular highlight (peak 0.576) crosses the title,
+   and the horizontal ramp alone handles it.
+
+   Stops solved by constrained coordinate descent over all nine overlay values,
+   maximising visible photograph subject to >= 4.77:1 on every text run in BOTH
+   the rest and hover states — hover matters because it brightens the image a
+   further 1.08x and scales it 1.06. Worst run is the body at 4.84:1.
+   Monotonicity is enforced: an unconstrained solve wanted .25 -> .68 -> .43
+   across the width, which passes but renders as a dark band with a brighter
+   left edge rather than a vignette. */
+.v2-art-pti {
+  --art-lift: 1.35;
+  --art-veil: 0;
+  --art-v-start: 55%;
+  --art-v-mid: 0;
+  --art-v-end: 0;
+  --art-scrim-0: .72;
+  --art-scrim-28: .72;
+  --art-scrim-54: .43;
+  --art-scrim-80: 0;
+  --art-scrim-100: 0;
+  --art-v-top: 0;
+}
+.v2-art-pti::before {
+  background-image: url('../img/card-pti-truck.jpg');
+  background-position: center;
+}
+.v2-art-toll { --art-lift: 1.45; }
+.v2-art-toll::before    { background-image: url('https://images.unsplash.com/photo-1535953928289-6bac80e96f3c?auto=format&fit=crop&w=760&q=52'); }
+
+/* Local asset, one fewer hotlink: this card no longer depends on Unsplash and
+   would survive the index.html CSP (img-src 'self') if that policy is ever
+   extended to this page. Four hotlinked cards remain.
+
+   `center`, not the ::before default of `center right`. Measured in fractions
+   so it survives a re-export: the image is 1.79:1 on a ~1.23:1 card, so cover
+   hides 31.5% of the width. Anchored right that trims the whole left 31.5% —
+   which is the entire tractor, leaving a disembodied box trailer. Centred it
+   trims 15.7% off each edge instead, keeping the middle 68.5%, and every
+   subject survives: tractor, tandem axle group, the 53FT marking and the rear
+   doors. Same lesson as the PTI card above — losing the tractor costs the
+   thing that reads as "truck" at card size.
+   (Asset is currently 760x424, 43KB, downsampled from a 2752x1536 original.
+   760 covers the 350-wide art box at better than 2x for retina.) */
+/* Tuning vars go on the ELEMENT, not on ::before. --art-lift is read by
+   ::before but --art-veil / --art-scrim-* are read by ::after, and the two
+   pseudo-elements are siblings — a property set on one is invisible to the
+   other.
+
+   This card CANNOT go as light as the PTI one, and the reason is in the
+   photograph rather than the design. Measured directly behind the title and
+   the description, the trailer panel peaks at pure white, rgb(255,255,255),
+   luminance 1.0, against a mean of 0.28. Near-white text needs its background
+   under luminance 0.163 to clear 4.5:1, so that region has to come down by
+   roughly 6x. A flat .23 veil below the top band is the lightest that manages
+   it, and the top 20% carries no text at all — the tag sits on its own ground
+   — so that band stays completely clear.
+
+   Photograph visible across 49.0% of the card, up from 29.1%. Worst text run
+   is 4.77:1 on hover. Same constrained solve as the PTI card above; this one
+   simply has less room to give.
+
+   The durable fix is structural — copy on solid ground rather than on the
+   photograph — which makes contrast independent of whichever image is used. */
+.v2-art-axle {
+  --art-lift: 1;
+  --art-veil: .23;
+  --art-v-start: 55%;
+  --art-v-mid: .23;
+  --art-v-end: .23;
+  --art-scrim-0: .49;
+  --art-scrim-28: .49;
+  --art-scrim-54: .49;
+  --art-scrim-80: .23;
+  --art-scrim-100: 0;
+  --art-v-top: 0;
+}
+.v2-art-axle::before {
+  background-image: url('../img/card-axle-limits.jpg');
+  background-position: center;
+}
+
+/* CAT Scale locator. Local asset, one fewer hotlink; three cards still remote.
+   Framing: cover + center. The image is 1.79:1 on a ~1.23:1 card, so cover
+   keeps the full HEIGHT and trims 31.5% of the width, 15.75% from each edge.
+   Measured against that window, the sign banner occupies card x 16.8-74.8%
+   and the tractor-trailer x 43-76%, so both sit entirely inside the visible
+   region — nothing of either is cropped. contain was rejected: it would fit
+   the width instead and letterbox 90px of dead card above and below.
+
+   NO OVERLAY ACROSS THE SIGN. The banner sits at card y 5.8-27.3%, so every
+   vertical stop is zero until --art-v-start, well below it, and the darkening
+   that remains is weighted to the bottom where the copy sits. */
+/* CAT Scale locator.
+
+   FRAMING: contain, anchored top. Not cover — cover would trim 31.5% of the
+   width and, more importantly, keep the image at full card height, which puts
+   the sign banner at y 5.8-27.4% where it collides with the title at 25.7%.
+   Protecting the title would then mean dimming the sign, which is the one
+   thing this card must not do. contain fits the whole frame instead: NOTHING
+   is cropped, the image occupies y 0-77.4%, and the banner lifts to y
+   4.5-21.2% — a clear 4.5-point gap above the title. The tractor-trailer sits
+   at y 36.8-60.4%, also complete.
+
+   ZERO OVERLAY ON THE SIGN. Every horizontal stop is 0, so nothing darkens by
+   column; the only overlay is vertical and it starts at 22%, which is 0.8
+   points BELOW the bottom of the banner. Measured row by row, the sign's
+   lettering runs from y 6.7% to 21.2% and every one of those rows is fully
+   unobscured. It ramps to .7 by 28%, before the title, and holds.
+
+   The tag is the only text that lands on the banner, at y 11.6-16.4%. It is
+   fixed by deepening its own pill ground to .74 rather than by shadowing the
+   photograph — a small chip on the sign instead of a wash across it.
+
+   The meta pills fall at y 81.3-86.2%, below where the image ends, so they sit
+   on plain card surface and need nothing. */
+.v2-art-scale {
+  --art-lift: 1;
+  --art-v-top: 0;
+  --art-veil: 0;
+  --art-v-plateau: 22%;
+  --art-v-start: 22%;
+  --art-v-mid:.75;
+  --art-v-knee:27%;
+  --art-v-end:.75;
+  --art-scrim-0: 0;
+  --art-scrim-28: 0;
+  --art-scrim-54: 0;
+  --art-scrim-80: 0;
+  --art-scrim-100: 0;
+  --tag-ground:.80;
+}
+.v2-art-scale::before {
+  background-image: url('../img/card-cat-scale.jpg');
+  background-size: contain;
+  background-position: top center;
+  background-repeat: no-repeat;
+}
+.v2-art-traffic { --art-lift: 1.7; }
+.v2-art-traffic::before { background-image: url('https://images.unsplash.com/photo-1686006354746-2b243585a692?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-states { --art-lift: 1.2; }
+.v2-art-states::before  { background-image: url('https://images.unsplash.com/photo-1506747111041-18b1844bf60f?auto=format&fit=crop&w=760&q=52'); }
+
+.v2-tool-card:hover .v2-tool-art::before {
+  transform: scale(1.06);
+  filter: saturate(.92) contrast(1.08) brightness(calc(var(--art-lift, 1.14) * 1.08));
+}
+
+/* Right-to-left darkening so the copy column is fully protected, plus a
+   vertical pass so the meta pills and button sit on their own ground. */
+.v2-tool-art::after {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background:
+    /* Five stops, not three. The top band carries no text — the tag sits on its
+       own ground — so it can stay lighter than the title/body band below it.
+       Splitting them is worth several points of visible photograph. Defaults
+       (0, 0, 0 through 46%) reproduce the original `transparent 46%` exactly,
+       so the four cards that set nothing are pixel-identical. */
+    linear-gradient(180deg,
+      rgba(var(--v2-surface-rgb), var(--art-v-top, 0)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-plateau, 20%),
+      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-start, 46%),
+      rgba(var(--v2-surface-rgb), var(--art-v-mid, .66)) var(--art-v-knee, 84%),
+      rgba(var(--v2-surface-rgb), var(--art-v-end, .9)) 100%),
+    linear-gradient(90deg,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-0, 1)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-28, .94)) 28%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-54, .6)) 54%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-80, .24)) 80%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-100, .06)) 100%);
+}
+
+.v2-tool-art svg {
+  position: absolute; inset: 0; z-index: 2;
+  width: 100%; height: 100%;
+  opacity: .95;
+  transition: opacity var(--v2-t-base), transform var(--v2-t-base);
+  transform-origin: 80% 50%;
+}
+.v2-tool-card:hover .v2-tool-art svg { opacity: 1; transform: scale(1.04); }
+
+/* ── Card body ───────────────────────────────────────────────────────────── */
+
+/* Tag sits tight to the title; the title/description pair is the tighter
+   group, with the larger gap above it. Uneven gaps, deliberately — even
+   spacing between all three would flatten the hierarchy. */
+.v2-tool-body { display: flex; flex-direction: column; flex: 1; }
+.v2-tool-body .v2-tag { margin-bottom: var(--v2-s4); }
+.v2-tool-card h3 { margin: 0 0 var(--v2-s2); }
+
+.v2-tag {
+  align-self: flex-start;
+  /* Caption: 11/16 Medium, per the design system. */
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  /* Outline pill: accent hairline, accent text, near-transparent ground.
+     Reads as a label on the photograph rather than a filled block. */
+  background: rgba(0, 5, 13, var(--tag-ground, .62));
+  border: 1px solid var(--tc-ring);
+  color: var(--tc-hi);
+  backdrop-filter: blur(8px);
+  padding: var(--v2-s1) var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+}
+
+.v2-tool-card h3 {
+  /* H2: 20/28 SemiBold. */
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  color: var(--v2-ink);
+}
+
+.v2-tool-card p {
+  margin: 0;
+  max-width: 36ch;
+  /* Body 1: 14/20 Regular, in the one secondary tone. */
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-regular);
+  /* Near-white, not the secondary tone. Body copy here sits ON a photograph,
+     and --v2-ink-2 needs its background under luminance 0.041 to clear 4.5:1
+     where --v2-ink needs only 0.163 — four times more permissive. That single
+     step is what lets the scrim come off. Brighter text cannot reduce contrast
+     on any card, so the four hotlinked cards can only benefit. */
+  color: var(--v2-ink);
+}
+
+/* ── Card footer: meta pills + action ────────────────────────────────────── */
+
+.v2-tool-foot {
+  margin-top: auto;
+  padding-top: var(--v2-s6);
+  display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap;
+}
+
+.v2-meta { display: flex; align-items: center; gap: var(--v2-s2); flex-wrap: wrap; }
+.v2-meta-pill {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s1) var(--v2-s2);
+  /* Same tinted-glass treatment as .v2-tag, minus the accent, so pills stay
+     readable where they overlap the artwork at the foot of a card. */
+  background: rgba(0, 5, 13, var(--meta-ground, .52));
+  border: 1px solid var(--v2-line-glass);
+  backdrop-filter: blur(6px);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-2);
+  white-space: nowrap;
+}
+
+/* Inter carries tabular figures, so the axle limits and toll specs line up
+   in a column without pulling in a second font family for it. */
+.v2-meta-pill, .v2-tab-n, .v2-row-meta, .v2-alert-n, .v2-alert-st {
+  font-variant-numeric: tabular-nums;
+}
+.v2-meta-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* "Live" pill — describes a destination that updates on its own. */
+.v2-meta-pill.is-live { color: var(--v2-green-hi); border-color: var(--v2-green-ring); background: var(--v2-green-soft); }
+.v2-live-dot {
+  width: 6px; height: 6px; flex-shrink: 0;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-green);
+  box-shadow: 0 0 0 3px var(--v2-green-soft);
+  animation: v2-pulse 2.4s var(--v2-ease) infinite;
+}
+@keyframes v2-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .v2-live-dot { animation: none; } }
+
+.v2-btn {
+  position: relative;
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  border-radius: var(--v2-r-sm);
+  /* Solid accent fill — flat and crisp, as in the reference. No gradient. */
+  background: var(--tc);
+  /* Dark ink on a bright accent. White on #ff8a00 is only ~2.4:1 and fails
+     AA; dark ink is ~8.4:1, which is what "high contrast" actually needs. */
+  color: var(--v2-ink-on-accent);
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: 0;
+  white-space: nowrap;
+  box-shadow: 0 2px 12px -4px var(--tc);
+  transition: box-shadow var(--v2-t-base), transform var(--v2-t-fast), filter var(--v2-t-fast);
+}
+.v2-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -4px var(--tc);
+}
+.v2-btn:active { transform: translateY(0); }
+
+/* Stretched link: the whole card is clickable, but the accessibility tree
+   still sees exactly one link per card. Anything interactive added to a card
+   later needs position:relative to sit above this. */
+.v2-btn::after {
+  content: ''; position: absolute; inset: 0;
+  /* Matches the card's radius, not the button's — this pseudo covers the card. */
+  border-radius: var(--v2-r-lg);
+}
+
+.v2-arrow { transition: transform var(--v2-t-fast); }
+.v2-tool-card:hover .v2-arrow { transform: translateX(2px); }
+
+/* ── Narrow viewports ────────────────────────────────────────────────────── */
+
+@media (max-width: 620px) {
+  .v2-tool-grid { grid-template-columns: minmax(0, 1fr); }
+  .v2-tool-art svg { opacity: .35; }
+  .v2-tool-foot { align-items: stretch; }
+  .v2-btn { margin-left: 0; width: 100%; justify-content: center; }
+  .v2-section-head { flex-wrap: wrap; }
+  .v2-section-link { margin-left: 0; padding-left: 0; }
+}

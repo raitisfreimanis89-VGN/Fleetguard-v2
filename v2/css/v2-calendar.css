@@ -1,0 +1,287 @@
+/* ==========================================================================
+   FleetGuard v2 — Calendar
+   --------------------------------------------------------------------------
+   STAGING ONLY. Month control bar, the seven-column grid, and the upcoming
+   deadlines stream.
+
+   Event types and countdown thresholds follow renderCalendar() in js/app.js.
+   ========================================================================== */
+
+/* ── Control bar ─────────────────────────────────────────────────────────── */
+
+.v2-cal-bar {
+  display: flex; align-items: center; gap: var(--v2-s4); flex-wrap: wrap;
+  margin-bottom: var(--v2-s6);
+}
+
+.v2-cal-nav { display: flex; align-items: center; gap: var(--v2-s3); }
+
+.v2-cal-arrow {
+  display: grid; place-items: center;
+  width: 36px; height: 36px;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-2);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-cal-arrow svg { width: 16px; height: 16px; }
+.v2-cal-arrow:hover { background: var(--v2-surface-2); border-color: var(--v2-line-glass-hi); color: var(--v2-ink); }
+
+.v2-cal-month {
+  min-width: 200px;
+  text-align: center;
+  /* H2: 20/28 SemiBold. The month is the page's second-loudest thing. */
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+
+.v2-cal-today-btn {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s3);
+  background: var(--v2-cyan-soft);
+  border: 1px solid var(--v2-cyan-ring);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-cyan-hi);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  cursor: pointer;
+  transition: background var(--v2-t-fast);
+}
+.v2-cal-today-btn:hover { background: var(--v2-cyan-ring); color: var(--v2-ink); }
+
+/* ── Filter pills ────────────────────────────────────────────────────────── */
+
+.v2-cal-filters { display: flex; align-items: center; gap: var(--v2-s2); margin-left: auto; flex-wrap: wrap; }
+
+.v2-cal-pill {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s3);
+  background: transparent;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-pill);
+  color: var(--v2-ink-2);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-cal-pill:hover { background: var(--v2-surface-2); color: var(--v2-ink); }
+.v2-cal-pill.is-active {
+  background: var(--tc-soft);
+  border-color: var(--tc-ring);
+  color: var(--tc-hi);
+  font-weight: var(--v2-fw-semibold);
+}
+/* Colour key doubles as the filter's own swatch. */
+.v2-cal-dot {
+  width: 8px; height: 8px;
+  border-radius: var(--v2-r-pill);
+  background: var(--tc);
+  box-shadow: 0 0 0 3px var(--tc-soft);
+}
+
+/* ── Month grid ──────────────────────────────────────────────────────────── */
+
+.v2-cal-card {
+  overflow: hidden;
+  margin-bottom: var(--v2-s8);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+
+.v2-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  /* The gap colour IS the grid rule — one background behind 1px gaps beats
+     seven columns of border maths. */
+  background: var(--v2-line);
+  border-top: 1px solid var(--v2-line);
+}
+
+.v2-cal-dow {
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface-2);
+  text-align: left;
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-cal-day {
+  position: relative;
+  min-height: 116px;
+  display: flex; flex-direction: column; gap: var(--v2-s2);
+  padding: var(--v2-s3);
+  /* Frosted: a translucent plate over the card, not an opaque fill, so the
+     grid reads as one surface with cells cut into it. */
+  background: rgba(255, 255, 255, .014);
+  backdrop-filter: blur(6px);
+  transition: background var(--v2-t-fast);
+}
+.v2-cal-day:hover { background: rgba(255, 255, 255, .04); }
+
+/* Leading and trailing cells outside the month. */
+.v2-cal-day.is-blank { background: rgba(0, 0, 0, .22); }
+.v2-cal-day.is-blank:hover { background: rgba(0, 0, 0, .22); }
+
+.v2-cal-num {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-2);
+}
+.v2-cal-day.has-events .v2-cal-num { color: var(--v2-ink); }
+
+/* Today: cyan ring plus a filled date badge. Both, because a ring alone is
+   easy to lose against the event capsules. */
+.v2-cal-day.is-today {
+  background: var(--v2-cyan-soft);
+  box-shadow: inset 0 0 0 1px var(--v2-cyan), 0 0 24px -6px var(--v2-cyan-ring);
+}
+.v2-cal-day.is-today .v2-cal-num {
+  align-self: flex-start;
+  min-width: 24px; padding: 0 var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-cyan);
+  color: var(--v2-ink-on-accent);
+  text-align: center;
+}
+
+/* ── Event capsules ──────────────────────────────────────────────────────── */
+
+.v2-cal-events { display: flex; flex-direction: column; gap: var(--v2-s1); min-width: 0; }
+
+.v2-cap {
+  display: flex; align-items: center; gap: var(--v2-s2);
+  padding: 3px var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  background: var(--tc-soft);
+  border: 1px solid var(--tc-ring);
+  color: var(--tc-hi);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast);
+}
+.v2-cap:hover { background: var(--tc-ring); color: var(--v2-ink); }
+/* Type is carried by a leading dot AND by the label text, never by colour
+   alone — production truncates the label to "Truck #X" and leaves colour as
+   the only signal, which a colour-blind dispatcher cannot read. */
+.v2-cap-dot {
+  width: 5px; height: 5px; flex-shrink: 0;
+  border-radius: var(--v2-r-pill);
+  background: var(--tc);
+}
+.v2-cap-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Upcoming deadlines stream ───────────────────────────────────────────── */
+
+.v2-stream { display: flex; flex-direction: column; }
+
+.v2-stream-row {
+  display: flex; align-items: center; gap: var(--v2-s4);
+  padding: var(--v2-s3) var(--v2-s5);
+  border-bottom: 1px solid var(--v2-line);
+  transition: background var(--v2-t-fast);
+}
+.v2-stream-row:last-child { border-bottom: 0; }
+.v2-stream-row:hover { background: var(--v2-surface-2); }
+
+.v2-stream-ic {
+  width: 30px; height: 30px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft); color: var(--tc);
+  border: 1px solid var(--tc-ring);
+}
+.v2-stream-ic svg { width: 15px; height: 15px; }
+
+.v2-stream-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.v2-stream-label {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+.v2-stream-type {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-3);
+}
+
+.v2-stream-date {
+  flex-shrink: 0;
+  font-size: var(--v2-fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+/* Countdown thresholds, straight from renderCalendar():
+   <= 7 days red, <= 14 amber, beyond that blue. Day zero reads "Today". */
+.v2-countdown {
+  flex-shrink: 0;
+  min-width: 46px;
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+.v2-countdown.is-urgent { background: var(--v2-red);   color: var(--v2-ink-on-accent); }
+.v2-countdown.is-soon   { background: var(--v2-amber); color: var(--v2-ink-on-accent); }
+/* Neutral, not blue. Blue now denotes the Yard clock in the type key, and a
+   blue urgency badge beside a red Brake row would read as a second type
+   rather than "not urgent yet". */
+.v2-countdown.is-later  {
+  background: var(--v2-surface-3);
+  border: 1px solid var(--v2-line-strong);
+  color: var(--v2-ink-2);
+}
+
+@media (max-width: 900px) {
+  .v2-cal-day { min-height: 92px; }
+  .v2-cal-filters { margin-left: 0; width: 100%; }
+}
+@media (max-width: 620px) {
+  .v2-cal-grid { font-size: var(--v2-fs-micro); }
+  .v2-cal-day { min-height: 76px; padding: var(--v2-s2); }
+  .v2-stream-date { display: none; }
+}
+
+/* ── Filter pill counts ──────────────────────────────────────────────────── */
+
+.v2-cal-n {
+  margin-left: var(--v2-s1);
+  font-size: var(--v2-fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+}
+.v2-cal-pill.is-active .v2-cal-n { color: var(--tc-hi); }
+
+/* ── Cell overflow ───────────────────────────────────────────────────────── */
+
+/* A busy day gets three capsules and a count. Without this a single date with
+   nine events would stretch its row and drag the whole grid out of shape. */
+.v2-cap-more {
+  padding: 2px var(--v2-s2);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink-2);
+  cursor: pointer;
+}
+.v2-cap-more:hover { color: var(--v2-ink); }

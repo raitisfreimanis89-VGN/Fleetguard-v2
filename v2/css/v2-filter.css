@@ -1,0 +1,148 @@
+/* ==========================================================================
+   FleetGuard v2 — filter bar, sort control, empty state
+   --------------------------------------------------------------------------
+   STAGING ONLY. Category tabs, the sort select, and the no-results block.
+
+   Tab counts are NOT written into the markup — js/v2-guides.js counts the
+   cards actually present and fills them in. That keeps the numbers honest
+   while sections are still being built (Compliance and Documents read 0 and
+   sit disabled until step 5 adds them) and means nobody has to remember to
+   bump a hardcoded number when a card is added or removed later.
+   ========================================================================== */
+
+.v2-filterbar {
+  position: sticky;
+  top: var(--v2-topbar-h);
+  z-index: 20;
+  display: flex; align-items: center; gap: var(--v2-s4); flex-wrap: wrap;
+  margin-bottom: var(--v2-s10);
+  padding: var(--v2-s4) 0;
+  background: color-mix(in srgb, var(--v2-bg) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--v2-line);
+}
+@supports not (background: color-mix(in srgb, red 50%, blue)) {
+  .v2-filterbar { background: var(--v2-bg); }
+}
+
+.v2-tabs {
+  display: flex; align-items: center; gap: var(--v2-s2);
+  flex: 1; min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.v2-tabs::-webkit-scrollbar { display: none; }
+
+.v2-tab {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  flex-shrink: 0;
+  padding: var(--v2-s2) var(--v2-s4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink-2);
+  font: inherit; font-size: var(--v2-fs-base); font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast), border-color var(--v2-t-fast);
+}
+.v2-tab:hover:not(:disabled) { background: var(--v2-surface-2); color: var(--v2-ink); }
+
+.v2-tab.is-active {
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
+  font-weight: var(--v2-fw-semibold);
+}
+
+/* A category with nothing in it yet. Dimmed and unclickable rather than
+   hidden, so the shape of the finished nav is visible during review. */
+.v2-tab:disabled { opacity: .38; cursor: not-allowed; }
+
+.v2-tab-n {
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  padding: 1px var(--v2-s2);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-pill);
+  color: var(--v2-ink-3);
+}
+.v2-tab.is-active .v2-tab-n {
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
+}
+
+/* ── Sort ────────────────────────────────────────────────────────────────── */
+
+.v2-sort {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  flex-shrink: 0;
+  font-size: var(--v2-fs-sm); color: var(--v2-ink-3);
+}
+.v2-sort-field { position: relative; display: inline-flex; align-items: center; }
+.v2-sort select {
+  appearance: none; -webkit-appearance: none;
+  padding: var(--v2-s2) 2rem var(--v2-s2) var(--v2-s3);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink);
+  font: inherit; font-size: var(--v2-fs-sm); font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--v2-t-fast);
+}
+.v2-sort select:hover { border-color: var(--v2-line-strong); }
+.v2-sort select:focus { outline: none; border-color: var(--v2-cyan-ring); }
+/* Native option lists render in the OS palette; force a dark ground so the
+   menu does not flash white over this page. */
+.v2-sort select option { background: var(--v2-surface); color: var(--v2-ink); }
+.v2-sort-field svg {
+  position: absolute; right: var(--v2-s2);
+  width: 15px; height: 15px;
+  color: var(--v2-ink-3);
+  pointer-events: none;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.v2-empty {
+  display: flex; flex-direction: column; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s12) var(--v2-s8);
+  margin-bottom: var(--v2-s10);
+  background: var(--v2-surface);
+  border: 1px dashed var(--v2-line-strong);
+  border-radius: var(--v2-r-lg);
+  text-align: center;
+}
+.v2-empty-ic {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-3);
+  margin-bottom: var(--v2-s1);
+}
+.v2-empty-ic svg { width: 19px; height: 19px; }
+.v2-empty strong {
+  font-family: var(--v2-font-display);
+  font-size: var(--v2-fs-md); font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+}
+.v2-empty span { font-size: var(--v2-fs-sm); color: var(--v2-ink-2); max-width: 42ch; }
+.v2-empty button {
+  margin-top: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: var(--v2-primary);
+  border: 0; border-radius: var(--v2-r-md);
+  color: var(--v2-ink-on-accent);
+  font: inherit; font-size: var(--v2-fs-sm); font-weight: 700;
+  cursor: pointer;
+  transition: filter var(--v2-t-fast);
+}
+.v2-empty button:hover { filter: brightness(1.08); }
+
+@media (max-width: 720px) {
+  .v2-filterbar { position: static; }
+  .v2-sort { width: 100%; justify-content: space-between; }
+}

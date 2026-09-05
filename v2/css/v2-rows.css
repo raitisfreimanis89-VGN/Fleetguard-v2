@@ -1,0 +1,104 @@
+/* ==========================================================================
+   FleetGuard v2 — compact document rows
+   --------------------------------------------------------------------------
+   STAGING ONLY. The dense two-column list used by Compliance and Documents,
+   as opposed to the large art-backed cards used by Tools and Live Maps.
+
+   These are HTML pages on this site, not downloadable files. So the format
+   chip says what the thing actually is (HTML / Reference), the icon is a
+   document rather than a red PDF glyph, and the action reads "Open →" with a
+   straight arrow. Nothing here implies a download, because nothing here is
+   one — every href resolves to a page in this repo.
+   ========================================================================== */
+
+.v2-row-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(352px, 1fr));
+  gap: var(--v2-s4);
+}
+
+.v2-row {
+  position: relative;
+  display: flex; align-items: center; gap: var(--v2-s4);
+  padding: var(--v2-s4);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-md);
+  color: inherit;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), transform var(--v2-t-fast);
+}
+.v2-row:hover {
+  background: var(--v2-surface-2);
+  border-color: var(--tc-ring);
+  transform: translateX(2px);
+}
+/* Accent hairline that grows in on hover — the row's own highlight state. */
+.v2-row::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  width: 2px; height: 0;
+  background: var(--tc);
+  border-radius: var(--v2-r-pill);
+  transform: translateY(-50%);
+  transition: height var(--v2-t-base);
+}
+.v2-row:hover::before { height: 62%; }
+
+.v2-row-ic {
+  width: 36px; height: 36px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft);
+  color: var(--tc);
+  border: 1px solid var(--tc-ring);
+}
+.v2-row-ic svg { width: 18px; height: 18px; }
+
+.v2-row-main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.v2-row-title {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.v2-row:hover .v2-row-title { color: var(--tc-hi); }
+.v2-row-sub {
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs); color: var(--v2-ink-3);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* Format chip — what the resource actually is. */
+.v2-row-fmt {
+  flex-shrink: 0;
+  padding: 2px var(--v2-s2);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  letter-spacing: .06em; text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-row-meta {
+  flex-shrink: 0;
+  font-size: var(--v2-fs-micro); letter-spacing: var(--v2-track-micro);
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+.v2-row-cta {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  color: var(--tc);
+}
+.v2-row:hover .v2-arrow { transform: translateX(2px); }
+
+/* Below ~900px the meta and format chips are the first things to go — the
+   title and the action are what the row is for. */
+@media (max-width: 900px) {
+  .v2-row-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) {
+  .v2-row-meta { display: none; }
+  .v2-row-cta span:not(.v2-arrow) { display: none; }
+}

@@ -1,0 +1,278 @@
+/* ==========================================================================
+   FleetGuard v2 — Vehicles page
+   --------------------------------------------------------------------------
+   STAGING ONLY. Two blocks: the Add Vehicle panel and the fleet card grid.
+
+   Fields and pill semantics follow renderVehicles() and getVehicleStatus()
+   in js/app.js. Nothing here invents a field that has no column behind it.
+   ========================================================================== */
+
+/* ── Add Vehicle panel ───────────────────────────────────────────────────── */
+
+.v2-form-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-bottom: var(--v2-s10);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+/* Accent bloom top-right, matching every other surface in the system. */
+.v2-form-card::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(460px 200px at 92% -40%, var(--tc-soft), transparent 68%);
+}
+
+.v2-form-head {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s4) var(--v2-s6);
+  border-bottom: 1px solid var(--v2-line);
+  background: linear-gradient(180deg, var(--tc-soft), transparent);
+}
+.v2-form-ic {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft); color: var(--tc);
+  border: 1px solid var(--tc-ring);
+}
+.v2-form-ic svg { width: 17px; height: 17px; }
+.v2-form-head h2 {
+  margin: 0; flex: 1;
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+}
+/* Production gates this whole panel behind isAdmin(). */
+.v2-form-note {
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-form-body { padding: var(--v2-s6); }
+.v2-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: var(--v2-s4);
+  margin-bottom: var(--v2-s5);
+}
+
+.v2-field { display: flex; flex-direction: column; gap: var(--v2-s2); min-width: 0; }
+.v2-field label {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+.v2-field-req { color: var(--v2-amber); }
+
+.v2-input, .v2-select {
+  width: 100%;
+  padding: var(--v2-s3);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink);
+  font: inherit;
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  /* Without this the native date picker paints its own light chrome. */
+  color-scheme: dark;
+  transition: border-color var(--v2-t-fast), background var(--v2-t-fast);
+}
+.v2-input::placeholder { color: var(--v2-ink-3); }
+.v2-input:hover, .v2-select:hover { border-color: var(--v2-line-glass-hi); }
+.v2-input:focus, .v2-select:focus {
+  outline: none;
+  border-color: var(--v2-cyan-ring);
+  background: var(--v2-surface-3);
+  box-shadow: 0 0 0 3px var(--v2-cyan-soft);
+}
+
+.v2-select {
+  appearance: none; -webkit-appearance: none;
+  padding-right: var(--v2-s8);
+  cursor: pointer;
+}
+.v2-select-wrap { position: relative; display: flex; }
+.v2-select-wrap svg {
+  position: absolute; right: var(--v2-s3); top: 50%;
+  transform: translateY(-50%);
+  width: 15px; height: 15px;
+  color: var(--v2-ink-3);
+  pointer-events: none;
+}
+.v2-select option { background: var(--v2-surface-2); color: var(--v2-ink); }
+
+.v2-btn-primary {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s3) var(--v2-s5);
+  background: var(--v2-amber);
+  border: 0; border-radius: var(--v2-r-sm);
+  /* Dark ink: white on #ff8a00 is 2.4:1 and fails AA, dark ink is 8.6:1. */
+  color: var(--v2-ink-on-accent);
+  font: inherit;
+  font-size: var(--v2-fs-base); font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 12px -4px var(--v2-amber);
+  transition: filter var(--v2-t-fast), transform var(--v2-t-fast), box-shadow var(--v2-t-base);
+}
+.v2-btn-primary:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -4px var(--v2-amber);
+}
+.v2-btn-primary:active { transform: translateY(0); }
+.v2-form-hint {
+  margin: var(--v2-s3) 0 0;
+  font-size: var(--v2-fs-xs); color: var(--v2-ink-3);
+}
+
+/* ── Fleet grid ──────────────────────────────────────────────────────────── */
+
+.v2-fleet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: var(--v2-s5);
+}
+
+.v2-veh {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  padding: var(--v2-s5);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+  transition: transform var(--v2-t-base), border-color var(--v2-t-base), box-shadow var(--v2-t-base);
+}
+.v2-veh:hover {
+  transform: translateY(-2px);
+  border-color: var(--tc-ring);
+  box-shadow: var(--v2-shadow-hover), 0 14px 36px -20px var(--tc);
+}
+/* Card-level accent comes from its worst status, so a critical truck reads
+   red at a glance before any pill is read. */
+.v2-veh::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(360px 180px at 92% -30%, var(--tc-soft), transparent 70%);
+}
+
+/* Production stamps a NEW TRUCK watermark while a vehicle is still on the
+   new-truck inspection ladder. */
+/* Sits fully inside the card: rotated text bleeding off the edge reads as a
+   clipping bug rather than a watermark. */
+.v2-veh-mark {
+  position: absolute; top: 52%; right: var(--v2-s4); z-index: -1;
+  transform: translateY(-50%) rotate(-12deg);
+  transform-origin: 100% 50%;
+  font-size: 1.5rem; font-weight: var(--v2-fw-bold);
+  letter-spacing: var(--v2-track-micro);
+  color: var(--v2-cyan);
+  opacity: .1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.v2-veh-head {
+  display: flex; align-items: flex-start; gap: var(--v2-s3);
+  margin-bottom: var(--v2-s4);
+}
+.v2-veh-id { flex: 1; min-width: 0; }
+.v2-veh-truck {
+  display: block;
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-veh-trailer {
+  display: block;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+}
+
+/* Overall roll-up: critical | warning | ok, computed in getVehicleStatus(). */
+.v2-veh-status {
+  flex-shrink: 0;
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+}
+.v2-veh-status.is-crit { background: var(--v2-red);   color: var(--v2-ink-on-accent); }
+.v2-veh-status.is-warn { background: var(--v2-amber); color: var(--v2-ink-on-accent); }
+.v2-veh-status.is-ok   { background: var(--v2-green-soft); border: 1px solid var(--v2-green-ring); color: var(--v2-green-hi); }
+
+.v2-veh-people {
+  display: flex; flex-direction: column; gap: var(--v2-s1);
+  margin-bottom: var(--v2-s4);
+}
+.v2-veh-person {
+  display: flex; align-items: center; gap: var(--v2-s2);
+  font-size: var(--v2-fs-base); color: var(--v2-ink-2);
+  min-width: 0;
+}
+.v2-veh-person svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--v2-ink-3); }
+.v2-veh-person span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-veh-person.is-unassigned { color: var(--v2-ink-3); font-style: italic; }
+
+/* ── Compliance pills ────────────────────────────────────────────────────── */
+
+.v2-pills {
+  display: flex; flex-wrap: wrap; gap: var(--v2-s2);
+  margin-top: auto;
+  padding-top: var(--v2-s4);
+  border-top: 1px solid var(--v2-line);
+}
+
+/* Four states, matching the colour rules in getVehicleStatus():
+     is-ok     within schedule
+     is-warn   due soon, or tyre overdue (a warning, not critical)
+     is-crit   brake/service overdue, expired annual, unrepaired defect
+     is-none   nothing on record — grey, because absence is not "good" */
+.v2-pill {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-pill svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+.v2-pill.is-ok {
+  background: var(--v2-green-soft);
+  border: 1px solid var(--v2-green-ring);
+  color: var(--v2-green-hi);
+}
+.v2-pill.is-warn {
+  background: var(--v2-amber-soft);
+  border: 1px solid var(--v2-amber-ring);
+  color: var(--v2-amber-hi);
+}
+/* Solid, not outlined — a critical item should not be scannable past. */
+.v2-pill.is-crit {
+  background: var(--v2-red);
+  border: 1px solid var(--v2-red);
+  color: var(--v2-ink-on-accent);
+}
+.v2-pill.is-none {
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-2);
+}
+
+@media (max-width: 620px) {
+  .v2-fleet-grid { grid-template-columns: minmax(0, 1fr); }
+  .v2-form-grid { grid-template-columns: minmax(0, 1fr); }
+}

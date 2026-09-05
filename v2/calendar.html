@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Calendar  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/calendar.html   Production: the Calendar view inside
+     /index.html, rendered by renderCalendar() in js/app.js (untouched).
+
+     Seventh page of the v2 redesign.
+
+     EVENT TAXONOMY — three distinct clocks, per the fleet ruling:
+
+       Yard / periodic inspection   90 days   BLUE   last service + interval
+       Brake inspection due         30 days   RED    last brake test + interval
+       Annual DOT inspection        manual   CYAN   the entered certificate expiry
+
+     This drops production's fourth type, `maint`, which drew
+     maintenance_records.next_inspection_date — a service+60 value baked at
+     insert time by addMaintenance() and never recalculated. That field was
+     pulled out of getVehicleStatus() on 2026-08-18 for "duplicating the
+     yard/periodic cadence and contradicting the 90-day Service pill", but
+     renderCalendar() kept rendering it. For any vehicle with no
+     service_records row it resolved to the same day as the service event, so
+     one service was drawn twice in two colours. Removing it also frees cyan
+     for the annual certificate, which previously had no calendar presence at
+     all despite being the date a roadside inspection actually asks for.
+
+     Intervals are read from the shared schedule constants, never hardcoded.
+
+     SAMPLE DATA. The 45 trucks are the shared fixture the Dispatch Board and
+     Reports use, so all three pages describe one fleet. Every date here is
+     derived from those vehicles' elapsed-day counters, and the month grid is
+     real: September 2026 begins on a Tuesday and runs 30 days.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Calendar — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+<link rel="stylesheet" href="css/v2-drivers.css">
+<link rel="stylesheet" href="css/v2-reminders.css">
+<link rel="stylesheet" href="css/v2-calendar.css">
+<link rel="stylesheet" href="css/v2-dispatch.css">
+<link rel="stylesheet" href="css/v2-reports.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="dispatch.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="drivers.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item is-active" href="calendar.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="reports.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="inspections.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="reminders.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg></button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search the schedule</label>
+        <input id="v2-q" type="text" placeholder="Search trucks, events..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Calendar</h1>
+        <p>Every compliance clock in the fleet, laid out by the day it comes due.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> The same 45 trucks the Dispatch Board and Reports show. Every date is derived from those vehicles' clocks &mdash; yard at 90 days, brakes at 30, annual from the entered certificate expiry.</span>
+      </div>
+
+      <!-- ══ Control bar ═══════════════════════════════════════════════════ -->
+      <div class="v2-cal-bar">
+        <div class="v2-cal-nav">
+          <button class="v2-cal-arrow" type="button" aria-label="Previous month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+          </button>
+          <span class="v2-cal-month">September 2026</span>
+          <button class="v2-cal-arrow" type="button" aria-label="Next month">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+          </button>
+          <button class="v2-cal-today-btn" type="button">Today</button>
+        </div>
+
+        <!-- Filter pills double as the colour key for the grid. One pill per
+             clock — no pill describes the same date as another. -->
+        <div class="v2-cal-filters" role="group" aria-label="Filter events by type">
+          <button class="v2-cal-pill is-active v2-accent-amber" type="button">All events <span class="v2-cal-n">46</span></button>
+          <button class="v2-cal-pill v2-accent-blue" type="button"><span class="v2-cal-dot"></span>Yard <span class="v2-cal-n">5</span></button>
+          <button class="v2-cal-pill v2-accent-red" type="button"><span class="v2-cal-dot"></span>Brakes <span class="v2-cal-n">40</span></button>
+          <button class="v2-cal-pill v2-accent-cyan" type="button"><span class="v2-cal-dot"></span>Annual DOT <span class="v2-cal-n">1</span></button>
+        </div>
+      </div>
+
+      <!-- ══ Month grid ════════════════════════════════════════════════════ -->
+      <section class="v2-cal-card" aria-label="September 2026">
+        <div class="v2-cal-grid">
+        <div class="v2-cal-dow">Sun</div>
+        <div class="v2-cal-dow">Mon</div>
+        <div class="v2-cal-dow">Tue</div>
+        <div class="v2-cal-dow">Wed</div>
+        <div class="v2-cal-dow">Thu</div>
+        <div class="v2-cal-dow">Fri</div>
+        <div class="v2-cal-dow">Sat</div>
+        <div class="v2-cal-day is-blank" aria-hidden="true"></div>
+        <div class="v2-cal-day is-blank" aria-hidden="true"></div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">1</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-blue" title="Truck #25141 — Yard / periodic inspection (90-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25141 Yard due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">2</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">3</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">4</span>
+        </div>
+        <div class="v2-cal-day is-today">
+          <span class="v2-cal-num">5</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">6</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">7</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">8</span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">9</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25113 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25113 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">10</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25094 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25094 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">11</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">12</span>
+        </div>
+        <div class="v2-cal-day">
+          <span class="v2-cal-num">13</span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">14</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #26140 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26140 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">15</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25709 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25709 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26134 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26134 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">16</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #26057 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26057 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26099 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26099 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">17</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #26030 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26030 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26102 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26102 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">18</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25887 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25887 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26048 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26048 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">19</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25873 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25873 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26064 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26064 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">20</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25650 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25650 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26073 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26073 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">21</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25501 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25501 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26016 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26016 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">22</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25277 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25277 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26127 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26127 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26146 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26146 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">23</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25086 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25086 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25330 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25330 Brake due</span></span>
+            <span class="v2-cap v2-accent-cyan" title="Truck #25455 — Annual DOT inspection (certificate expiry)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25455 Annual</span></span>
+            <span class="v2-cap-more">+2 more</span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">24</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25004 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25004 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25573 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25573 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26115 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26115 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">25</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25058 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25058 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25218 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25218 Brake due</span></span>
+            <span class="v2-cap v2-accent-blue" title="Truck #26057 — Yard / periodic inspection (90-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26057 Yard due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">26</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25141 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25141 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25162 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25162 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25999 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25999 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">27</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25196 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25196 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25455 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25455 Brake due</span></span>
+            <span class="v2-cap v2-accent-blue" title="Truck #26064 — Yard / periodic inspection (90-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26064 Yard due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">28</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25822 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25822 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #26041 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#26041 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">29</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-blue" title="Truck #25709 — Yard / periodic inspection (90-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25709 Yard due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25901 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25901 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25940 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25940 Brake due</span></span>
+            <span class="v2-cap-more">+1 more</span>
+          </span>
+        </div>
+        <div class="v2-cal-day has-events">
+          <span class="v2-cal-num">30</span>
+          <span class="v2-cal-events">
+            <span class="v2-cap v2-accent-red" title="Truck #25612 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25612 Brake due</span></span>
+            <span class="v2-cap v2-accent-red" title="Truck #25744 — Brake inspection due (30-day)"><span class="v2-cap-dot"></span><span class="v2-cap-text">#25744 Brake due</span></span>
+          </span>
+        </div>
+        <div class="v2-cal-day is-blank" aria-hidden="true"></div>
+        <div class="v2-cal-day is-blank" aria-hidden="true"></div>
+        <div class="v2-cal-day is-blank" aria-hidden="true"></div>
+        </div>
+      </section>
+
+      <!-- ══ Upcoming deadlines ════════════════════════════════════════════ -->
+      <section class="v2-table-card" aria-label="Upcoming compliance deadlines">
+        <div class="v2-panel-head v2-accent-amber">
+          <span class="v2-panel-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          </span>
+          <h2>Upcoming compliance deadlines</h2>
+          <span class="v2-panel-count">15</span>
+        </div>
+        <div class="v2-stream">
+          <div class="v2-stream-row v2-accent-red">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #25113</span>
+              <span class="v2-stream-type">Brake inspection due &middot; 30-day</span>
+            </span>
+            <span class="v2-stream-date">09 Sep 2026</span>
+            <span class="v2-countdown is-urgent">4d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-red">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #25094</span>
+              <span class="v2-stream-type">Brake inspection due &middot; 30-day</span>
+            </span>
+            <span class="v2-stream-date">10 Sep 2026</span>
+            <span class="v2-countdown is-urgent">5d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-red">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26140</span>
+              <span class="v2-stream-type">Brake inspection due &middot; 30-day</span>
+            </span>
+            <span class="v2-stream-date">14 Sep 2026</span>
+            <span class="v2-countdown is-soon">9d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-red">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #25709</span>
+              <span class="v2-stream-type">Brake inspection due &middot; 30-day</span>
+            </span>
+            <span class="v2-stream-date">15 Sep 2026</span>
+            <span class="v2-countdown is-soon">10d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-red">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26134</span>
+              <span class="v2-stream-type">Brake inspection due &middot; 30-day</span>
+            </span>
+            <span class="v2-stream-date">15 Sep 2026</span>
+            <span class="v2-countdown is-soon">10d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-cyan">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #25455</span>
+              <span class="v2-stream-type">Annual DOT inspection &middot; certificate expiry</span>
+            </span>
+            <span class="v2-stream-date">23 Sep 2026</span>
+            <span class="v2-countdown is-later">18d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-blue">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26030</span>
+              <span class="v2-stream-type">Yard / periodic inspection &middot; 90-day</span>
+            </span>
+            <span class="v2-stream-date">23 Sep 2026</span>
+            <span class="v2-countdown is-later">18d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-blue">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26057</span>
+              <span class="v2-stream-type">Yard / periodic inspection &middot; 90-day</span>
+            </span>
+            <span class="v2-stream-date">25 Sep 2026</span>
+            <span class="v2-countdown is-later">20d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-blue">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26064</span>
+              <span class="v2-stream-type">Yard / periodic inspection &middot; 90-day</span>
+            </span>
+            <span class="v2-stream-date">27 Sep 2026</span>
+            <span class="v2-countdown is-later">22d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-blue">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #25709</span>
+              <span class="v2-stream-type">Yard / periodic inspection &middot; 90-day</span>
+            </span>
+            <span class="v2-stream-date">29 Sep 2026</span>
+            <span class="v2-countdown is-later">24d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-blue">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26134</span>
+              <span class="v2-stream-type">Yard / periodic inspection &middot; 90-day</span>
+            </span>
+            <span class="v2-stream-date">01 Oct 2026</span>
+            <span class="v2-countdown is-later">26d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-cyan">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26134</span>
+              <span class="v2-stream-type">Annual DOT inspection &middot; certificate expiry</span>
+            </span>
+            <span class="v2-stream-date">18 Jan 2027</span>
+            <span class="v2-countdown is-later">135d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-cyan">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26057</span>
+              <span class="v2-stream-type">Annual DOT inspection &middot; certificate expiry</span>
+            </span>
+            <span class="v2-stream-date">23 Jan 2027</span>
+            <span class="v2-countdown is-later">140d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-cyan">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26099</span>
+              <span class="v2-stream-type">Annual DOT inspection &middot; certificate expiry</span>
+            </span>
+            <span class="v2-stream-date">28 Jan 2027</span>
+            <span class="v2-countdown is-later">145d</span>
+          </div>
+          <div class="v2-stream-row v2-accent-cyan">
+            <span class="v2-stream-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-stream-main">
+              <span class="v2-stream-label">Truck #26140</span>
+              <span class="v2-stream-type">Annual DOT inspection &middot; certificate expiry</span>
+            </span>
+            <span class="v2-stream-date">02 Feb 2027</span>
+            <span class="v2-countdown is-later">150d</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1338 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Reports & Analytics  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/reports.html   Production: the Reports view inside /index.html,
+     rendered by renderReports() and _driverSafetyCard() in js/app.js
+     (untouched).
+
+     Ninth page of the v2 redesign.
+
+     SAMPLE DATA, REAL FORMULAS. The 45 trucks are the same set the Dispatch
+     Board shows (shared fleet fixture), and every rate, score, colour band and
+     total is computed here with production's own expressions — compliance and
+     thoroughness scoring, the 30-day business-day window, clean-rate bands,
+     defect-resolution states.
+
+     POPULATION NOTE. renderReports() maps over VEHICLES with no vacation
+     filter, while renderDashboard() counts the same !critical && !tyreOverdue
+     test over activeStatuses (vacationing drivers' trucks removed). The two
+     pages therefore report different roadworthy figures for one fleet. This
+     page follows renderReports() for parity and states the other number
+     alongside rather than hiding the disagreement.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Reports — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+<link rel="stylesheet" href="css/v2-drivers.css">
+<link rel="stylesheet" href="css/v2-reminders.css">
+<link rel="stylesheet" href="css/v2-calendar.css">
+<link rel="stylesheet" href="css/v2-dispatch.css">
+<link rel="stylesheet" href="css/v2-reports.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="dispatch.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="drivers.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="calendar.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item is-active" href="reports.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="inspections.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="reminders.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg></button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search reports</label>
+        <input id="v2-q" type="text" placeholder="Search trucks, drivers..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Reports &amp; Analytics</h1>
+        <p>Compliance, inspection and maintenance performance across the fleet.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data, real formulas.</strong> The same 45 trucks the Dispatch Board shows. Every rate, score and colour band is computed with production's own expressions &mdash; nothing here is a typed-in number.</span>
+      </div>
+
+      <!-- ══ Report controls ═══════════════════════════════════════════════ -->
+      <div class="v2-rep-bar">
+        <div class="v2-rep-group">
+          <label class="v2-rep-label" for="v2-rep-range">Date range</label>
+          <span class="v2-rep-select">
+            <select id="v2-rep-range">
+              <option>Last 30 days</option>
+              <option>Last 7 days</option>
+              <option>Last 90 days</option>
+              <option>Last 12 months</option>
+              <option>Custom range&hellip;</option>
+            </select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </span>
+        </div>
+
+        <div class="v2-rep-group">
+          <label class="v2-rep-label" for="v2-rep-veh">Vehicle</label>
+          <span class="v2-rep-select">
+            <select id="v2-rep-veh">
+              <option>All vehicles (45)</option>
+              <option>Truck #25086</option>
+              <option>Truck #25141</option>
+              <option>Truck #26016</option>
+              <option>Truck #25940</option>
+              <option>Truck #26102</option>
+              <option>Truck #25004</option>
+              <option>Truck #25873</option>
+              <option>Truck #26041</option>
+              <option>&hellip;</option>
+            </select>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+          </span>
+        </div>
+
+        <div class="v2-rep-actions">
+          <button class="v2-rep-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"/></svg>Print summary</button>
+          <button class="v2-rep-btn is-primary" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>Export CSV</button>
+        </div>
+      </div>
+
+      <!-- ══ Headline metrics ══════════════════════════════════════════════
+           Fleet Health is renderReports()' roadworthy rate: !critical &&
+           !tyreOverdue, counted over ALL vehicles. The Dashboard runs the same
+           test over active vehicles only, which is why the two pages disagree
+           — the sub-line names both rather than picking one silently.
+           ══════════════════════════════════════════════════════════════════ -->
+      <div class="v2-metrics">
+
+        <article class="v2-metric v2-accent-green">
+          <div class="v2-metric-head">
+            <span class="v2-metric-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 22l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span>
+            <span class="v2-metric-label">Fleet Health Score</span>
+          </div>
+          <span class="v2-metric-val">89<span class="v2-metric-unit">%</span></span>
+          <span class="v2-metric-sub">40 of 45 roadworthy &middot; 5 pending. Dashboard reads 91% (active only).</span>
+          <div class="v2-metric-meter"><div style="width:89%"></div></div>
+        </article>
+
+        <article class="v2-metric v2-accent-cyan">
+          <div class="v2-metric-head">
+            <span class="v2-metric-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg></span>
+            <span class="v2-metric-label">Inspections Completed</span>
+          </div>
+          <span class="v2-metric-val">757</span>
+          <span class="v2-metric-sub">Last 30 days &middot; 21 business days &middot; 42 drivers</span>
+          
+        </article>
+
+        <article class="v2-metric v2-accent-blue">
+          <div class="v2-metric-head">
+            <span class="v2-metric-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <span class="v2-metric-label">Defect Resolution Rate</span>
+          </div>
+          <span class="v2-metric-val">76<span class="v2-metric-unit">%</span></span>
+          <span class="v2-metric-sub">26 of 34 resolved &middot; 8 still open &middot; median 29h</span>
+          <div class="v2-metric-meter"><div style="width:76%"></div></div>
+        </article>
+
+        <article class="v2-metric v2-accent-amber">
+          <div class="v2-metric-head">
+            <span class="v2-metric-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+            <span class="v2-metric-label">Maintenance Compliance</span>
+          </div>
+          <span class="v2-metric-val">98<span class="v2-metric-unit">%</span></span>
+          <span class="v2-metric-sub">44 of 45 inside the 90-day yard interval</span>
+          <div class="v2-metric-meter"><div style="width:98%"></div></div>
+        </article>
+      </div>
+
+      <!-- ══ Inspection breakdown + DOT clean rate ═════════════════════════ -->
+      <div class="v2-rep-grid">
+
+        <div class="v2-rep-col">
+
+        <section class="v2-table-card" aria-label="Inspection log breakdown">
+          <div class="v2-panel-head v2-accent-cyan">
+            <span class="v2-panel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg></span>
+            <h2>Inspection log breakdown</h2>
+            <span class="v2-panel-count">757</span>
+          </div>
+          <div class="v2-bd">
+
+          <div class="v2-bd-row v2-accent-green">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Pass</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:95.5%"></span></span>
+            <span class="v2-bd-n">723</span>
+            <span class="v2-bd-pct">95.5%</span>
+          </div>
+
+          <div class="v2-bd-row v2-accent-amber">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Minor defect</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:3.8%"></span></span>
+            <span class="v2-bd-n">29</span>
+            <span class="v2-bd-pct">3.8%</span>
+          </div>
+
+          <div class="v2-bd-row v2-accent-red">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Major defect</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:0.7%"></span></span>
+            <span class="v2-bd-n">5</span>
+            <span class="v2-bd-pct">0.7%</span>
+          </div>
+          </div>
+          <div class="v2-rep-note">
+            <b>34 defects caught</b> by drivers in the window &mdash; reported as a positive, never a penalty. Scoring a driver down for finding faults would only pay them to stay quiet.<br>
+            <b>5 drivers</b> have a median walk-around under 120s, the threshold the inspection log flags as suspiciously quick.
+          </div>
+        </section>
+
+        <section class="v2-table-card" aria-label="Fleet roadworthiness">
+          <div class="v2-panel-head v2-accent-green">
+            <span class="v2-panel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>
+            <h2>Fleet roadworthiness</h2>
+            <span class="v2-panel-count">45</span>
+          </div>
+          <div class="v2-bd">
+
+          <div class="v2-bd-row v2-accent-green">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Roadworthy</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:88.9%"></span></span>
+            <span class="v2-bd-n">40</span>
+            <span class="v2-bd-pct">88.9%</span>
+          </div>
+
+          <div class="v2-bd-row v2-accent-red">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Pending</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:11.1%"></span></span>
+            <span class="v2-bd-n">5</span>
+            <span class="v2-bd-pct">11.1%</span>
+          </div>
+          </div>
+          <div class="v2-bd-sub">By vehicle status</div>
+          <div class="v2-bd">
+
+          <div class="v2-bd-row v2-accent-green">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>OK</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:77.8%"></span></span>
+            <span class="v2-bd-n">35</span>
+            <span class="v2-bd-pct">77.8%</span>
+          </div>
+
+          <div class="v2-bd-row v2-accent-amber">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Warning</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:15.6%"></span></span>
+            <span class="v2-bd-n">7</span>
+            <span class="v2-bd-pct">15.6%</span>
+          </div>
+
+          <div class="v2-bd-row v2-accent-red">
+            <span class="v2-bd-key"><span class="v2-bd-dot"></span>Critical</span>
+            <span class="v2-bd-meter"><span class="v2-bd-fill" style="width:6.7%"></span></span>
+            <span class="v2-bd-n">3</span>
+            <span class="v2-bd-pct">6.7%</span>
+          </div>
+          </div>
+          <div class="v2-rep-note">
+            <b>Roadworthy</b> is <b>!critical &amp;&amp; !tyreOverdue</b> &mdash; a truck with a minor defect or an annual due soon still counts as roadworthy, which is why Roadworthy (40) exceeds OK (35).
+          </div>
+        </section>
+
+        </div>
+
+        <div class="v2-rep-col">
+
+        <section class="v2-table-card" aria-label="DOT inspection clean rate">
+          <div class="v2-panel-head v2-accent-blue">
+            <span class="v2-panel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
+            <h2>DOT clean rate &middot; monthly</h2>
+            <span class="v2-panel-count">84</span>
+          </div>
+          <div class="v2-table-wrap">
+            <table class="v2-table" style="min-width:0">
+              <thead><tr><th>Month</th><th>Total</th><th>Clean</th><th>Violation</th><th>% clean</th></tr></thead>
+              <tbody>
+            <tr>
+              <td class="v2-cell-strong">Apr 2026</td>
+              <td class="v2-cell-num">10</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">7</td>
+              <td class="v2-cell-num"><span style="color:var(--v2-red-hi);font-weight:600">3</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:70%"></span></span><span class="v2-meter-pct is-t-warn">70%</span></span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">May 2026</td>
+              <td class="v2-cell-num">15</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">13</td>
+              <td class="v2-cell-num"><span style="color:var(--v2-red-hi);font-weight:600">2</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:87%"></span></span><span class="v2-meter-pct is-t-ok">87%</span></span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Jun 2026</td>
+              <td class="v2-cell-num">16</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">14</td>
+              <td class="v2-cell-num"><span style="color:var(--v2-red-hi);font-weight:600">2</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:88%"></span></span><span class="v2-meter-pct is-t-ok">88%</span></span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Jul 2026</td>
+              <td class="v2-cell-num">13</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">13</td>
+              <td class="v2-cell-num"><span class="v2-cell-dim">—</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Aug 2026</td>
+              <td class="v2-cell-num">12</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">11</td>
+              <td class="v2-cell-num"><span style="color:var(--v2-red-hi);font-weight:600">1</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:92%"></span></span><span class="v2-meter-pct is-t-ok">92%</span></span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Sep 2026</td>
+              <td class="v2-cell-num">18</td>
+              <td class="v2-cell-num" style="color:var(--v2-green-hi);font-weight:600">16</td>
+              <td class="v2-cell-num"><span style="color:var(--v2-red-hi);font-weight:600">2</span></td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:89%"></span></span><span class="v2-meter-pct is-t-ok">89%</span></span></td>
+            </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="v2-rep-note">
+            <b>Clean rate</b> = passes / total. Violations and out-of-service are counted together as issues, exactly as production does.<br>
+            Bands are strict: above 70% green, above 50% amber, otherwise red &mdash; so exactly 70 reads amber.
+          </div>
+        </section>
+
+        </div>
+
+      </div>
+
+      <!-- ══ Vehicle maintenance ═══════════════════════════════════════════ -->
+      <section class="v2-table-card v2-rep-section" aria-label="Vehicle maintenance overview">
+        <div class="v2-panel-head v2-accent-amber">
+          <span class="v2-panel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg></span>
+          <h2>Vehicle maintenance overview</h2>
+          <span class="v2-panel-count">45</span>
+        </div>
+        <div class="v2-table-wrap">
+          <table class="v2-table">
+            <thead><tr><th>Truck</th><th>Dispatcher</th><th>Driver</th><th>Last service</th><th>Next due</th><th>Yard clock</th><th>Brakes</th><th>Status</th></tr></thead>
+            <tbody>
+            <tr>
+              <td class="v2-cell-strong">#25141</td>
+              <td class="v2-cell-num">Alex</td>
+              <td class="v2-cell-num">Ray Osei</td>
+              <td class="v2-cell-num">03 Jun 2026 <span class="v2-cell-dim">· 94d ago</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-rtag is-crit">Overdue 4d</span></td>
+              <td class="v2-cell-num">9d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-crit">Critical</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25046</td>
+              <td class="v2-cell-num">Andy</td>
+              <td class="v2-cell-num">Priya Raman</td>
+              <td class="v2-cell-num">09 Jun 2026 <span class="v2-cell-dim">· 88d ago</span></td>
+              <td class="v2-cell-num">07 Sep 2026</td>
+              <td><span class="v2-rtag is-warn">2d</span></td>
+              <td class="v2-cell-num">31d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-crit">Critical</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25389</td>
+              <td class="v2-cell-num">Dom</td>
+              <td class="v2-cell-num">Sasha Ivanova</td>
+              <td class="v2-cell-num">18 Jun 2026 <span class="v2-cell-dim">· 79d ago</span></td>
+              <td class="v2-cell-num">16 Sep 2026</td>
+              <td><span class="v2-rtag is-ok">11d</span></td>
+              <td class="v2-cell-num">27d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26030</td>
+              <td class="v2-cell-num">David</td>
+              <td class="v2-cell-num">Omar Haddad</td>
+              <td class="v2-cell-num">25 Jun 2026 <span class="v2-cell-dim">· 72d ago</span></td>
+              <td class="v2-cell-num">23 Sep 2026</td>
+              <td><span class="v2-rtag is-ok">18d</span></td>
+              <td class="v2-cell-num">18d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26057</td>
+              <td class="v2-cell-num">Arthur</td>
+              <td class="v2-cell-num">Josie Hart</td>
+              <td class="v2-cell-num">27 Jun 2026 <span class="v2-cell-dim">· 70d ago</span></td>
+              <td class="v2-cell-num">25 Sep 2026</td>
+              <td><span class="v2-rtag is-ok">20d</span></td>
+              <td class="v2-cell-num">19d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26064</td>
+              <td class="v2-cell-num">Dom</td>
+              <td class="v2-cell-num">Iris Lindqvist</td>
+              <td class="v2-cell-num">29 Jun 2026 <span class="v2-cell-dim">· 68d ago</span></td>
+              <td class="v2-cell-num">27 Sep 2026</td>
+              <td><span class="v2-rtag is-ok">22d</span></td>
+              <td class="v2-cell-num">16d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25709</td>
+              <td class="v2-cell-num">Carl</td>
+              <td class="v2-cell-num">Dmitri Volkov</td>
+              <td class="v2-cell-num">01 Jul 2026 <span class="v2-cell-dim">· 66d ago</span></td>
+              <td class="v2-cell-num">29 Sep 2026</td>
+              <td><span class="v2-rtag is-ok">24d</span></td>
+              <td class="v2-cell-num">20d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26134</td>
+              <td class="v2-cell-num">Jacob</td>
+              <td class="v2-cell-num">Elena Rossi</td>
+              <td class="v2-cell-num">03 Jul 2026 <span class="v2-cell-dim">· 64d ago</span></td>
+              <td class="v2-cell-num">01 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">26d</span></td>
+              <td class="v2-cell-num">20d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25873</td>
+              <td class="v2-cell-num">Andy</td>
+              <td class="v2-cell-num">Nina Alvarez</td>
+              <td class="v2-cell-num">04 Jul 2026 <span class="v2-cell-dim">· 63d ago</span></td>
+              <td class="v2-cell-num">02 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">27d</span></td>
+              <td class="v2-cell-num">16d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26146</td>
+              <td class="v2-cell-num">John</td>
+              <td class="v2-cell-num">Aaron Beck</td>
+              <td class="v2-cell-num">05 Jul 2026 <span class="v2-cell-dim">· 62d ago</span></td>
+              <td class="v2-cell-num">03 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">28d</span></td>
+              <td class="v2-cell-num">13d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26140</td>
+              <td class="v2-cell-num">Cody</td>
+              <td class="v2-cell-num">Ana Cardoso</td>
+              <td class="v2-cell-num">06 Jul 2026 <span class="v2-cell-dim">· 61d ago</span></td>
+              <td class="v2-cell-num">04 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">29d</span></td>
+              <td class="v2-cell-num">21d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26099</td>
+              <td class="v2-cell-num">G-SDE</td>
+              <td class="v2-cell-num">Julio Barros</td>
+              <td class="v2-cell-num">08 Jul 2026 <span class="v2-cell-dim">· 59d ago</span></td>
+              <td class="v2-cell-num">06 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">31d</span></td>
+              <td class="v2-cell-num">19d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26102</td>
+              <td class="v2-cell-num">Alex</td>
+              <td class="v2-cell-num">Sam Ortiz</td>
+              <td class="v2-cell-num">09 Jul 2026 <span class="v2-cell-dim">· 58d ago</span></td>
+              <td class="v2-cell-num">07 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">32d</span></td>
+              <td class="v2-cell-num">18d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25573</td>
+              <td class="v2-cell-num">John</td>
+              <td class="v2-cell-num">Halima Yusuf</td>
+              <td class="v2-cell-num">10 Jul 2026 <span class="v2-cell-dim">· 57d ago</span></td>
+              <td class="v2-cell-num">08 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">33d</span></td>
+              <td class="v2-cell-num">11d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25501</td>
+              <td class="v2-cell-num">David</td>
+              <td class="v2-cell-num">Yusuf Demir</td>
+              <td class="v2-cell-num">12 Jul 2026 <span class="v2-cell-dim">· 55d ago</span></td>
+              <td class="v2-cell-num">10 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">35d</span></td>
+              <td class="v2-cell-num">14d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25455</td>
+              <td class="v2-cell-num">Carl</td>
+              <td class="v2-cell-num">Bea Nowak</td>
+              <td class="v2-cell-num">15 Jul 2026 <span class="v2-cell-dim">· 52d ago</span></td>
+              <td class="v2-cell-num">13 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">38d</span></td>
+              <td class="v2-cell-num">8d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25650</td>
+              <td class="v2-cell-num">Jacob</td>
+              <td class="v2-cell-num">Aida Sow</td>
+              <td class="v2-cell-num">17 Jul 2026 <span class="v2-cell-dim">· 50d ago</span></td>
+              <td class="v2-cell-num">15 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">40d</span></td>
+              <td class="v2-cell-num">15d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25094</td>
+              <td class="v2-cell-num">Arthur</td>
+              <td class="v2-cell-num">Luis Ferrer</td>
+              <td class="v2-cell-num">19 Jul 2026 <span class="v2-cell-dim">· 48d ago</span></td>
+              <td class="v2-cell-num">17 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">42d</span></td>
+              <td class="v2-cell-num">25d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25277</td>
+              <td class="v2-cell-num">Dom</td>
+              <td class="v2-cell-num">Victor Cruz</td>
+              <td class="v2-cell-num">21 Jul 2026 <span class="v2-cell-dim">· 46d ago</span></td>
+              <td class="v2-cell-num">19 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">44d</span></td>
+              <td class="v2-cell-num">13d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25330</td>
+              <td class="v2-cell-num">Cody</td>
+              <td class="v2-cell-num">Miguel Sosa</td>
+              <td class="v2-cell-num">23 Jul 2026 <span class="v2-cell-dim">· 44d ago</span></td>
+              <td class="v2-cell-num">21 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">46d</span></td>
+              <td class="v2-cell-num">12d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25113</td>
+              <td class="v2-cell-num">John</td>
+              <td class="v2-cell-num">Duncan Frye</td>
+              <td class="v2-cell-num">24 Jul 2026 <span class="v2-cell-dim">· 43d ago</span></td>
+              <td class="v2-cell-num">22 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">47d</span></td>
+              <td class="v2-cell-num">26d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26152</td>
+              <td class="v2-cell-num">G-SDE</td>
+              <td class="v2-cell-num">Mei Tanaka</td>
+              <td class="v2-cell-num">25 Jul 2026 <span class="v2-cell-dim">· 42d ago</span></td>
+              <td class="v2-cell-num">23 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">48d</span></td>
+              <td class="v2-cell-num">12d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26016</td>
+              <td class="v2-cell-num">Alex</td>
+              <td class="v2-cell-num">Dana Kroll</td>
+              <td class="v2-cell-num">26 Jul 2026 <span class="v2-cell-dim">· 41d ago</span></td>
+              <td class="v2-cell-num">24 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">49d</span></td>
+              <td class="v2-cell-num">14d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25162</td>
+              <td class="v2-cell-num">David</td>
+              <td class="v2-cell-num">Peter Nagy</td>
+              <td class="v2-cell-num">28 Jul 2026 <span class="v2-cell-dim">· 39d ago</span></td>
+              <td class="v2-cell-num">26 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">51d</span></td>
+              <td class="v2-cell-num">9d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26048</td>
+              <td class="v2-cell-num">John</td>
+              <td class="v2-cell-num">Greta Lang</td>
+              <td class="v2-cell-num">29 Jul 2026 <span class="v2-cell-dim">· 38d ago</span></td>
+              <td class="v2-cell-num">27 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">52d</span></td>
+              <td class="v2-cell-num">17d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26073</td>
+              <td class="v2-cell-num">Carl</td>
+              <td class="v2-cell-num">Kofi Mensah</td>
+              <td class="v2-cell-num">30 Jul 2026 <span class="v2-cell-dim">· 37d ago</span></td>
+              <td class="v2-cell-num">28 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">53d</span></td>
+              <td class="v2-cell-num">15d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25058</td>
+              <td class="v2-cell-num">G-SDE</td>
+              <td class="v2-cell-num">Caleb Whit</td>
+              <td class="v2-cell-num">31 Jul 2026 <span class="v2-cell-dim">· 36d ago</span></td>
+              <td class="v2-cell-num">29 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">54d</span></td>
+              <td class="v2-cell-num">10d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-warn">Warning</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25086</td>
+              <td class="v2-cell-num">Alex</td>
+              <td class="v2-cell-num">Marcus Webb</td>
+              <td class="v2-cell-num">02 Aug 2026 <span class="v2-cell-dim">· 34d ago</span></td>
+              <td class="v2-cell-num">31 Oct 2026</td>
+              <td><span class="v2-rtag is-ok">56d</span></td>
+              <td class="v2-cell-num">12d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26115</td>
+              <td class="v2-cell-num">David</td>
+              <td class="v2-cell-num">Ruth Kimani</td>
+              <td class="v2-cell-num">03 Aug 2026 <span class="v2-cell-dim">· 33d ago</span></td>
+              <td class="v2-cell-num">01 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">57d</span></td>
+              <td class="v2-cell-num">11d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26127</td>
+              <td class="v2-cell-num">Arthur</td>
+              <td class="v2-cell-num">Owen Blake</td>
+              <td class="v2-cell-num">05 Aug 2026 <span class="v2-cell-dim">· 31d ago</span></td>
+              <td class="v2-cell-num">03 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">59d</span></td>
+              <td class="v2-cell-num">13d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25999</td>
+              <td class="v2-cell-num"><span class="v2-cell-dim">Unassigned</span></td>
+              <td class="v2-cell-num"><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">06 Aug 2026 <span class="v2-cell-dim">· 30d ago</span></td>
+              <td class="v2-cell-num">04 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">60d</span></td>
+              <td class="v2-cell-num">9d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25887</td>
+              <td class="v2-cell-num">Cody</td>
+              <td class="v2-cell-num">Grace Otieno</td>
+              <td class="v2-cell-num">07 Aug 2026 <span class="v2-cell-dim">· 29d ago</span></td>
+              <td class="v2-cell-num">05 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">61d</span></td>
+              <td class="v2-cell-num">17d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25196</td>
+              <td class="v2-cell-num">Jacob</td>
+              <td class="v2-cell-num">Silas Novak</td>
+              <td class="v2-cell-num">08 Aug 2026 <span class="v2-cell-dim">· 28d ago</span></td>
+              <td class="v2-cell-num">06 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">62d</span></td>
+              <td class="v2-cell-num">8d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25004</td>
+              <td class="v2-cell-num">Andy</td>
+              <td class="v2-cell-num">Hector Diaz</td>
+              <td class="v2-cell-num">09 Aug 2026 <span class="v2-cell-dim">· 27d ago</span></td>
+              <td class="v2-cell-num">07 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">63d</span></td>
+              <td class="v2-cell-num">11d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25218</td>
+              <td class="v2-cell-num">Carl</td>
+              <td class="v2-cell-num">Andre Kalu</td>
+              <td class="v2-cell-num">11 Aug 2026 <span class="v2-cell-dim">· 25d ago</span></td>
+              <td class="v2-cell-num">09 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">65d</span></td>
+              <td class="v2-cell-num">10d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-crit">Critical</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25822</td>
+              <td class="v2-cell-num">Dom</td>
+              <td class="v2-cell-num">Femi Adeyemi</td>
+              <td class="v2-cell-num">13 Aug 2026 <span class="v2-cell-dim">· 23d ago</span></td>
+              <td class="v2-cell-num">11 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">67d</span></td>
+              <td class="v2-cell-num">7d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25940</td>
+              <td class="v2-cell-num">Alex</td>
+              <td class="v2-cell-num">Ivan Petrov</td>
+              <td class="v2-cell-num">14 Aug 2026 <span class="v2-cell-dim">· 22d ago</span></td>
+              <td class="v2-cell-num">12 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">68d</span></td>
+              <td class="v2-cell-num">6d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25901</td>
+              <td class="v2-cell-num">John</td>
+              <td class="v2-cell-num">Tomas Vargas</td>
+              <td class="v2-cell-num">16 Aug 2026 <span class="v2-cell-dim">· 20d ago</span></td>
+              <td class="v2-cell-num">14 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">70d</span></td>
+              <td class="v2-cell-num">6d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25612</td>
+              <td class="v2-cell-num">Arthur</td>
+              <td class="v2-cell-num">Colin Mabe</td>
+              <td class="v2-cell-num">17 Aug 2026 <span class="v2-cell-dim">· 19d ago</span></td>
+              <td class="v2-cell-num">15 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">71d</span></td>
+              <td class="v2-cell-num">5d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25744</td>
+              <td class="v2-cell-num">G-SDE</td>
+              <td class="v2-cell-num">Noor Rahman</td>
+              <td class="v2-cell-num">19 Aug 2026 <span class="v2-cell-dim">· 17d ago</span></td>
+              <td class="v2-cell-num">17 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">73d</span></td>
+              <td class="v2-cell-num">5d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26011</td>
+              <td class="v2-cell-num">Cody</td>
+              <td class="v2-cell-num">Ben Harlow</td>
+              <td class="v2-cell-num">21 Aug 2026 <span class="v2-cell-dim">· 15d ago</span></td>
+              <td class="v2-cell-num">19 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">75d</span></td>
+              <td class="v2-cell-num">6d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26022</td>
+              <td class="v2-cell-num">Jacob</td>
+              <td class="v2-cell-num">Rory Quinn</td>
+              <td class="v2-cell-num">22 Aug 2026 <span class="v2-cell-dim">· 14d ago</span></td>
+              <td class="v2-cell-num">20 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">76d</span></td>
+              <td class="v2-cell-num">4d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26041</td>
+              <td class="v2-cell-num">Andy</td>
+              <td class="v2-cell-num">Terrence Boyd</td>
+              <td class="v2-cell-num">24 Aug 2026 <span class="v2-cell-dim">· 12d ago</span></td>
+              <td class="v2-cell-num">22 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">78d</span></td>
+              <td class="v2-cell-num">7d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#25963</td>
+              <td class="v2-cell-num">David</td>
+              <td class="v2-cell-num">Lena Fischer</td>
+              <td class="v2-cell-num">25 Aug 2026 <span class="v2-cell-dim">· 11d ago</span></td>
+              <td class="v2-cell-num">23 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">79d</span></td>
+              <td class="v2-cell-num">3d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">#26088</td>
+              <td class="v2-cell-num">Carl</td>
+              <td class="v2-cell-num">Talia Reyes</td>
+              <td class="v2-cell-num">28 Aug 2026 <span class="v2-cell-dim">· 8d ago</span></td>
+              <td class="v2-cell-num">26 Nov 2026</td>
+              <td><span class="v2-rtag is-ok">82d</span></td>
+              <td class="v2-cell-num">4d <span class="v2-cell-dim">/ 30</span></td>
+              <td><span class="v2-rtag is-ok">OK</span></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="v2-rep-note">
+          Sorted by the 90-day yard clock, soonest first &mdash; a maintenance report is read to find out what to book next.<br>
+          <b>Brakes</b> shows days elapsed against the 30-day interval, the same sense as the Dispatch Board's B pill.
+        </div>
+      </section>
+
+      <!-- ══ Driver compliance ═════════════════════════════════════════════
+           _driverSafetyCard() sorts ascending by score — weakest first, since
+           that is who needs attention. Preserved here; a report that buries the
+           struggling driver on page two is not doing its job.
+           ══════════════════════════════════════════════════════════════════ -->
+      <section class="v2-table-card" aria-label="Driver compliance summary">
+        <div class="v2-panel-head v2-accent-blue">
+          <span class="v2-panel-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <h2>Driver compliance summary</h2>
+          <span class="v2-panel-count">42</span>
+        </div>
+        <div class="v2-table-wrap">
+          <table class="v2-table">
+            <thead><tr><th>Driver</th><th>Truck</th><th>PTIs done</th><th>Compliance</th><th>Median walk-around</th><th>Defects caught</th><th>Last PTI</th><th>Score</th></tr></thead>
+            <tbody>
+            <tr>
+              <td class="v2-cell-strong">Elena Rossi</td>
+              <td class="v2-cell-num">#26134</td>
+              <td class="v2-cell-num">9 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-bad" style="width:43%"></span></span><span class="v2-meter-pct is-t-bad">43%</span></span></td>
+              <td class="v2-cell-dur is-t-bad">0m 47s <span title="Under the 120s quick-inspection flag">&#9888;</span></td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-bad" title="Compliance 26/60 + thoroughness 0/40">26</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Yusuf Demir</td>
+              <td class="v2-cell-num">#25501</td>
+              <td class="v2-cell-num">7 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-bad" style="width:33%"></span></span><span class="v2-meter-pct is-t-bad">33%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">1m 20s <span title="Under the 120s quick-inspection flag">&#9888;</span></td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-bad" title="Compliance 20/60 + thoroughness 7/40">27</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Rory Quinn</td>
+              <td class="v2-cell-num">#26022</td>
+              <td class="v2-cell-num">7 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-bad" style="width:33%"></span></span><span class="v2-meter-pct is-t-bad">33%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">1m 50s <span title="Under the 120s quick-inspection flag">&#9888;</span></td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 3</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-bad" title="Compliance 20/60 + thoroughness 17/40">37</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Halima Yusuf</td>
+              <td class="v2-cell-num">#25573</td>
+              <td class="v2-cell-num">8 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-bad" style="width:38%"></span></span><span class="v2-meter-pct is-t-bad">38%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">1m 42s <span title="Under the 120s quick-inspection flag">&#9888;</span></td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-bad" title="Compliance 23/60 + thoroughness 14/40">37</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Sam Ortiz</td>
+              <td class="v2-cell-num">#26102</td>
+              <td class="v2-cell-num">13 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:62%"></span></span><span class="v2-meter-pct is-t-warn">62%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 00s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 37/60 + thoroughness 20/40">57</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Femi Adeyemi</td>
+              <td class="v2-cell-num">#25822</td>
+              <td class="v2-cell-num">14 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:67%"></span></span><span class="v2-meter-pct is-t-warn">67%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">1m 57s <span title="Under the 120s quick-inspection flag">&#9888;</span></td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 40/60 + thoroughness 19/40">59</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Ray Osei</td>
+              <td class="v2-cell-num">#25141</td>
+              <td class="v2-cell-num">14 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:67%"></span></span><span class="v2-meter-pct is-t-warn">67%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 13s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 40/60 + thoroughness 24/40">64</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Tomas Vargas</td>
+              <td class="v2-cell-num">#25901</td>
+              <td class="v2-cell-num">15 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:71%"></span></span><span class="v2-meter-pct is-t-warn">71%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 02s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 43/60 + thoroughness 21/40">64</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Marcus Webb</td>
+              <td class="v2-cell-num">#25086</td>
+              <td class="v2-cell-num">14 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:67%"></span></span><span class="v2-meter-pct is-t-warn">67%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 35s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 40/60 + thoroughness 32/40">72</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Josie Hart</td>
+              <td class="v2-cell-num">#26057</td>
+              <td class="v2-cell-num">14 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-warn" style="width:67%"></span></span><span class="v2-meter-pct is-t-warn">67%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 58s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-warn" title="Compliance 40/60 + thoroughness 39/40">79</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Duncan Frye</td>
+              <td class="v2-cell-num">#25113</td>
+              <td class="v2-cell-num">17 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:81%"></span></span><span class="v2-meter-pct is-t-ok">81%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 43s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 49/60 + thoroughness 34/40">83</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Dana Kroll</td>
+              <td class="v2-cell-num">#26016</td>
+              <td class="v2-cell-num">17 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:81%"></span></span><span class="v2-meter-pct is-t-ok">81%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 53s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 49/60 + thoroughness 38/40">87</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Dmitri Volkov</td>
+              <td class="v2-cell-num">#25709</td>
+              <td class="v2-cell-num">17 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:81%"></span></span><span class="v2-meter-pct is-t-ok">81%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 55s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 49/60 + thoroughness 40/40">89</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Miguel Sosa</td>
+              <td class="v2-cell-num">#25330</td>
+              <td class="v2-cell-num">17 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:81%"></span></span><span class="v2-meter-pct is-t-ok">81%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 54s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 49/60 + thoroughness 40/40">89</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Julio Barros</td>
+              <td class="v2-cell-num">#26099</td>
+              <td class="v2-cell-num">17 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:81%"></span></span><span class="v2-meter-pct is-t-ok">81%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 04s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 49/60 + thoroughness 40/40">89</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Bea Nowak</td>
+              <td class="v2-cell-num">#25455</td>
+              <td class="v2-cell-num">18 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:86%"></span></span><span class="v2-meter-pct is-t-ok">86%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 18s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 52/60 + thoroughness 40/40">92</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Hector Diaz</td>
+              <td class="v2-cell-num">#25004</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 43s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Nina Alvarez</td>
+              <td class="v2-cell-num">#25873</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 23s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Terrence Boyd</td>
+              <td class="v2-cell-num">#26041</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 39s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Luis Ferrer</td>
+              <td class="v2-cell-num">#25094</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 16s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Owen Blake</td>
+              <td class="v2-cell-num">#26127</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 25s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 3</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Colin Mabe</td>
+              <td class="v2-cell-num">#25612</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 22s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Talia Reyes</td>
+              <td class="v2-cell-num">#26088</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 40s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Ana Cardoso</td>
+              <td class="v2-cell-num">#26140</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 02s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 3</span></td>
+              <td class="v2-cell-num">03 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Peter Nagy</td>
+              <td class="v2-cell-num">#25162</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 49s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Caleb Whit</td>
+              <td class="v2-cell-num">#25058</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 12s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">02 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Noor Rahman</td>
+              <td class="v2-cell-num">#25744</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 29s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Mei Tanaka</td>
+              <td class="v2-cell-num">#26152</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 21s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Aida Sow</td>
+              <td class="v2-cell-num">#25650</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 49s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Greta Lang</td>
+              <td class="v2-cell-num">#26048</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 23s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">01 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Aaron Beck</td>
+              <td class="v2-cell-num">#26146</td>
+              <td class="v2-cell-num">20 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:95%"></span></span><span class="v2-meter-pct is-t-ok">95%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 04s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 57/60 + thoroughness 40/40">97</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Kofi Mensah</td>
+              <td class="v2-cell-num">#26073</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-warn">2m 58s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 39/40">99</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Ivan Petrov</td>
+              <td class="v2-cell-num">#25940</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 47s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Andre Kalu</td>
+              <td class="v2-cell-num">#25218</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 53s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Grace Otieno</td>
+              <td class="v2-cell-num">#25887</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 34s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Ben Harlow</td>
+              <td class="v2-cell-num">#26011</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 55s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Lena Fischer</td>
+              <td class="v2-cell-num">#25963</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 37s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Omar Haddad</td>
+              <td class="v2-cell-num">#26030</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 19s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Ruth Kimani</td>
+              <td class="v2-cell-num">#26115</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 14s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Victor Cruz</td>
+              <td class="v2-cell-num">#25277</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">3m 10s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 1</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Iris Lindqvist</td>
+              <td class="v2-cell-num">#26064</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">5m 31s</td>
+              <td><span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; 2</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            <tr>
+              <td class="v2-cell-strong">Silas Novak</td>
+              <td class="v2-cell-num">#25196</td>
+              <td class="v2-cell-num">21 / 21</td>
+              <td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill is-t-ok" style="width:100%"></span></span><span class="v2-meter-pct is-t-ok">100%</span></span></td>
+              <td class="v2-cell-dur is-t-ok">4m 56s</td>
+              <td><span class="v2-cell-dim">—</span></td>
+              <td class="v2-cell-num">04 Sep 2026</td>
+              <td><span class="v2-score is-t-ok" title="Compliance 60/60 + thoroughness 40/40">100</span></td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="v2-rep-note">
+          <b>Score</b> = compliance (60) + walk-around thoroughness (40). Full thoroughness at 3 min, zero at 60s.<br>
+          <b>Reporting a defect never lowers a score</b> &mdash; a driver who finds faults is doing the job, and penalising it would only teach them to stay quiet.<br>
+          Compliance counts business days (21 in this window), since driving days are not recorded; a driver off sick or on leave will read low. Fleet average 85%.<br>
+          2 drivers on vacation are excluded entirely rather than scored as absent.
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

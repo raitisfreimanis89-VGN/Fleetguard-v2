@@ -1,0 +1,315 @@
+/* ==========================================================================
+   FleetGuard v2 — Reports & Analytics
+   --------------------------------------------------------------------------
+   STAGING ONLY. Report controls, headline metric cards, breakdown meters and
+   the three report tables.
+
+   Mirrors renderReports() and _driverSafetyCard() in js/app.js. Table chrome
+   (.v2-table-card / .v2-table) is reused from v2-inspections.css rather than
+   redefined — see the collision note in v2-dispatch.css for why that matters.
+   ========================================================================== */
+
+/* ── Report controls ─────────────────────────────────────────────────────── */
+
+.v2-rep-bar {
+  display: flex; align-items: flex-end; gap: var(--v2-s4); flex-wrap: wrap;
+  margin-bottom: var(--v2-s6);
+  padding: var(--v2-s4) var(--v2-s5);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+}
+
+.v2-rep-group { display: flex; flex-direction: column; gap: var(--v2-s2); min-width: 0; }
+.v2-rep-label {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-rep-select { position: relative; display: inline-flex; align-items: center; }
+.v2-rep-select select {
+  appearance: none; -webkit-appearance: none;
+  min-width: 190px;
+  padding: var(--v2-s2) var(--v2-s8) var(--v2-s2) var(--v2-s3);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink);
+  font: inherit; font-size: var(--v2-fs-base);
+  cursor: pointer;
+  transition: border-color var(--v2-t-fast), background var(--v2-t-fast);
+}
+.v2-rep-select select:hover { border-color: var(--v2-line-strong); background: var(--v2-surface-3); }
+.v2-rep-select select:focus { outline: none; border-color: var(--v2-cyan-ring); }
+.v2-rep-select select option { background: var(--v2-surface); color: var(--v2-ink); }
+.v2-rep-select svg {
+  position: absolute; right: var(--v2-s3);
+  width: 15px; height: 15px;
+  color: var(--v2-ink-3);
+  pointer-events: none;
+}
+
+.v2-rep-actions { display: flex; align-items: center; gap: var(--v2-s2); margin-left: auto; }
+
+.v2-rep-btn {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink);
+  font: inherit; font-size: var(--v2-fs-base); font-weight: var(--v2-fw-semibold);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast);
+}
+.v2-rep-btn svg { width: 15px; height: 15px; }
+.v2-rep-btn:hover { background: var(--v2-surface-3); border-color: var(--v2-line-glass-hi); }
+
+.v2-rep-btn.is-primary {
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
+  color: var(--v2-ink-on-accent);
+}
+.v2-rep-btn.is-primary:hover { filter: brightness(1.08); background: var(--v2-primary); }
+
+/* ── Headline metrics ────────────────────────────────────────────────────── */
+
+.v2-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: var(--v2-s4);
+  margin-bottom: var(--v2-s8);
+}
+
+.v2-metric {
+  position: relative;
+  overflow: hidden;
+  padding: var(--v2-s5);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+/* Accent hairline along the top edge, matching the metric's own tone. */
+.v2-metric::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--tc);
+}
+
+.v2-metric-head { display: flex; align-items: center; gap: var(--v2-s3); margin-bottom: var(--v2-s4); }
+.v2-metric-ic {
+  display: grid; place-items: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft);
+  border: 1px solid var(--tc-ring);
+  color: var(--tc);
+}
+.v2-metric-ic svg { width: 16px; height: 16px; }
+.v2-metric-label {
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink-2);
+}
+
+.v2-metric-val {
+  display: block;
+  /* Display: 32/40 Bold. The number is the point of the card. */
+  font-size: var(--v2-fs-display); line-height: var(--v2-lh-display);
+  font-weight: var(--v2-fw-bold);
+  letter-spacing: var(--v2-track-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-metric-unit { font-size: var(--v2-fs-lg); font-weight: var(--v2-fw-semibold); color: var(--tc-hi); }
+
+.v2-metric-sub {
+  display: block;
+  margin-top: var(--v2-s1);
+  font-size: var(--v2-fs-micro); line-height: 1.45;
+  color: var(--v2-ink-3);
+}
+
+/* The bar under a percentage metric. Omitted on count metrics, where a
+   proportion would be meaningless. */
+.v2-metric-meter {
+  height: 4px;
+  margin-top: var(--v2-s3);
+  background: var(--v2-surface-3);
+  border-radius: var(--v2-r-pill);
+  overflow: hidden;
+}
+.v2-metric-meter > div { height: 100%; border-radius: var(--v2-r-pill); background: var(--tc); }
+
+/* ── Section layout ──────────────────────────────────────────────────────── */
+
+.v2-rep-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--v2-s5);
+  margin-bottom: var(--v2-s8);
+  align-items: start;
+}
+.v2-rep-section { margin-bottom: var(--v2-s8); }
+
+/* ── Breakdown meters ────────────────────────────────────────────────────── */
+
+.v2-bd { display: flex; flex-direction: column; gap: var(--v2-s4); padding: var(--v2-s5); }
+
+.v2-bd-row { display: flex; align-items: center; gap: var(--v2-s3); }
+.v2-bd-key {
+  flex: 0 0 132px;
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink-2);
+}
+.v2-bd-dot {
+  width: 8px; height: 8px; flex-shrink: 0;
+  border-radius: var(--v2-r-pill);
+  background: var(--tc);
+  box-shadow: 0 0 0 3px var(--tc-soft);
+}
+.v2-bd-meter {
+  flex: 1; min-width: 40px;
+  height: 8px;
+  background: var(--v2-surface-3);
+  border-radius: var(--v2-r-pill);
+  overflow: hidden;
+}
+.v2-bd-fill { height: 100%; border-radius: var(--v2-r-pill); background: var(--tc); }
+.v2-bd-n {
+  flex-shrink: 0; min-width: 34px; text-align: right;
+  font-size: var(--v2-fs-base);
+  font-weight: var(--v2-fw-bold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-bd-pct {
+  flex-shrink: 0; min-width: 46px; text-align: right;
+  font-size: var(--v2-fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+}
+
+/* ── Inline table meter ──────────────────────────────────────────────────── */
+
+.v2-meter { display: flex; align-items: center; gap: var(--v2-s3); }
+.v2-meter-track {
+  width: 64px; height: 5px; flex-shrink: 0;
+  background: var(--v2-surface-3);
+  border-radius: var(--v2-r-pill);
+  overflow: hidden;
+}
+.v2-meter-fill { height: 100%; border-radius: var(--v2-r-pill); }
+.v2-meter-pct {
+  min-width: 38px;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Production's thresholds: >=80 green, >=55 amber, else red. */
+/* Scoped, never bare: an unqualified .is-t-ok in a shared sheet is exactly the
+   kind of global every other v2 rule is prefixed to avoid. */
+.v2-meter-pct.is-t-ok,  .v2-cell-dur.is-t-ok   { color: var(--v2-green-hi); }
+.v2-meter-pct.is-t-warn,.v2-cell-dur.is-t-warn { color: var(--v2-amber-hi); }
+.v2-meter-pct.is-t-bad, .v2-cell-dur.is-t-bad  { color: var(--v2-red-hi); }
+.v2-cell-dur { font-weight: var(--v2-fw-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-cell-dur.is-t-none { color: var(--v2-ink-3); }
+.v2-meter-fill.is-t-ok   { background: var(--v2-green); }
+.v2-meter-fill.is-t-warn { background: var(--v2-amber); }
+.v2-meter-fill.is-t-bad  { background: var(--v2-red); }
+
+/* ── Score badge ─────────────────────────────────────────────────────────── */
+
+.v2-score {
+  display: inline-block; min-width: 40px;
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-xs);
+  font-weight: var(--v2-fw-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--v2-ink-on-accent);
+}
+.v2-score.is-t-ok   { background: var(--v2-green); }
+.v2-score.is-t-warn { background: var(--v2-amber); }
+/* --v2-red is 3.76:1 against dark ink; --v2-red-deep carries white instead. */
+.v2-score.is-t-bad  { background: var(--v2-red-deep); color: #fff; }
+
+/* ── Table cell helpers ──────────────────────────────────────────────────── */
+
+.v2-cell-strong {
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+.v2-cell-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.v2-cell-dim { color: var(--v2-ink-3); }
+.v2-cell-caught { color: var(--v2-green-hi); font-weight: var(--v2-fw-semibold); white-space: nowrap; }
+.v2-cell-never { color: var(--v2-red-hi); font-weight: var(--v2-fw-semibold); }
+
+.v2-rtag {
+  display: inline-block;
+  padding: 2px var(--v2-s2);
+  border-radius: var(--v2-r-xs);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+}
+.v2-rtag.is-ok   { background: var(--v2-green-soft); color: var(--v2-green-hi); }
+.v2-rtag.is-warn { background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+.v2-rtag.is-crit { background: var(--v2-red-soft);   color: var(--v2-red-hi);   }
+.v2-rtag.is-idle { background: var(--v2-surface-3);  color: var(--v2-ink-2);    }
+
+/* ── Methodology note ────────────────────────────────────────────────────── */
+
+/* Production prints the scoring rule under the table. It is not decoration:
+   a score nobody can reconstruct is a score drivers cannot argue with. */
+.v2-rep-note {
+  padding: var(--v2-s4) var(--v2-s5);
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+  font-size: var(--v2-fs-micro); line-height: 1.75;
+  color: var(--v2-ink-2);
+}
+.v2-rep-note b { color: var(--v2-ink); font-weight: var(--v2-fw-semibold); }
+.v2-rep-note + .v2-rep-note { border-top: 0; }
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .v2-rep-grid { grid-template-columns: 1fr; }
+  .v2-rep-actions { margin-left: 0; width: 100%; }
+  .v2-rep-group, .v2-rep-select select { width: 100%; }
+}
+@media (max-width: 620px) {
+  .v2-bd-key { flex-basis: 96px; }
+  .v2-bd-pct { display: none; }
+}
+
+/* ── Roadworthiness sub-header ───────────────────────────────────────────── */
+
+/* A plain divider label, not a .v2-panel-head: that class expects an accent
+   helper to supply --tc, and there is no .v2-accent-slate to give it one. */
+.v2-bd-sub {
+  padding: var(--v2-s3) var(--v2-s5);
+  border-top: 1px solid var(--v2-line);
+  background: var(--v2-surface-2);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+/* ── Two-column report layout ────────────────────────────────────────────── */
+
+/* Each column stacks its own panels, so a short panel does not leave a void
+   beside a tall one — grid alone would stretch or strand them. */
+.v2-rep-col { display: flex; flex-direction: column; gap: var(--v2-s5); min-width: 0; }
