@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Dashboard  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/index.html      Production route: /index.html (untouched)
+
+     Second page of the v2 redesign. Shares the entire token and shell layer
+     with /v2/guides.html — same six stylesheets, no page-specific CSS yet.
+
+     SHELL ONLY. The content region below is a planning stub: the widget
+     layout is being agreed before it is built, so nothing here yet claims to
+     be the Dashboard.
+
+     NOTE ON THE SIDEBAR. This nav lists the ELEVEN destinations production
+     actually has (from index.html and PAGE_TITLES in js/app.js), not the
+     eight in the concept mockup. The mockup invented "Loads", "Maintenance"
+     and "Alerts", and omitted Dispatch Board, Calendar, Pre-Trip Inspections,
+     Driver Portal, Reminders and User Management. v2/guides.html currently
+     carries the mockup's list; the two need reconciling — see the notes with
+     this page's review.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Staging: keep this out of search results even if the branch lands on main. -->
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Dashboard — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item is-active" href="index.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+        Driver Portal
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Management
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <!-- Placeholder identity, same as v2/guides.html. Production reads the
+           signed-in user into #user-pill via app.js; wire to that at cutover. -->
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search vehicles, drivers, records</label>
+        <input id="v2-q" type="text" placeholder="Search vehicles, drivers, records..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <!-- Both of these are the same placeholders carried from v2/guides.html.
+             Neither has a data source. Resolve once, for every v2 page. -->
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Dashboard</h1>
+        <p>Fleet roadworthiness at a glance &mdash; what is overdue, what is due soon, and what changed today.</p>
+      </div>
+
+      <!-- ══ SAMPLE DATA ══════════════════════════════════════════════════
+           Every number, truck and date below is invented for layout review.
+           None of it is read from Supabase. The STRUCTURE, thresholds and
+           rules, however, are taken from renderDashboard() in js/app.js:
+
+             brake_service   overdue > 30 days, due soon inside 7
+             dot_inspection  service overdue > 90 days
+             tyre_check      overdue >= 7 days
+
+           Those come from SCHED_DEFAULTS but are read per vehicle through
+           vehSched() against the SCHEDULES / GLOBAL_SCHED rows, so at wiring
+           time they must be read, never re-declared here — app.js carries a
+           comment about those values having already drifted apart once
+           between the UI, the digest and the SMS bot.
+
+           Also preserved: vehicles whose assigned driver is on vacation are
+           excluded from the Roadworthy and Critical counts. That is why 45
+           total does not equal 27 roadworthy + 2 critical.
+           ══════════════════════════════════════════════════════════════ -->
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> Counts, trucks and dates are invented for layout review &mdash; this page is not connected to the fleet database. Thresholds and rules match production.</span>
+      </div>
+
+      <!-- ── Tier 1 · summary counters ──────────────────────────────────── -->
+      <section class="v2-stat-row" aria-label="Fleet summary">
+
+        <article class="v2-stat v2-accent-cyan">
+          <div class="v2-stat-art" aria-hidden="true">
+            <svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="1.4">
+              <circle cx="112" cy="80" r="20" stroke-opacity=".9"/>
+              <circle cx="112" cy="80" r="38" stroke-opacity=".5"/>
+              <circle cx="112" cy="80" r="56" stroke-opacity=".28"/>
+              <circle cx="112" cy="80" r="74" stroke-opacity=".14"/>
+              <path d="M112 6v148M38 80h148" stroke-opacity=".18"/>
+              <circle cx="112" cy="42" r="3.5" fill="currentColor" stroke="none"/>
+              <circle cx="150" cy="80" r="3" fill="currentColor" stroke="none" fill-opacity=".7"/>
+              <circle cx="112" cy="118" r="2.5" fill="currentColor" stroke="none" fill-opacity=".5"/>
+            </svg>
+          </div>
+          <span class="v2-stat-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          </span>
+          <div class="v2-stat-body">
+            <span class="v2-stat-num">45</span>
+            <span class="v2-stat-label">Total vehicles</span>
+          </div>
+        </article>
+
+        <article class="v2-stat v2-accent-green is-toned">
+          <div class="v2-stat-art" aria-hidden="true">
+            <svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="1.4">
+              <g stroke-opacity=".55">
+                <path d="M96 44l18-10 18 10v20l-18 10-18-10z"/>
+                <path d="M132 64l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".5"/>
+                <path d="M96 84l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".75"/>
+                <path d="M60 64l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".3"/>
+                <path d="M132 104l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".22"/>
+              </g>
+              <path d="M105 84l7 7 14-15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span class="v2-stat-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/></svg>
+          </span>
+          <div class="v2-stat-body">
+            <span class="v2-stat-num">27</span>
+            <span class="v2-stat-label">Roadworthy</span>
+          </div>
+        </article>
+
+        <article class="v2-stat v2-accent-red is-toned">
+          <div class="v2-stat-art" aria-hidden="true">
+            <svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="1.4">
+              <g stroke-opacity=".3">
+                <path d="M56 160L160 56M76 160L160 76M96 160L160 96M116 160L160 116M36 160L160 36M16 160L160 16"/>
+              </g>
+              <path d="M112 48l30 52h-60z" stroke-width="2" stroke-linejoin="round" stroke-opacity=".9"/>
+              <path d="M112 68v14" stroke-width="2.4" stroke-linecap="round"/>
+              <circle cx="112" cy="90" r="2.4" fill="currentColor" stroke="none"/>
+            </svg>
+          </div>
+          <span class="v2-stat-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          </span>
+          <div class="v2-stat-body">
+            <span class="v2-stat-num">2</span>
+            <span class="v2-stat-label">Critical issues</span>
+          </div>
+        </article>
+
+        <article class="v2-stat v2-accent-blue">
+          <div class="v2-stat-art" aria-hidden="true">
+            <svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="1.4">
+              <g stroke-opacity=".35">
+                <path d="M112 80L74 46M112 80l38-30M112 80l-30 44M112 80l40 30M112 80l44-6"/>
+              </g>
+              <circle cx="112" cy="80" r="9" stroke-opacity=".95"/>
+              <circle cx="74" cy="46" r="5.5" stroke-opacity=".7"/>
+              <circle cx="150" cy="50" r="4.5" stroke-opacity=".55"/>
+              <circle cx="82" cy="124" r="5" stroke-opacity=".5"/>
+              <circle cx="152" cy="110" r="4" stroke-opacity=".4"/>
+              <circle cx="156" cy="74" r="3.5" stroke-opacity=".3"/>
+              <circle cx="112" cy="80" r="3" fill="currentColor" stroke="none"/>
+            </svg>
+          </div>
+          <span class="v2-stat-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          </span>
+          <div class="v2-stat-body">
+            <span class="v2-stat-num">46</span>
+            <span class="v2-stat-label">Drivers</span>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ── Tier 2 · conditional banners ───────────────────────────────────
+           Both render only when non-empty in production. Shown here because
+           the sample fleet has entries for each. -->
+
+      <div class="v2-banner v2-accent-red">
+        <span class="v2-banner-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+        </span>
+        <div class="v2-banner-body">
+          <div class="v2-banner-title">Service overdue &mdash; yard visit ASAP</div>
+          <div class="v2-banner-sub">Past the 90-day inspection interval. These are the two vehicles counted as critical.</div>
+          <div class="v2-banner-rows">
+            <a class="v2-banner-row" href="#">
+              <span class="v2-banner-truck">Truck #4412</span>
+              <span class="v2-banner-meta">M. Webb &nbsp;&middot;&nbsp; Dispatch: R. Alvarez &nbsp;&middot;&nbsp; 104 days</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+            <a class="v2-banner-row" href="#">
+              <span class="v2-banner-truck">Truck #2287</span>
+              <span class="v2-banner-meta">D. Kowalski &nbsp;&middot;&nbsp; Dispatch: T. Nguyen &nbsp;&middot;&nbsp; 97 days</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Vicious circle: a maintenance record with no brake test on the same
+           date — service done without re-testing the brakes afterwards. -->
+      <div class="v2-banner v2-accent-amber" style="margin-bottom: var(--v2-s8)">
+        <span class="v2-banner-ic">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/></svg>
+        </span>
+        <div class="v2-banner-body">
+          <div class="v2-banner-title">Vicious circle alert</div>
+          <div class="v2-banner-sub">Serviced with no brake test recorded on the same date.</div>
+          <div class="v2-chips">
+            <a class="v2-chip" href="#">Truck #4412</a>
+            <a class="v2-chip" href="#">Truck #3390</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Tier 3 · compliance panels, 2x2 ───────────────────────────────
+           Empty states are written out rather than left blank: an empty panel
+           here means "nothing is overdue", which is the good outcome and
+           should read that way. -->
+      <section class="v2-panel-grid" aria-label="Compliance">
+
+        <article class="v2-panel v2-accent-red">
+          <div class="v2-panel-head">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+            <h2>Brake inspection overdue</h2>
+            <span class="v2-panel-count">3</span>
+          </div>
+          <div class="v2-panel-body">
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #4412</span>
+              <span class="v2-line-detail">41 days since last test</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #3390</span>
+              <span class="v2-line-detail">38 days since last test</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #1156</span>
+              <span class="v2-line-detail">No test on record</span>
+              <span class="v2-badge is-solid">None</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="v2-panel v2-accent-amber">
+          <div class="v2-panel-head">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </span>
+            <h2>Brake test due soon</h2>
+            <span class="v2-panel-count">2</span>
+          </div>
+          <div class="v2-panel-body">
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #5501</span>
+              <span class="v2-line-detail">Within the 30-day interval</span>
+              <span class="v2-badge">Due in 3 days</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #2841</span>
+              <span class="v2-line-detail">Within the 30-day interval</span>
+              <span class="v2-badge">Due in 6 days</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="v2-panel v2-accent-amber">
+          <div class="v2-panel-head">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/></svg>
+            </span>
+            <h2>Tyre check overdue</h2>
+            <span class="v2-panel-count">4</span>
+          </div>
+          <div class="v2-panel-body">
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #4412</span>
+              <span class="v2-line-detail">Since last check</span>
+              <span class="v2-badge is-solid">12 days</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #2287</span>
+              <span class="v2-line-detail">Since last check</span>
+              <span class="v2-badge is-solid">9 days</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #3390</span>
+              <span class="v2-line-detail">Since last check</span>
+              <span class="v2-badge is-solid">8 days</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #7724</span>
+              <span class="v2-line-detail">No check on record</span>
+              <span class="v2-badge is-solid">None</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="v2-panel v2-accent-blue">
+          <div class="v2-panel-head">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+            </span>
+            <h2>Service overdue &middot; 90-day</h2>
+            <span class="v2-panel-count">2</span>
+          </div>
+          <div class="v2-panel-body">
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #4412</span>
+              <span class="v2-line-detail">104 days since last service</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+            <a class="v2-line-row" href="#">
+              <span class="v2-line-truck">Truck #2287</span>
+              <span class="v2-line-detail">97 days since last service</span>
+              <span class="v2-badge is-solid">Overdue</span>
+            </a>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ── Tier 4 · recent activity ──────────────────────────────────────
+           Production merges MAINTENANCE + BRAKE_TESTS + SERVICE_RECORDS,
+           sorts by date and takes the newest six. -->
+      <section class="v2-panel v2-accent-cyan" aria-label="Recent activity">
+        <div class="v2-panel-head">
+          <span class="v2-panel-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/><path d="M8 13h8M8 17h5"/></svg>
+          </span>
+          <h2>Recent activity</h2>
+          <span class="v2-panel-count">6</span>
+        </div>
+        <div class="v2-timeline">
+          <div class="v2-tl-row v2-accent-green">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Brake pass &mdash; <b>Truck #5501</b></span>
+            <span class="v2-tl-date">04 Sep 2026</span>
+          </div>
+          <div class="v2-tl-row v2-accent-green">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Vehicle service pass &mdash; <b>Truck #6018</b></span>
+            <span class="v2-tl-date">03 Sep 2026</span>
+          </div>
+          <div class="v2-tl-row v2-accent-blue">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Service &mdash; <b>Truck #2287</b></span>
+            <span class="v2-tl-date">02 Sep 2026</span>
+          </div>
+          <div class="v2-tl-row v2-accent-red">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Brake fail &mdash; <b>Truck #1156</b></span>
+            <span class="v2-tl-date">01 Sep 2026</span>
+          </div>
+          <div class="v2-tl-row v2-accent-green">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Vehicle service pass &mdash; <b>Truck #7724</b></span>
+            <span class="v2-tl-date">29 Aug 2026</span>
+          </div>
+          <div class="v2-tl-row v2-accent-blue">
+            <span class="v2-tl-dot"></span>
+            <span class="v2-tl-label">Service &mdash; <b>Truck #3390</b></span>
+            <span class="v2-tl-date">27 Aug 2026</span>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>
