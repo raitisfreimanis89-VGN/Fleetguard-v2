@@ -357,8 +357,14 @@ select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .cal-day-num { font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .cal-day.today .cal-day-num { color: var(--primary); }
 .cal-event { font-size: 10px; padding: 2px 5px; border-radius: 3px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cal-event-brake { background: var(--danger-bg); color: var(--danger-text); }
-.cal-event-maint { background: var(--primary-dim); color: var(--primary-text); }
+/* One colour per clock. Measured against a has-events day cell (warning-bg at
+   12% over surface-container): brake 6.83:1, yard 5.97:1, annual 6.75:1.
+   `.cal-event-maint` is gone along with the maint event type it styled, and
+   there was never a `.cal-event-svc` rule at all — service events had been
+   rendering with no chip styling since that type was introduced. */
+.cal-event-brake  { background: var(--danger-bg);         color: var(--danger-text); }
+.cal-event-yard   { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.cal-event-annual { background: rgba(0, 212, 255, 0.16);  color: #7fe6ff; }
 
 /* --- MODAL --- */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 20px; backdrop-filter: blur(2px); }

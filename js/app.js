@@ -1383,16 +1383,47 @@ function renderCalendar(){
   const firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate();
   const todayStr=today(),events=[];
   const _calVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
+  // Three clocks, one colour each, no overlap between them:
+  //   yard    last service + vehSched(dot_inspection)   90 days by default
+  //   brake   last brake test + vehSched(brake_service) 30 days by default
+  //   annual  the DOT certificate expiry, entered by hand
+  // Intervals come from vehSched so per-vehicle overrides and the new-truck
+  // ladder are honoured; they are no longer hardcoded here.
+  //
+  // The old `maint` event is gone. It drew maintenance_records
+  // .next_inspection_date, which addMaintenance() bakes as service_date + 60
+  // at insert time and never recalculates. That field was removed from
+  // getVehicleStatus() on 2026-08-18 for "duplicating the yard/periodic
+  // cadence and contradicting the 90-day Service pill" — see the note there —
+  // but this function kept rendering it. Because svcRefDate falls back to the
+  // maintenance service date when a vehicle has no service_records row, the
+  // two events resolved to the SAME day for those vehicles: one service drawn
+  // twice in two colours. The column itself is untouched and still shown in
+  // the Service history and on the vehicle detail page.
+  //
+  // Date maths is UTC throughout. The previous code parsed an ISO date as UTC
+  // midnight and then stepped it with local setDate(), which shifts the result
+  // by a day when the interval crosses a daylight-saving boundary.
+  const _calAdd=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().split('T')[0];};
   VEHICLES.forEach(v=>{
     if(_calVacSet.has(v.assignedDriverId)) return;
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-    if(brakes[0]){const d=new Date(brakes[0].testDate);d.setDate(d.getDate()+30);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} brake due`,type:'brake'});}
-    if(maint[0]) events.push({date:maint[0].nextInspectionDate,label:`Truck #${esc(v.truckNumber)} inspection`,type:'maint'});
-    // FIX: use 60-day interval and fall back to maintenance date if no service_records
+    const tn=esc(v.truckNumber);
+    if(brakes[0]){
+      const iv=vehSched(v.id,'brake_service').interval;
+      events.push({date:_calAdd(brakes[0].testDate,iv),label:`Truck #${tn} brake inspection due (${iv}-day)`,short:`#${tn} Brake`,type:'brake'});
+    }
     const svcRefDate=svcs[0]?.serviceDate||maint[0]?.serviceDate||null;
-    if(svcRefDate){const d=new Date(svcRefDate);d.setDate(d.getDate()+60);events.push({date:d.toISOString().split('T')[0],label:`Truck #${esc(v.truckNumber)} service due`,type:'svc'});}
+    if(svcRefDate){
+      const iv=vehSched(v.id,'dot_inspection').interval;
+      events.push({date:_calAdd(svcRefDate,iv),label:`Truck #${tn} yard / periodic inspection due (${iv}-day)`,short:`#${tn} Yard`,type:'yard'});
+    }
+    // Certificate expiry is a stored date, not an interval — nothing to add to.
+    if(ANNUAL_AVAILABLE&&v.annualExpiry){
+      events.push({date:v.annualExpiry,label:`Truck #${tn} annual DOT certificate expires`,short:`#${tn} Annual`,type:'annual'});
+    }
   });
   const monthName=calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   let html=`<div class="card" style="margin-bottom:20px"><div class="card-body">
@@ -1401,11 +1432,24 @@ function renderCalendar(){
   for(let d=1;d<=daysInMonth;d++){
     const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dayEvents=events.filter(e=>e.date===dateStr),isToday=dateStr===todayStr;
-    html+=`<div class="cal-day ${isToday?'today':''} ${dayEvents.length?'has-events':''}"><div class="cal-day-num">${d}</div>${dayEvents.map(e=>`<div class="cal-event cal-event-${e.type}" title="${e.label}">${e.label.split(' ').slice(0,2).join(' ')}</div>`).join('')}</div>`;
+    // `short` carries the clock name as well as the truck, so the three types
+    // are told apart by text and not by colour alone.
+    html+=`<div class="cal-day ${isToday?'today':''} ${dayEvents.length?'has-events':''}"><div class="cal-day-num">${d}</div>${dayEvents.map(e=>`<div class="cal-event cal-event-${e.type}" title="${e.label}">${e.short}</div>`).join('')}</div>`;
   }
   html+=`</div></div></div><div class="card"><div class="card-header">📋 Upcoming Events</div><div class="card-body">`;
-  const upcoming=events.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+  // Next few of EACH clock, merged back into date order — not simply the next
+  // N dates. A 30-day brake cycle across a 40-odd truck fleet produces roughly
+  // one brake event per truck per month, so a purely chronological list runs
+  // about 90% brakes and the yard visit and certificate expiry sit dozens of
+  // rows below the fold. Per-clock quotas keep every deadline type visible.
+  const CAL_PER_TYPE=5;
+  const _calFuture=events.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+  const upcoming=['yard','brake','annual']
+    .flatMap(t=>_calFuture.filter(e=>e.type===t).slice(0,CAL_PER_TYPE))
+    .sort((a,b)=>a.date.localeCompare(b.date));
   if(upcoming.length===0) html+=`<div class="empty">No upcoming events</div>`;
+  // --text2, not --text3: text3 measures 2.75:1 on the card and fails AA.
+  else if(_calFuture.length>upcoming.length) html+=`<div class="text-sm" style="color:var(--text2);margin-bottom:8px">Showing the next ${CAL_PER_TYPE} of each type &middot; ${_calFuture.length} upcoming in total</div>`;
   upcoming.forEach(e=>{const d=daysBetween(todayStr,e.date);html+=`<div class="history-item"><span>${e.label}</span><div style="display:flex;gap:8px;align-items:center"><span class="text-sm">${fmtDate(e.date)}</span><span class="badge ${d<=7?'badge-red':d<=14?'badge-yellow':'badge-blue'}">${d===0?'Today':d+'d'}</span></div></div>`;});
   html+=`</div></div>`;
   return html;
