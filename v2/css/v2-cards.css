@@ -188,14 +188,16 @@
    would survive the index.html CSP (img-src 'self') if that policy is ever
    extended to this page. Four hotlinked cards remain.
 
-   `center`, not the ::before default of `center right`. Measured: the image is
-   2752x1536 (1.79:1) on a 350x285 card (1.23:1), so cover scales to 510.6 wide
-   and hides 31.5% of the width. Anchored right that trims everything left of
-   x=866 — which is the whole tractor, leaving a disembodied box trailer.
-   Centred it trims 15.7% off each edge instead (visible x 433..2319) and every
+   `center`, not the ::before default of `center right`. Measured in fractions
+   so it survives a re-export: the image is 1.79:1 on a ~1.23:1 card, so cover
+   hides 31.5% of the width. Anchored right that trims the whole left 31.5% —
+   which is the entire tractor, leaving a disembodied box trailer. Centred it
+   trims 15.7% off each edge instead, keeping the middle 68.5%, and every
    subject survives: tractor, tandem axle group, the 53FT marking and the rear
    doors. Same lesson as the PTI card above — losing the tractor costs the
-   thing that reads as "truck" at card size. */
+   thing that reads as "truck" at card size.
+   (Asset is currently 760x424, 43KB, downsampled from a 2752x1536 original.
+   760 covers the 350-wide art box at better than 2x for retina.) */
 /* Tuning vars go on the ELEMENT, not on ::before. --art-lift is read by
    ::before but --art-scrim-* is read by ::after, and the two pseudo-elements
    are siblings — a custom property set on one is invisible to the other. */
