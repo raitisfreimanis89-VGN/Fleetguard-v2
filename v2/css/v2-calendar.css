@@ -244,10 +244,13 @@
 }
 .v2-countdown.is-urgent { background: var(--v2-red);   color: var(--v2-ink-on-accent); }
 .v2-countdown.is-soon   { background: var(--v2-amber); color: var(--v2-ink-on-accent); }
+/* Neutral, not blue. Blue now denotes the Yard clock in the type key, and a
+   blue urgency badge beside a red Brake row would read as a second type
+   rather than "not urgent yet". */
 .v2-countdown.is-later  {
-  background: var(--v2-blue-soft);
-  border: 1px solid var(--v2-blue-ring);
-  color: var(--v2-blue-hi);
+  background: var(--v2-surface-3);
+  border: 1px solid var(--v2-line-strong);
+  color: var(--v2-ink-2);
 }
 
 @media (max-width: 900px) {
@@ -259,3 +262,26 @@
   .v2-cal-day { min-height: 76px; padding: var(--v2-s2); }
   .v2-stream-date { display: none; }
 }
+
+/* ── Filter pill counts ──────────────────────────────────────────────────── */
+
+.v2-cal-n {
+  margin-left: var(--v2-s1);
+  font-size: var(--v2-fs-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+}
+.v2-cal-pill.is-active .v2-cal-n { color: var(--tc-hi); }
+
+/* ── Cell overflow ───────────────────────────────────────────────────────── */
+
+/* A busy day gets three capsules and a count. Without this a single date with
+   nine events would stretch its row and drag the whole grid out of shape. */
+.v2-cap-more {
+  padding: 2px var(--v2-s2);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink-2);
+  cursor: pointer;
+}
+.v2-cap-more:hover { color: var(--v2-ink); }
