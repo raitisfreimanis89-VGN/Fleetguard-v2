@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Reminders  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/reminders.html   Production: the Reminders view inside
+     /index.html, rendered by renderReminders() in js/reminders.js (untouched).
+
+     Sixth page of the v2 redesign.
+
+     ADMIN ONLY, ENTIRELY. renderReminders() returns "Access restricted to
+     administrators." before rendering a single tab. The gate is on the whole
+     page, not on individual controls.
+
+     SAMPLE DATA. Every driver, number, schedule and override is invented for
+     layout review. Phone numbers are masked exactly as maskPhone() does it.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Reminders — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+<link rel="stylesheet" href="css/v2-drivers.css">
+<link rel="stylesheet" href="css/v2-reminders.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item" href="drivers.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="inspections.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+        Driver Portal
+      </a>
+      <a class="v2-nav-item is-active" href="reminders.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Management
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search reminders</label>
+        <input id="v2-q" type="text" placeholder="Search drivers, trucks, messages..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Reminders</h1>
+        <p>Automated service reminders, the numbers they go to, and the schedules that trigger them.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> Invented drivers, schedules and overrides &mdash; not connected to the fleet database. Masking, service types and defaults match production.</span>
+      </div>
+
+      <!-- ══ Sub-navigation ════════════════════════════════════════════════
+           Four tabs, as in renderReminders(). Schedule Config is the active
+           one because that is the content built below; the reply count only
+           renders above zero, and is green.
+           ══════════════════════════════════════════════════════════════ -->
+      <nav class="v2-subtabs" aria-label="Reminders sections">
+        <button class="v2-subtab" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+          Overview
+        </button>
+        <button class="v2-subtab" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+          SMS History
+        </button>
+        <button class="v2-subtab" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/><path d="m8 10 2.5 2.5L15 8"/></svg>
+          Driver Replies
+          <span class="v2-subtab-badge">99</span>
+        </button>
+        <button class="v2-subtab is-active" type="button" aria-current="page">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+          Schedule Config
+        </button>
+      </nav>
+
+      <!-- ══ Upper split · defaults + phone roster ═════════════════════════ -->
+      <section class="v2-rem-grid" aria-label="Schedule configuration">
+
+        <!-- pm_service is deliberately absent: retired 2026-07-01 and no
+             longer tracked. Three types remain. -->
+        <article class="v2-table-card">
+          <div class="v2-panel-head v2-accent-amber">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/></svg>
+            </span>
+            <h2>Global defaults</h2>
+            <span class="v2-panel-tag">Applies to all vehicles</span>
+          </div>
+
+          <div class="v2-table-wrap">
+            <table class="v2-sched-table">
+              <thead>
+                <tr>
+                  <th>Service type</th>
+                  <th>Interval</th>
+                  <th>Warn before</th>
+                  <th>Escalate after</th>
+                  <th>On</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="v2-accent-blue">
+                  <td>
+                    <span class="v2-sched-type">
+                      <span class="v2-sched-ic">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+                      </span>
+                      <span>
+                        <span class="v2-sched-label">Periodic Inspection</span><br>
+                        <span class="v2-sched-sub">Yard inspection</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td><span class="v2-num"><input type="number" value="90" min="1" max="365" aria-label="Periodic inspection interval in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="7" min="1" max="30" aria-label="Periodic inspection warn before, in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="48" min="1" max="168" aria-label="Periodic inspection escalate after, in hours"><span class="v2-num-unit">h</span></span></td>
+                  <td>
+                    <label class="v2-toggle">
+                      <input type="checkbox" checked aria-label="Periodic inspection reminders enabled">
+                      <span class="v2-toggle-track"><span class="v2-toggle-thumb"></span></span>
+                    </label>
+                  </td>
+                </tr>
+
+                <tr class="v2-accent-red">
+                  <td>
+                    <span class="v2-sched-type">
+                      <span class="v2-sched-ic">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/></svg>
+                      </span>
+                      <span>
+                        <span class="v2-sched-label">Brake Inspection</span><br>
+                        <span class="v2-sched-sub">Safety critical</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td><span class="v2-num"><input type="number" value="30" min="1" max="365" aria-label="Brake inspection interval in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="7" min="1" max="30" aria-label="Brake inspection warn before, in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="48" min="1" max="168" aria-label="Brake inspection escalate after, in hours"><span class="v2-num-unit">h</span></span></td>
+                  <td>
+                    <label class="v2-toggle">
+                      <input type="checkbox" checked aria-label="Brake inspection reminders enabled">
+                      <span class="v2-toggle-track"><span class="v2-toggle-thumb"></span></span>
+                    </label>
+                  </td>
+                </tr>
+
+                <tr class="v2-accent-amber">
+                  <td>
+                    <span class="v2-sched-type">
+                      <span class="v2-sched-ic">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M12 15.5v5M3.5 12h5M15.5 12h5"/></svg>
+                      </span>
+                      <span>
+                        <span class="v2-sched-label">Tyre Check</span><br>
+                        <span class="v2-sched-sub">Tread photos</span>
+                      </span>
+                    </span>
+                  </td>
+                  <td><span class="v2-num"><input type="number" value="7" min="1" max="365" aria-label="Tyre check interval in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="2" min="1" max="30" aria-label="Tyre check warn before, in days"><span class="v2-num-unit">d</span></span></td>
+                  <td><span class="v2-num"><input type="number" value="24" min="1" max="168" aria-label="Tyre check escalate after, in hours"><span class="v2-num-unit">h</span></span></td>
+                  <td>
+                    <label class="v2-toggle">
+                      <input type="checkbox" checked aria-label="Tyre check reminders enabled">
+                      <span class="v2-toggle-track"><span class="v2-toggle-thumb"></span></span>
+                    </label>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="v2-panel-foot">
+            <span class="v2-panel-foot-hint">Changes save as you edit.</span>
+            <button class="v2-btn-primary" type="button">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+              Save defaults
+            </button>
+          </div>
+        </article>
+
+        <!-- Masked with maskPhone(): every digit but the last four becomes a
+             bullet, country code included. Three states, not two — verified,
+             present-but-unverified, and absent. Absent is red because that
+             driver receives nothing at all. -->
+        <article class="v2-table-card">
+          <div class="v2-panel-head v2-accent-cyan">
+            <span class="v2-panel-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <h2>Driver phone numbers</h2>
+            <span class="v2-panel-tag">Admin only</span>
+          </div>
+
+          <div class="v2-phone-list">
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">M. Webb</span>
+                <span class="v2-phone-who-truck">Truck #26016</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0142</span>
+              <span class="v2-phone-badge is-verified">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Verified
+              </span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">D. Kowalski</span>
+                <span class="v2-phone-who-truck">Truck #26041</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0188</span>
+              <span class="v2-phone-badge is-verified">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Verified
+              </span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">A. Ferreira</span>
+                <span class="v2-phone-who-truck">Truck #25873</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0271</span>
+              <span class="v2-phone-badge is-active">Active</span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">J. Brennan</span>
+                <span class="v2-phone-who-truck">Truck #26102</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0319</span>
+              <span class="v2-phone-badge is-verified">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Verified
+              </span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">P. Ostrowski</span>
+                <span class="v2-phone-who-truck">Truck #25940</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0204</span>
+              <span class="v2-phone-badge is-verified">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Verified
+              </span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">R. Castellanos</span>
+                <span class="v2-phone-who-truck">Unassigned</span>
+              </span>
+              <span class="v2-phone-unset">Not set</span>
+              <span class="v2-phone-badge is-missing">Missing</span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">S. Whitfield</span>
+                <span class="v2-phone-who-truck">Unassigned</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0166</span>
+              <span class="v2-phone-badge is-active">Active</span>
+            </div>
+
+            <div class="v2-phone-item">
+              <span class="v2-phone-who">
+                <span class="v2-phone-who-name">L. Duarte</span>
+                <span class="v2-phone-who-truck">Truck #25141</span>
+              </span>
+              <span class="v2-phone-masked">+&bull;&bull;&bull;&bull;&bull;&bull;&bull;0233</span>
+              <span class="v2-phone-badge is-verified">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                Verified
+              </span>
+            </div>
+
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══ Per-vehicle overrides ═════════════════════════════════════════
+           Rows in reminder_schedules with a non-null vehicle_id. They replace
+           the global row for that truck and service type.
+           ══════════════════════════════════════════════════════════════ -->
+      <section class="v2-table-card" aria-label="Per-vehicle overrides">
+        <div class="v2-panel-head v2-accent-red">
+          <span class="v2-panel-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+          </span>
+          <h2>Per-vehicle overrides</h2>
+          <span class="v2-panel-tag">Overrides global defaults for specific trucks</span>
+        </div>
+
+        <div class="v2-override-list">
+
+          <div class="v2-override">
+            <span class="v2-override-main">
+              <span class="v2-override-head">
+                <span class="v2-override-truck">Truck #26057</span>
+                <span class="v2-override-chip is-type v2-accent-red">Brake Inspection</span>
+                <span class="v2-override-chip is-custom">Custom</span>
+              </span>
+              <span class="v2-override-params">
+                Interval <b>21d</b> <span class="v2-override-sep">&middot;</span>
+                Warn <b>5d</b> <span class="v2-override-sep">&middot;</span>
+                Escalate <b>24h</b>
+              </span>
+            </span>
+            <button class="v2-act is-danger" type="button" aria-label="Remove override for Truck #26057">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+
+          <div class="v2-override">
+            <span class="v2-override-main">
+              <span class="v2-override-head">
+                <span class="v2-override-truck">Truck #25873</span>
+                <span class="v2-override-chip is-type v2-accent-amber">Tyre Check</span>
+                <span class="v2-override-chip is-custom">Custom</span>
+              </span>
+              <span class="v2-override-params">
+                Interval <b>5d</b> <span class="v2-override-sep">&middot;</span>
+                Warn <b>1d</b> <span class="v2-override-sep">&middot;</span>
+                Escalate <b>12h</b>
+              </span>
+            </span>
+            <button class="v2-act is-danger" type="button" aria-label="Remove override for Truck #25873">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+
+          <div class="v2-override">
+            <span class="v2-override-main">
+              <span class="v2-override-head">
+                <span class="v2-override-truck">Truck #26102</span>
+                <span class="v2-override-chip is-type v2-accent-blue">Periodic Inspection</span>
+                <span class="v2-override-chip is-custom">Custom</span>
+              </span>
+              <span class="v2-override-params">
+                Interval <b>60d</b> <span class="v2-override-sep">&middot;</span>
+                Warn <b>10d</b> <span class="v2-override-sep">&middot;</span>
+                Escalate <b>72h</b>
+              </span>
+            </span>
+            <button class="v2-act is-danger" type="button" aria-label="Remove override for Truck #26102">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

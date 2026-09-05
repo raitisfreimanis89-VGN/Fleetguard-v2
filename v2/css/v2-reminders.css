@@ -1,0 +1,333 @@
+/* ==========================================================================
+   FleetGuard v2 — Reminders
+   --------------------------------------------------------------------------
+   STAGING ONLY. Sub-navigation, the Schedule Config split, and the
+   per-vehicle override list.
+
+   Structure follows renderReminders() and remRenderSchedule() in
+   js/reminders.js. Note that the ENTIRE page is admin-only in production —
+   renderReminders() returns "Access restricted to administrators." for
+   anyone else, before rendering a single tab.
+   ========================================================================== */
+
+/* ── Sub-navigation ──────────────────────────────────────────────────────── */
+
+.v2-subtabs {
+  display: flex; align-items: center; gap: var(--v2-s2); flex-wrap: wrap;
+  margin-bottom: var(--v2-s8);
+  padding-bottom: var(--v2-s3);
+  border-bottom: 1px solid var(--v2-line);
+}
+
+.v2-subtab {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s3) var(--v2-s4);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-2);
+  font: inherit;
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast), border-color var(--v2-t-fast);
+}
+.v2-subtab svg { width: 16px; height: 16px; }
+.v2-subtab:hover { background: var(--v2-surface-2); color: var(--v2-ink); }
+.v2-subtab.is-active {
+  background: var(--v2-amber-soft);
+  border-color: var(--v2-amber-ring);
+  color: var(--v2-amber-hi);
+  font-weight: var(--v2-fw-semibold);
+}
+
+/* Pending-reply count. Green in production, and only rendered above zero. */
+.v2-subtab-badge {
+  padding: 1px var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-green);
+  color: var(--v2-ink-on-accent);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Split grid ──────────────────────────────────────────────────────────── */
+
+.v2-rem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: var(--v2-s5);
+  margin-bottom: var(--v2-s8);
+}
+
+.v2-panel-tag {
+  flex-shrink: 0;
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-3);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  white-space: nowrap;
+}
+
+/* ── Schedule defaults table ─────────────────────────────────────────────── */
+
+.v2-sched-table { width: 100%; border-collapse: collapse; }
+.v2-sched-table thead th {
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface-2);
+  border-bottom: 1px solid var(--v2-line);
+  text-align: left;
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+.v2-sched-table thead th:first-child { padding-left: var(--v2-s5); }
+.v2-sched-table thead th:last-child  { padding-right: var(--v2-s5); text-align: center; }
+
+.v2-sched-table tbody td {
+  padding: var(--v2-s3) var(--v2-s4);
+  border-bottom: 1px solid var(--v2-line);
+  vertical-align: middle;
+}
+.v2-sched-table tbody td:first-child { padding-left: var(--v2-s5); }
+.v2-sched-table tbody td:last-child  { padding-right: var(--v2-s5); text-align: center; }
+.v2-sched-table tbody tr:last-child td { border-bottom: 0; }
+
+.v2-sched-type { display: flex; align-items: center; gap: var(--v2-s3); }
+.v2-sched-ic {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft); color: var(--tc);
+  border: 1px solid var(--tc-ring);
+}
+.v2-sched-ic svg { width: 16px; height: 16px; }
+.v2-sched-label {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+.v2-sched-sub {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+/* Number field with its unit sitting outside the box, so the unit is never
+   mistaken for part of the value. */
+.v2-num { display: inline-flex; align-items: baseline; gap: var(--v2-s2); }
+.v2-num input {
+  width: 62px;
+  padding: var(--v2-s2);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-xs);
+  color: var(--v2-ink);
+  font: inherit;
+  font-size: var(--v2-fs-base);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color-scheme: dark;
+  transition: border-color var(--v2-t-fast), background var(--v2-t-fast);
+}
+.v2-num input:hover { border-color: var(--v2-line-glass-hi); }
+.v2-num input:focus {
+  outline: none;
+  border-color: var(--v2-cyan-ring);
+  background: var(--v2-surface-3);
+  box-shadow: 0 0 0 3px var(--v2-cyan-soft);
+}
+.v2-num-unit { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+
+/* ── Toggle ──────────────────────────────────────────────────────────────── */
+
+.v2-toggle { position: relative; display: inline-flex; }
+.v2-toggle input {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  margin: 0; opacity: 0; cursor: pointer;
+}
+.v2-toggle-track {
+  width: 40px; height: 22px;
+  display: flex; align-items: center;
+  padding: 2px;
+  background: var(--v2-surface-3);
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-pill);
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast);
+}
+.v2-toggle-thumb {
+  width: 16px; height: 16px;
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-ink-3);
+  transition: transform var(--v2-t-base), background var(--v2-t-fast);
+}
+.v2-toggle input:checked ~ .v2-toggle-track {
+  background: var(--v2-green-soft);
+  border-color: var(--v2-green);
+}
+.v2-toggle input:checked ~ .v2-toggle-track .v2-toggle-thumb {
+  transform: translateX(18px);
+  background: var(--v2-green);
+}
+.v2-toggle input:focus-visible ~ .v2-toggle-track {
+  outline: 2px solid var(--v2-cyan);
+  outline-offset: 2px;
+}
+
+.v2-panel-foot {
+  display: flex; justify-content: flex-end; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s4) var(--v2-s5);
+  border-top: 1px solid var(--v2-line);
+}
+/* Production's Save button does not save — every input persists on change and
+   remSaveAllSchedules() only reloads. The hint says so rather than implying a
+   pending commit that does not exist. */
+.v2-panel-foot-hint {
+  margin-right: auto;
+  font-size: var(--v2-fs-xs); color: var(--v2-ink-3);
+}
+
+/* ── Driver phone list ───────────────────────────────────────────────────── */
+
+.v2-phone-list { display: flex; flex-direction: column; }
+.v2-phone-item {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s3) var(--v2-s5);
+  border-bottom: 1px solid var(--v2-line);
+}
+.v2-phone-item:last-child { border-bottom: 0; }
+.v2-phone-item:hover { background: var(--v2-surface-2); }
+
+.v2-phone-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.v2-phone-who-name {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+.v2-phone-who-truck {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+/* Masked exactly as production does it: every digit but the last four becomes
+   a bullet, the country code included. The full number is never rendered
+   here, even for an admin — this panel is a roster, not a contact card. */
+.v2-phone-masked {
+  font-size: var(--v2-fs-base);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .06em;
+  color: var(--v2-ink-2);
+  white-space: nowrap;
+}
+.v2-phone-unset {
+  font-size: var(--v2-fs-base);
+  color: var(--v2-ink-3);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* Three states, not two: verified, present-but-unverified, and absent. */
+.v2-phone-badge {
+  flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  white-space: nowrap;
+}
+.v2-phone-badge svg { width: 12px; height: 12px; }
+.v2-phone-badge.is-verified {
+  background: var(--v2-green);
+  color: var(--v2-ink-on-accent);
+}
+.v2-phone-badge.is-active {
+  background: var(--v2-amber-soft);
+  border: 1px solid var(--v2-amber-ring);
+  color: var(--v2-amber-hi);
+}
+.v2-phone-badge.is-missing {
+  background: var(--v2-red);
+  color: var(--v2-ink-on-accent);
+}
+
+/* ── Per-vehicle overrides ───────────────────────────────────────────────── */
+
+.v2-override-list { display: flex; flex-direction: column; gap: var(--v2-s3); padding: var(--v2-s5); }
+
+.v2-override {
+  display: flex; align-items: center; gap: var(--v2-s4);
+  padding: var(--v2-s4);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-sm);
+  transition: border-color var(--v2-t-fast), background var(--v2-t-fast);
+}
+.v2-override:hover { border-color: var(--v2-line-glass-hi); background: var(--v2-surface-3); }
+
+.v2-override-main { flex: 1; min-width: 0; }
+.v2-override-head {
+  display: flex; align-items: center; gap: var(--v2-s2); flex-wrap: wrap;
+  margin-bottom: var(--v2-s2);
+}
+.v2-override-truck {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-override-chip {
+  padding: 1px var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  white-space: nowrap;
+}
+.v2-override-chip.is-type {
+  background: var(--tc-soft);
+  border: 1px solid var(--tc-ring);
+  color: var(--tc-hi);
+}
+/* --v2-ink-3 on --v2-surface-3 measures 4.49:1 — under AA by a hair, because
+   the chip sits a step lighter than the ground the muted tone was tuned for.
+   The secondary tone clears it. */
+.v2-override-chip.is-custom {
+  background: var(--v2-surface-3);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-2);
+}
+
+.v2-override-params {
+  display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap;
+  font-size: var(--v2-fs-xs);
+  color: var(--v2-ink-3);
+}
+.v2-override-params b {
+  font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-2);
+}
+/* Was --v2-line-strong, a BORDER token used as a text colour: 1.5:1, barely
+   visible. Separators are still rendered text and have to be legible. */
+.v2-override-sep { color: var(--v2-ink-3); }
+
+.v2-override-empty {
+  padding: var(--v2-s8) var(--v2-s5);
+  text-align: center;
+  font-size: var(--v2-fs-xs);
+  color: var(--v2-ink-3);
+}
+
+@media (max-width: 620px) {
+  .v2-rem-grid { grid-template-columns: minmax(0, 1fr); }
+}
