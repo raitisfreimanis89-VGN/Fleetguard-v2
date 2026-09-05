@@ -4,20 +4,24 @@
      -------------------------------------------------------------------------
      Route:  /v2/index.html      Production route: /index.html (untouched)
 
-     Second page of the v2 redesign. Shares the entire token and shell layer
-     with /v2/guides.html — same six stylesheets, no page-specific CSS yet.
+     Second page of the v2 redesign. Shares the token and shell layer with
+     every other v2 page, plus v2-dash.css for the widgets below.
 
-     SHELL ONLY. The content region below is a planning stub: the widget
-     layout is being agreed before it is built, so nothing here yet claims to
-     be the Dashboard.
+     NOTE ON THE SIDEBAR. The nav is generated from one canonical table and
+     synced across every staging page, so all nine carry an identical block.
 
-     NOTE ON THE SIDEBAR. This nav lists the ELEVEN destinations production
-     actually has (from index.html and PAGE_TITLES in js/app.js), not the
-     eight in the concept mockup. The mockup invented "Loads", "Maintenance"
-     and "Alerts", and omitted Dispatch Board, Calendar, Pre-Trip Inspections,
-     Driver Portal, Reminders and User Management. v2/guides.html currently
-     carries the mockup's list; the two need reconciling — see the notes with
-     this page's review.
+     It is drawn from the ELEVEN destinations production actually has (from
+     index.html and PAGE_TITLES in js/app.js), not the eight in the concept
+     mockup — the mockup invented "Loads", "Maintenance" and "Alerts" and
+     omitted Dispatch Board, Calendar, Pre-Trip Inspections, Driver Portal,
+     Reminders and User Management. That reconciliation is done; guides.html
+     no longer carries the mockup's list.
+
+     NINE are shown. Driver Portal and User Management have no v2 page yet, so
+     they are marked hidden in the nav table rather than deleted from it: the
+     icon, label and agreed position survive for whenever those pages are
+     built. Until then a visible link would only lead back to the production
+     app, which reads as a broken redesign rather than an unfinished one.
      ========================================================================= -->
 <html lang="en">
 <head>
@@ -86,17 +90,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
         Guides
       </a>
-      <a class="v2-nav-item" href="../index.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
-        Driver Portal
-      </a>
       <a class="v2-nav-item" href="reminders.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
         Reminders
-      </a>
-      <a class="v2-nav-item" href="../index.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-        User Management
       </a>
     </nav>
 
