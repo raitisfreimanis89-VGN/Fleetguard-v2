@@ -945,37 +945,122 @@ function renderDashboard(){
   const tyreOverdue=activeStatuses.filter(x=>x.s.tyreOverdue);
   const serviceOverdue=activeStatuses.filter(x=>x.s.serviceOverdue);
   const vicious=activeStatuses.filter(x=>x.s.viciousCircle);
-  let html=`<div class="stats-grid">
-    <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">🚛</div><div><div class="stat-num">${VEHICLES.length}</div><div class="stat-label">Total vehicles</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">✅</div><div><div class="stat-num" style="color:var(--success)">${roadworthy}</div><div class="stat-label">Roadworthy</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#fee2e2">⚠️</div><div><div class="stat-num" style="color:var(--danger)">${critical}</div><div class="stat-label">Critical issues</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#f3e8ff">👤</div><div><div class="stat-num">${DRIVERS.length}</div><div class="stat-label">Drivers</div></div></div>
-  </div>`;
-  if(serviceOverdue.length>0) html+=`<div class="alert-urgent"><div style="flex:1"><div class="au-title">🚨 Service Overdue — YARD VISIT ASAP</div>${serviceOverdue.map(x=>{const dr=DRIVERS.find(d=>d.id===x.v.assignedDriverId);const drName=dr?esc(dr.name):'Unassigned Driver';const disp=esc(x.v.assignedDispatcher||'Unassigned');return`<div class="au-row"><div><div class="au-truck">Truck #${esc(x.v.truckNumber)}</div><div class="au-detail">${drName} &nbsp;·&nbsp; ${disp}</div></div><a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="au-badge">OVERDUE</span></a></div>`;}).join('')}</div></div>`;
-  if(vicious.length>0) html+=`<div class="alert alert-warning"><div><div class="alert-title">🔄 Vicious Circle Alert</div>${vicious.map(x=>`<a href="#" onclick="navigate('vehicle','${x.v.id}');return false"><span class="badge badge-yellow" style="margin-right:6px">Truck #${esc(x.v.truckNumber)}</span></a>`).join('')}</div></div>`;
-  html+=`<div class="two-col">`;
-  html+=`<div class="card"><div class="card-header">🔴 Brake Inspection Overdue</div><div class="card-body">`;
-  if(brakeOverdue.length===0) html+=`<div class="empty">All vehicles within 30-day schedule</div>`;
-  brakeOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--danger);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastBrake?x.s.brakeDays+' days since last test':'No test on record'}</div></div><span class="badge badge-red">OVERDUE</span></div>`;});
-  html+=`</div></div>`;
-  html+=`<div class="card"><div class="card-header">🟡 Brake Test Due Soon</div><div class="card-body">`;
-  if(brakeDueSoon.length===0) html+=`<div class="empty">No vehicles due in next 7 days</div>`;
-  brakeDueSoon.forEach(x=>{const d=x.s.brakeInterval-x.s.brakeDays;html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">Due in ${d} day${d===1?'':'s'}</div></div><span class="badge badge-yellow">DUE SOON</span></div>`;});
-  html+=`</div></div>`;
-  html+=`<div class="card"><div class="card-header">🟠 Tyre Check Overdue</div><div class="card-body">`;
-  if(tyreOverdue.length===0) html+=`<div class="empty">All tyre checks are current</div>`;
-  tyreOverdue.forEach(x=>{html+=`<div class="history-item" style="cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record'}</div></div><span class="badge badge-yellow">${x.s.tyreDays===null?'NONE':x.s.tyreDays+' days'}</span></div>`;});
-  html+=`</div></div>`;
-  html+=`<div class="card"><div class="card-header">🔵 Service Overdue (90-day)</div><div class="card-body">`;
-  if(serviceOverdue.length===0) html+=`<div class="empty">All vehicles within 90-day service schedule</div>`;
-  serviceOverdue.forEach(x=>{html+=`<div class="history-item" style="border-left:3px solid var(--primary);cursor:pointer" onclick="navigate('vehicle','${x.v.id}')"><div><div class="fw-600">Truck #${esc(x.v.truckNumber)}</div><div class="text-sm">${x.s.serviceDays+' days since last service'}</div></div><span class="badge badge-blue">OVERDUE</span></div>`;});
-  html+=`</div></div>`;
-  const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:`Service – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:`Brake ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:`Vehicle Service ${r.result} – Truck #${VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'}`,type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
-  html+=`<div class="card"><div class="card-header">📋 Recent Activity</div><div class="card-body">`;
-  if(allRecent.length===0) html+=`<div class="empty">No activity yet</div>`;
-  allRecent.forEach(r=>{const badge=r.type==='brake'?(r.pass?'badge-green':'badge-red'):r.type==='svc'?(r.pass?'badge-green':'badge-yellow'):'badge-blue';html+=`<div class="history-item"><span>${r.label}</span><span class="badge ${badge}">${fmtDate(r.date)}</span></div>`;});
-  html+=`</div></div></div>`;
-  if(VEHICLES.length===0) html+=`<div class="alert alert-success" style="margin-top:20px"><div><div class="alert-title">👋 Welcome to FleetGuard!</div>Start by adding drivers and vehicles.${isAdmin()?` <a href="#" onclick="navigate('vehicles');return false" style="color:var(--primary);font-weight:600">→ Add your first vehicle</a>`:''}</div></div>`;
+
+  // ── v2 markup helpers ─────────────────────────────────────────────────────
+  // The dashboard renders v2 components against live data. Styles come from
+  // v2-tokens.css + v2-bridge.css + v2-dash.css, loaded by index.html.
+  // v2-shell.css is deliberately not loaded — see the note in v2-bridge.css.
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _I={
+    truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    alert:'<path d="M10.3 3.6 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+    users:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    tyre:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/>',
+    wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+    cycle:'<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/>',
+    list:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    check:'<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
+  };
+  const _tile=(a,ic,n,l,toned)=>'<article class="v2-stat '+a+(toned?' is-toned':'')+'">'
+    +'<span class="v2-stat-ic">'+_sv(ic,'1.8')+'</span>'
+    +'<div class="v2-stat-body"><span class="v2-stat-num">'+n+'</span>'
+    +'<span class="v2-stat-label">'+l+'</span></div></article>';
+  // Rows stay anchors so they keep keyboard focus and the browser's own
+  // affordances; navigate() is called on click exactly as the old rows did.
+  const _row=(id,truck,detail,badge,solid)=>'<a class="v2-line-row" href="#" onclick="navigate(\'vehicle\',\''+id+'\');return false">'
+    +'<span class="v2-line-truck">Truck #'+esc(truck)+'</span>'
+    +'<span class="v2-line-detail">'+detail+'</span>'
+    +'<span class="v2-badge'+(solid?' is-solid':' is-muted')+'">'+badge+'</span></a>';
+  const _empty=m=>'<div class="v2-panel-empty">'+_sv(_I.check)+'<span>'+m+'</span></div>';
+  const _panel=(a,ic,title,count,body)=>'<article class="v2-panel '+a+'">'
+    +'<div class="v2-panel-head"><span class="v2-panel-ic">'+_sv(ic)+'</span>'
+    +'<h2>'+title+'</h2><span class="v2-panel-count">'+count+'</span></div>'
+    +'<div class="v2-panel-body">'+body+'</div></article>';
+
+  // ── Tier 1: headline counts ───────────────────────────────────────────────
+  let html='<div class="v2-region"><div class="v2-stat-row">'
+    +_tile('v2-accent-cyan',_I.truck,VEHICLES.length,'Total vehicles')
+    +_tile('v2-accent-green',_I.shield,roadworthy,'Roadworthy',true)
+    +_tile('v2-accent-red',_I.alert,critical,'Critical issues',true)
+    +_tile('v2-accent-primary',_I.users,DRIVERS.length,'Drivers')
+    +'</div>';
+
+  // ── Tier 2: banners ───────────────────────────────────────────────────────
+  if(serviceOverdue.length>0){
+    html+='<div class="v2-banner v2-accent-red"><span class="v2-banner-ic">'+_sv(_I.alert,'1.8')+'</span>'
+      +'<div class="v2-banner-body"><div class="v2-banner-title">Service overdue &mdash; yard visit ASAP</div>'
+      +'<div class="v2-banner-sub">Past the 90-day inspection interval.</div><div class="v2-banner-rows">'
+      +serviceOverdue.map(x=>{
+        const dr=DRIVERS.find(d=>d.id===x.v.assignedDriverId);
+        const drName=dr?esc(dr.name):'Unassigned Driver';
+        const disp=esc(x.v.assignedDispatcher||'Unassigned');
+        return '<a class="v2-banner-row" href="#" onclick="navigate(\'vehicle\',\''+x.v.id+'\');return false">'
+          +'<span class="v2-banner-truck">Truck #'+esc(x.v.truckNumber)+'</span>'
+          +'<span class="v2-banner-meta">'+drName+' &nbsp;&middot;&nbsp; '+disp+' &nbsp;&middot;&nbsp; '+x.s.serviceDays+' days</span>'
+          +'<span class="v2-badge is-solid">Overdue</span></a>';
+      }).join('')
+      +'</div></div></div>';
+  }
+  if(vicious.length>0){
+    html+='<div class="v2-banner v2-accent-amber"><span class="v2-banner-ic">'+_sv(_I.cycle,'1.8')+'</span>'
+      +'<div class="v2-banner-body"><div class="v2-banner-title">Vicious circle alert</div>'
+      +'<div class="v2-banner-sub">Serviced without a matching brake test on the same date.</div>'
+      +'<div class="v2-banner-rows">'
+      +vicious.map(x=>'<a class="v2-banner-row" href="#" onclick="navigate(\'vehicle\',\''+x.v.id+'\');return false">'
+        +'<span class="v2-banner-truck">Truck #'+esc(x.v.truckNumber)+'</span>'
+        +'<span class="v2-banner-meta">Service and brake dates do not line up</span>'
+        +'<span class="v2-badge">Review</span></a>').join('')
+      +'</div></div></div>';
+  }
+
+  // ── Tier 3: the four compliance panels ────────────────────────────────────
+  html+='<section class="v2-panel-grid" aria-label="Compliance">';
+  html+=_panel('v2-accent-red',_I.clock,'Brake inspection overdue',brakeOverdue.length,
+    brakeOverdue.length===0?_empty('All vehicles within the 30-day schedule')
+    :brakeOverdue.map(x=>_row(x.v.id,x.v.truckNumber,
+        x.s.lastBrake?x.s.brakeDays+' days since last test':'No test on record',
+        x.s.lastBrake?'Overdue':'None',true)).join(''));
+  html+=_panel('v2-accent-amber',_I.clock,'Brake test due soon',brakeDueSoon.length,
+    brakeDueSoon.length===0?_empty('No vehicles due in the next 7 days')
+    :brakeDueSoon.map(x=>{const d=x.s.brakeInterval-x.s.brakeDays;
+      return _row(x.v.id,x.v.truckNumber,'Due in '+d+' day'+(d===1?'':'s'),'Due soon',true);}).join(''));
+  html+=_panel('v2-accent-amber',_I.tyre,'Tyre check overdue',tyreOverdue.length,
+    tyreOverdue.length===0?_empty('All tyre checks are current')
+    :tyreOverdue.map(x=>_row(x.v.id,x.v.truckNumber,
+        x.s.lastTyre?x.s.tyreDays+' days since last check':'No check on record',
+        x.s.tyreDays===null?'None':x.s.tyreDays+'d',false)).join(''));
+  html+=_panel('v2-accent-blue',_I.wrench,'Service overdue (90-day)',serviceOverdue.length,
+    serviceOverdue.length===0?_empty('All vehicles within the 90-day service schedule')
+    :serviceOverdue.map(x=>_row(x.v.id,x.v.truckNumber,
+        x.s.serviceDays+' days since last service','Overdue',true)).join(''));
+  html+='</section>';
+
+  // ── Tier 4: recent activity ───────────────────────────────────────────────
+  const allRecent=[...MAINTENANCE.map(r=>({date:r.serviceDate,label:'Service &ndash; Truck #'+esc(VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'),type:'maint'})),...BRAKE_TESTS.map(r=>({date:r.testDate,label:'Brake '+esc(r.result)+' &ndash; Truck #'+esc(VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'),type:'brake',pass:r.result==='pass'})),...SERVICE_RECORDS.map(r=>({date:r.serviceDate,label:'Vehicle service '+esc(r.result)+' &ndash; Truck #'+esc(VEHICLES.find(v=>v.id===r.vehicleId)?.truckNumber||'?'),type:'svc',pass:r.result==='pass'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,6);
+  html+='<article class="v2-panel v2-accent-cyan"><div class="v2-panel-head">'
+    +'<span class="v2-panel-ic">'+_sv(_I.list)+'</span><h2>Recent activity</h2>'
+    +'<span class="v2-panel-count">'+allRecent.length+'</span></div><div class="v2-panel-body">';
+  if(allRecent.length===0) html+=_empty('No activity recorded yet');
+  else html+='<div class="v2-timeline">'+allRecent.map(r=>{
+      const acc=r.type==='brake'?(r.pass?'v2-accent-green':'v2-accent-red')
+        :r.type==='svc'?(r.pass?'v2-accent-green':'v2-accent-amber'):'v2-accent-blue';
+      return '<div class="v2-tl-row '+acc+'"><span class="v2-tl-dot"></span>'
+        +'<span class="v2-tl-label">'+r.label+'</span>'
+        +'<span class="v2-tl-date">'+fmtDate(r.date)+'</span></div>';
+    }).join('')+'</div>';
+  html+='</div></article>';
+
+  if(VEHICLES.length===0){
+    html+='<div class="v2-banner v2-accent-green" style="margin-top:var(--v2-s6)"><span class="v2-banner-ic">'+_sv(_I.check,'1.8')+'</span>'
+      +'<div class="v2-banner-body"><div class="v2-banner-title">Welcome to FleetGuard</div>'
+      +'<div class="v2-banner-sub">Start by adding drivers and vehicles.'
+      +(isAdmin()?' <a href="#" onclick="navigate(\'vehicles\');return false" style="color:var(--v2-primary-hi);font-weight:600">&rarr; Add your first vehicle</a>':'')
+      +'</div></div></div>';
+  }
+
+  html+='</div>';
   return html;
 }
 

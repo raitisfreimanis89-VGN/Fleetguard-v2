@@ -13,6 +13,21 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
   <link rel="stylesheet" href="css/styles.css?v=20260902a"/>
   <link rel="stylesheet" href="css/titan-slate-login.css"/>
+
+  <!-- v2 design layer, loaded AFTER styles.css so the --v2-* tokens are
+       available to the component sheets below.
+
+       v2-shell.css is deliberately NOT here. It is the staging pages' global
+       reset — it restyles body, a and [hidden] — and would repaint the live
+       app from #10131a to #00050d and break the .light theme. Everything the
+       ported pages need from it lives in v2-bridge.css instead, scoped.
+
+       Every selector in these three is .v2- prefixed and every custom property
+       is --v2-, so nothing collides with the production stylesheet above.
+       Pages are ported one at a time; add a component sheet as its page lands. -->
+  <link rel="stylesheet" href="v2/css/v2-tokens.css"/>
+  <link rel="stylesheet" href="v2/css/v2-bridge.css"/>
+  <link rel="stylesheet" href="v2/css/v2-dash.css"/>
 </head>
 <body>
 

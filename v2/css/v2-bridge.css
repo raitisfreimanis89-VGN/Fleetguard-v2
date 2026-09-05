@@ -1,0 +1,86 @@
+/* ==========================================================================
+   FleetGuard — v2 bridge for the LIVE application
+   --------------------------------------------------------------------------
+   Loaded by the production index.html so the running app can render v2
+   components against real Supabase data, one page at a time.
+
+   WHAT THIS FILE IS FOR
+   v2-dash.css (and the other component sheets) are safe to load in production:
+   every selector is .v2- prefixed and every custom property is --v2-, so
+   nothing collides with the production stylesheet. They do, however, depend on
+   two things that live elsewhere in the staging build:
+
+     1. the --v2-* token set          -> v2-tokens.css, also safe, :root only
+     2. the --tc accent indirection   -> declared by .v2-accent-* in
+                                         v2-cards.css
+
+   Rather than pull in v2-cards.css — which carries the whole photographic
+   tool-card system this app has no use for — the five accent helpers are
+   reproduced here.
+
+   WHAT MUST NOT BE LOADED
+   v2-shell.css. It is the staging pages' global reset and it would damage the
+   live app:
+
+     body { background: var(--v2-bg); color: var(--v2-ink); ... }
+       -> repaints the whole application from #10131a to #00050d and breaks
+          the .light theme, which production supports and v2 never did
+     a { color: inherit; text-decoration: none; }
+       -> strips link styling everywhere in the live UI
+     [hidden] { display: none !important; }
+     *, *::before, *::after { box-sizing: border-box; }
+       -> production already sets this in styles.css
+
+   Anything the ported pages need from the shell layer belongs here instead,
+   scoped so it cannot leak.
+   ========================================================================== */
+
+/* ── Accent indirection ───────────────────────────────────────────────────
+   Each v2 component reads --tc / --tc-hi / --tc-soft / --tc-ring and takes
+   its colour from whichever .v2-accent-* class its container carries, so a
+   panel is recoloured by swapping one class. */
+
+.v2-accent-amber { --tc: var(--v2-amber);  --tc-hi: var(--v2-amber-hi); --tc-soft: var(--v2-amber-soft); --tc-ring: var(--v2-amber-ring); }
+.v2-accent-cyan  { --tc: var(--v2-cyan);   --tc-hi: var(--v2-cyan-hi);  --tc-soft: var(--v2-cyan-soft);  --tc-ring: var(--v2-cyan-ring);  }
+.v2-accent-green { --tc: var(--v2-green);  --tc-hi: var(--v2-green-hi); --tc-soft: var(--v2-green-soft); --tc-ring: var(--v2-green-ring); }
+.v2-accent-red   { --tc: var(--v2-red);    --tc-hi: var(--v2-red-hi);   --tc-soft: var(--v2-red-soft);   --tc-ring: var(--v2-red-ring);   }
+.v2-accent-blue  { --tc: var(--v2-blue);   --tc-hi: var(--v2-blue-hi);  --tc-soft: var(--v2-blue-soft);  --tc-ring: var(--v2-blue-ring);  }
+.v2-accent-primary { --tc: var(--v2-primary); --tc-hi: var(--v2-primary-hi); --tc-soft: var(--v2-primary-soft); --tc-ring: var(--v2-primary-ring); }
+
+/* ── Ported-region ground ─────────────────────────────────────────────────
+   v2 cards are #030c19 and were designed to sit on the #00050d page ground.
+   Production's content area is #10131a, which is LIGHTER than the cards, so
+   without this they read as holes punched in the page rather than as raised
+   surfaces. Scoped to the region a ported render actually occupies, so the
+   rest of the app keeps production's own background.
+
+   This is transitional. Once every page is ported the ground moves up to the
+   shell and this rule goes away. */
+.v2-region {
+  background: var(--v2-bg);
+  color: var(--v2-ink);
+  margin: calc(var(--v2-s6) * -1);
+  padding: var(--v2-s6);
+  min-height: 100%;
+}
+
+/* The production content container has its own padding; the negative margin
+   above cancels it so the ground reaches the edges. Light theme keeps the v2
+   dark surface deliberately — the v2 palette has no light variant yet, and a
+   half-converted light mode would be worse than a consistent dark panel. */
+.light .v2-region { background: var(--v2-bg); color: var(--v2-ink); }
+
+/* Row and banner links are anchors so they keep keyboard focus and the
+   browser's own affordances. v2-shell.css neutralised anchor styling globally;
+   since that file is not loaded here, production's link rules would otherwise
+   underline every row. Scoped to the ported region so the rest of the live app
+   keeps its own link styling untouched. */
+.v2-region a { color: inherit; text-decoration: none; }
+
+/* Production's focus ring is defined for the app shell; give the ported region
+   the same visible focus these rows need for keyboard users. */
+.v2-region a:focus-visible {
+  outline: 2px solid var(--v2-cyan);
+  outline-offset: 2px;
+  border-radius: var(--v2-r-sm);
+}
