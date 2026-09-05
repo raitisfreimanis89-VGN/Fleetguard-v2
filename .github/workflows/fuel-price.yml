@@ -26,7 +26,8 @@ jobs:
   update:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      # node24, matching deploy.yml — the Node 20 runtime is being retired.
+      - uses: actions/checkout@v7
 
       - name: Fetch EIA weekly diesel page
         run: |

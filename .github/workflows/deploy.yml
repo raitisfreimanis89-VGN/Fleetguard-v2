@@ -20,10 +20,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v4
-      - uses: actions/upload-pages-artifact@v3
+      # All four run on node24. GitHub is retiring the Node 20 runtime, and the
+      # previous pins (checkout@v4, configure-pages@v4, upload-pages-artifact@v3,
+      # deploy-pages@v4) were being force-run on Node 24 with a deprecation
+      # warning on every deploy. upload-pages-artifact is a composite action —
+      # v3 pulled upload-artifact@v4 internally, which is where the fourth
+      # warning came from; v5 pins upload-artifact@v7.
+      - uses: actions/checkout@v7
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: '.'
-      - uses: actions/deploy-pages@v4
+      - uses: actions/deploy-pages@v5
         id: deployment
