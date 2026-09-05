@@ -399,74 +399,123 @@ function renderInspections(){
   const todayCount=rows.filter(i=>String(i.submittedAt||'').split('T')[0]===todayStr).length;
   const defectCount=rows.filter(i=>i.overallResult==='defect').length;
   const openRows=rows.filter(isOpenDefect);
-  let html='';
-  // Open defects lead the page: an unrepaired defect is the only thing here
-  // that needs action today, and it is what the CSA driver-observed category
-  // is scored on.
+
+  // v2 components against live data. Styles: v2-tokens + v2-bridge +
+  // v2-inspections.css (+ v2-vehicles.css for the field/select controls).
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    pulse:'<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+    send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+    wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+    user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+    check:'<path d="m5 12 5 5L20 7"/>',
+    list:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+  };
+
+  let html='<div class="v2-region">';
+
+  // ── Tier 1: open defects lead the page ───────────────────────────────────
+  // An unrepaired defect is the only thing here that needs action today, and
+  // it is what the CSA driver-observed category is scored on.
   if(openRows.length){
-    html+=`<div class="card" style="max-width:1040px;margin-bottom:18px;border-left:3px solid var(--danger)"><div class="card-header"><span class="card-header-accent"></span>🛠 Open Defects (${openRows.length})</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
-      <thead><tr><th style="padding-left:18px">Truck</th><th>Reported</th><th>Driver</th><th>Issues</th><th>Result</th>${isAdmin()?'<th>Action</th>':''}</tr></thead><tbody>`;
+    html+='<section class="v2-defect-grid" aria-label="Open defects">';
     openRows.forEach(r=>{
       const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
       const ageDays=r.submittedAt?daysBetween(String(r.submittedAt).split('T')[0],today()):null;
       const flags=[];
-      if(r.tyresFlagged) flags.push(`${r.tyresFlagged} tyre${r.tyresFlagged>1?'s':''}`);
-      if(r.checksFailed) flags.push(`${r.checksFailed} check${r.checksFailed>1?'s':''}`);
-      html+=`<tr>
-        <td style="padding-left:18px"><strong>Truck #${esc(r.truckNumber||'—')}</strong></td>
-        <td class="text-sm">${inspDT(r.submittedAt)}${ageDays>0?` <span class="badge badge-red" style="font-size:10px">${ageDays}d open</span>`:''}</td>
-        <td class="text-sm">${dName?esc(dName):'—'}</td>
-        <td class="text-sm" style="color:var(--danger)">${flags.join(' · ')||'—'}</td>
-        <td><span class="badge ${r.overallResult==='defect'?'badge-red':'badge-yellow'}">${r.overallResult==='defect'?'Defect':'Minor'}</span></td>
-        ${isAdmin()?`<td><button class="btn btn-success btn-sm mark-repaired-btn" data-insp="${esc(r.id)}">✓ Repaired</button></td>`:''}
-      </tr>`;
+      if(r.tyresFlagged) flags.push(r.tyresFlagged+' tyre'+(r.tyresFlagged>1?'s':''));
+      if(r.checksFailed) flags.push(r.checksFailed+' check'+(r.checksFailed>1?'s':''));
+      const isDefect=r.overallResult==='defect';
+      html+='<article class="v2-defect '+(isDefect?'v2-accent-red':'v2-accent-amber')+'">'
+        +'<div class="v2-defect-head"><span class="v2-defect-id">'
+          +'<span class="v2-defect-truck">Truck #'+esc(r.truckNumber||'—')+'</span>'
+          +'<span class="v2-defect-when">Reported '+inspDT(r.submittedAt)+'</span>'
+        +'</span><span class="v2-chip-status '+(isDefect?'is-defect':'is-minor')+'">'+(isDefect?'Defect':'Minor')+'</span></div>'
+        +'<div class="v2-defect-meta">'
+          +'<span class="v2-defect-line">'+_sv(_IC.user)+(dName?esc(dName):'&mdash;')+'</span>'
+          +'<span class="v2-defect-line">'+_sv(_IC.alert)+'<span class="v2-defect-issues">'+(flags.join(' &middot; ')||'&mdash;')+'</span></span>'
+        +'</div>'
+        +'<div class="v2-defect-foot">'
+          // class AND data-insp both required: render() binds this by
+          // querySelectorAll('.mark-repaired-btn') and reads dataset.insp.
+          +(isAdmin()?'<button class="v2-btn-repair mark-repaired-btn" type="button" data-insp="'+esc(r.id)+'">'+_sv(_IC.check,'2.2')+'Mark repaired</button>':'')
+          +(ageDays>0?'<span class="v2-chip-status is-flag">'+ageDays+'d open</span>':'')
+        +'</div></article>';
     });
-    html+=`</tbody></table></div></div></div>`;
+    html+='</section>';
   }
-  html+=`<div class="card" style="max-width:1040px;margin-bottom:18px"><div class="card-header"><span class="card-header-accent"></span>📋 Driver Pre-Trip Inspections</div><div class="card-body">
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <span class="badge badge-blue">${rows.length} total</span>
-      ${todayCount?`<span class="badge badge-green">● ${todayCount} today</span>`:`<span class="badge badge-gray">none today</span>`}
-      ${openRows.length?`<span class="badge badge-red">🛠 ${openRows.length} unrepaired</span>`:`<span class="badge badge-green">✓ none unrepaired</span>`}
-      ${defectCount?`<span class="badge badge-red">${defectCount} with defects</span>`:''}
-    </div>`;
+
+  // ── Tier 2: pulse counters + send console ────────────────────────────────
+  html+='<section class="v2-console-row" aria-label="Inspection console">';
+  html+='<article class="v2-console v2-accent-cyan"><div class="v2-console-head">'
+    +'<span class="v2-console-ic">'+_sv(_IC.pulse)+'</span><h2>Live inspection pulse</h2></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+      +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+rows.length+'</span><span class="v2-pulse-label">Total</span></div>'
+      +'<div class="v2-pulse-stat '+(todayCount?'v2-accent-green':'v2-accent-blue')+'"><span class="v2-pulse-num">'+todayCount+'</span><span class="v2-pulse-label">Today</span></div>'
+      +'<div class="v2-pulse-stat '+(openRows.length?'v2-accent-red':'v2-accent-green')+'"><span class="v2-pulse-num">'+openRows.length+'</span><span class="v2-pulse-label">Unrepaired</span></div>'
+      +'<div class="v2-pulse-stat '+(defectCount?'v2-accent-red':'v2-accent-green')+'"><span class="v2-pulse-num">'+defectCount+'</span><span class="v2-pulse-label">With defects</span></div>'
+    +'</div></div></article>';
+
   if(isAdmin()){
-    const opts=VEHICLES.filter(v=>v.assignedDriverId).map(v=>{const d=DRIVERS.find(x=>x.id===v.assignedDriverId);return `<option value="${v.id}">Truck #${esc(v.truckNumber)} · ${esc(d?d.name:'')}</option>`;}).join('');
-    html+=`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-      <div style="flex:1;min-width:220px"><label>Send pre-trip link to a driver</label>
-        <select id="sl-vehicle"><option value="">— select truck —</option>${opts}</select></div>
-      <button class="btn btn-primary" onclick="doSendLinkFromPicker()">📲 Send link</button>
-    </div>
-    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button id="pti-bulk-btn" class="btn btn-ghost" style="border:1px solid var(--border-strong)" onclick="doBulkSendAll()">📨 Send PTI link to ALL drivers</button>
-      <span class="text-sm" id="pti-queue-status" style="color:var(--text2)"></span>
-    </div>
-    <div class="text-sm" style="margin-top:8px;color:var(--text3)">🔒 Links are sent only when you click here — never automatically. Bulk sends go out in waves of 5 every 5 minutes.</div>`;
+    const opts=VEHICLES.filter(v=>v.assignedDriverId).map(v=>{
+      const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+      return '<option value="'+v.id+'">Truck #'+esc(v.truckNumber)+(d?' &middot; '+esc(d.name):'')+'</option>';
+    }).join('');
+    html+='<article class="v2-console v2-accent-primary"><div class="v2-console-head">'
+      +'<span class="v2-console-ic">'+_sv(_IC.send)+'</span><h2>Send PTI link</h2>'
+      +'<span class="v2-console-note">Admin only</span></div>'
+      +'<div class="v2-console-body"><div class="v2-send-row">'
+        +'<div class="v2-field"><label for="sl-vehicle">Send pre-trip link to a driver</label>'
+        +'<span class="v2-select-wrap"><select class="v2-select" id="sl-vehicle">'
+        +'<option value="">&mdash; select truck &mdash;</option>'+opts+'</select>'
+        +_sv('<path d="m6 9 6 6 6-6"/>','1.8')+'</span></div>'
+        +'<button class="v2-btn-send" type="button" onclick="doSendLinkFromPicker()">'+_sv(_IC.send,'2')+'Send link</button>'
+      +'</div>'
+      +'<div style="display:flex;gap:var(--v2-s3);align-items:center;flex-wrap:wrap;margin-top:var(--v2-s4)">'
+        +'<button id="pti-bulk-btn" class="v2-btn-ghost" type="button" onclick="doBulkSendAll()">'+_sv(_IC.send,'1.8')+'Send PTI link to ALL drivers</button>'
+        // loadPtiQueueStatus() writes innerHTML here, including its own
+        // Cancel-pending button, so the element must keep this exact id.
+        +'<span class="v2-console-note" id="pti-queue-status" style="text-transform:none;letter-spacing:0"></span>'
+      +'</div>'
+      +'<p class="v2-send-notice">Links are sent only when you click here &mdash; never automatically. Bulk sends go out in waves of 5 every 5 minutes.</p>'
+      +'</div></article>';
     setTimeout(loadPtiQueueStatus,50);
   }
-  html+=`</div></div>`;
-  html+=`<div class="card" style="max-width:1040px"><div class="card-body" style="padding:0"><div class="table-wrap"><table>
-    <thead><tr><th style="padding-left:18px">When</th><th>Truck</th><th>Driver</th><th>Result</th><th>Tyres</th><th>Checks</th><th>Walk-around</th><th>Ref</th></tr></thead><tbody>`;
+  html+='</section>';
+
+  // ── Tier 3: the full inspection stream ───────────────────────────────────
+  html+='<section class="v2-table-card" aria-label="Pre-trip inspections">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.list)+'</span>'
+    +'<h2>Driver pre-trip inspections</h2></div>'
+    +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
+    +'<th>When</th><th>Truck</th><th>Driver</th><th>Result</th><th>Tyres</th><th>Checks</th><th>Walk-around</th><th>Ref</th>'
+    +'</tr></thead><tbody>';
   if(rows.length===0){
-    html+=`<tr><td colspan="8" class="empty" style="padding:26px">No inspections yet.${isAdmin()?' Send a driver a link above to get the first one.':''}</td></tr>`;
+    html+='<tr><td colspan="8" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No inspections yet.'
+      +(isAdmin()?' Send a driver a link above to get the first one.':'')+'</td></tr>';
   }
   rows.slice(0,200).forEach(i=>{
     const d=DRIVERS.find(x=>x.id===i.driverId);
-    const rb=i.overallResult==='defect'?'badge-red':i.overallResult==='minor'?'badge-yellow':'badge-green';
-    const rl=i.overallResult==='defect'?'Defect':i.overallResult==='minor'?'Minor':'Roadworthy';
+    const tone=i.overallResult==='defect'?'is-defect':i.overallResult==='minor'?'is-minor':'is-pass';
+    const label=i.overallResult==='defect'?'Defect':i.overallResult==='minor'?'Minor':'Roadworthy';
+    // renderInspections() has always flagged anything under 120s as suspiciously
+    // quick. That threshold is separate from the driver score's 60/180 band.
     const quick=i.durationSec!=null&&i.durationSec<120;
-    html+=`<tr onclick="openInspection('${i.id}')" style="cursor:pointer" title="Open full inspection">
-      <td style="padding-left:18px;white-space:nowrap">${inspDT(i.submittedAt)}</td>
-      <td><strong>#${esc(i.truckNumber||'')}</strong></td>
-      <td>${esc(d?d.name:'—')}</td>
-      <td><span class="badge ${rb}">${rl}</span></td>
-      <td>${i.tyresFlagged?`<span style="color:var(--danger)">${i.tyresFlagged} flagged</span>`:`<span style="color:var(--success)">OK</span>`}</td>
-      <td>${i.checksFailed?`<span style="color:var(--danger)">${i.checksFailed} failed</span>`:`<span style="color:var(--success)">OK</span>`}</td>
-      <td style="white-space:nowrap">${inspDur(i.durationSec)}${quick?` <span title="Completed very quickly" style="color:var(--warning)">⚠</span>`:''}</td>
-      <td class="text-sm">${esc(i.ref||'')}</td>
-    </tr>`;
+    html+='<tr onclick="openInspection(\''+i.id+'\')" style="cursor:pointer" title="Open full inspection">'
+      +'<td class="v2-td-when">'+inspDT(i.submittedAt)+'</td>'
+      +'<td class="v2-td-truck">#'+esc(i.truckNumber||'')+'</td>'
+      +'<td class="v2-td-driver">'+esc(d?d.name:'—')+'</td>'
+      +'<td><span class="v2-chip-status '+tone+'">'+label+'</span></td>'
+      +'<td>'+(i.tyresFlagged?'<span style="color:var(--v2-red-hi)">'+i.tyresFlagged+' flagged</span>':'<span style="color:var(--v2-green-hi)">OK</span>')+'</td>'
+      +'<td>'+(i.checksFailed?'<span style="color:var(--v2-red-hi)">'+i.checksFailed+' failed</span>':'<span style="color:var(--v2-green-hi)">OK</span>')+'</td>'
+      +'<td style="white-space:nowrap">'+inspDur(i.durationSec)+(quick?' <span title="Completed very quickly" style="color:var(--v2-amber-hi)">&#9888;</span>':'')+'</td>'
+      +'<td class="v2-td-ref">'+esc(i.ref||'')+'</td>'
+    +'</tr>';
   });
-  html+=`</tbody></table></div></div></div>`;
+  html+='</tbody></table></div></section>';
+
+  html+='</div>';
   return html;
 }
 
