@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<!-- =========================================================================
+     FleetGuard v2 — Drivers  ::  STAGING PREVIEW
+     -------------------------------------------------------------------------
+     Route:  /v2/drivers.html   Production: the Drivers view inside
+     /index.html, rendered by renderDrivers() in js/app.js (untouched).
+
+     Fifth page of the v2 redesign.
+
+     SAMPLE DATA. Every driver, number and assignment below is invented for
+     layout review. Phone numbers are fictional and in E.164, the format the
+     driver_phones CHECK constraint actually enforces.
+     ========================================================================= -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>FleetGuard Drivers — v2 preview</title>
+
+<link rel="icon" type="image/png" href="../img/fleetguard-icon.png?v=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="css/v2-tokens.css">
+<link rel="stylesheet" href="css/v2-shell.css">
+<link rel="stylesheet" href="css/v2-cards.css">
+<link rel="stylesheet" href="css/v2-hero.css">
+<link rel="stylesheet" href="css/v2-filter.css">
+<link rel="stylesheet" href="css/v2-rows.css">
+<link rel="stylesheet" href="css/v2-dash.css">
+<link rel="stylesheet" href="css/v2-vehicles.css">
+<link rel="stylesheet" href="css/v2-inspections.css">
+<link rel="stylesheet" href="css/v2-drivers.css">
+</head>
+<body>
+
+<a class="v2-skip" href="#v2-main">Skip to content</a>
+
+<div class="v2-app">
+
+  <aside class="v2-sidebar">
+
+    <a class="v2-brand" href="../index.html">
+      <img src="../img/fleetguard-icon.png?v=1" alt="">
+      FleetGuard
+    </a>
+
+    <nav class="v2-nav" aria-label="Main">
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M15.5 5H9a3.5 3.5 0 0 0 0 7h6a3.5 3.5 0 0 1 0 7H8.5"/></svg>
+        Dispatch Board
+      </a>
+      <a class="v2-nav-item" href="index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        Dashboard
+      </a>
+      <a class="v2-nav-item" href="vehicles.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Vehicles
+      </a>
+      <a class="v2-nav-item is-active" href="drivers.html" aria-current="page">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Drivers
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        Calendar
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 18v-3M12 18v-6M16 18v-2"/></svg>
+        Reports
+      </a>
+      <a class="v2-nav-item" href="inspections.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
+        Pre-Trip Inspections
+      </a>
+      <a class="v2-nav-item" href="guides.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
+        Guides
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+        Driver Portal
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        Reminders
+      </a>
+      <a class="v2-nav-item" href="../index.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        User Management
+      </a>
+    </nav>
+
+    <div class="v2-sidebar-foot">
+      <button class="v2-user" type="button">
+        <span class="v2-user-avatar">JS</span>
+        <span class="v2-user-meta">
+          <span class="v2-user-name">John Smith</span><br>
+          <span class="v2-user-role">Fleet Manager</span>
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+
+      <div class="v2-tools-row">
+        <button class="v2-icon-btn" type="button" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+        </button>
+        <span class="v2-tools-sep"></span>
+        <button class="v2-icon-btn" type="button" aria-label="Theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z"/></svg>
+        </button>
+      </div>
+
+      <button class="v2-collapse" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        Collapse
+        <svg class="v2-collapse-end" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="v2-main" id="v2-main">
+
+    <header class="v2-topbar">
+      <div class="v2-search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <label class="v2-sr-only" for="v2-q">Search drivers</label>
+        <input id="v2-q" type="text" placeholder="Search drivers, trucks, dispatchers..." autocomplete="off" spellcheck="false">
+        <span class="v2-kbd">&#8984;K</span>
+      </div>
+
+      <div class="v2-topbar-actions">
+        <button class="v2-icon-btn v2-bell" type="button" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+          <span class="v2-bell-badge">5</span>
+        </button>
+        <button class="v2-status-pill" type="button">
+          <span class="v2-status-dot"></span>
+          <span class="v2-status-meta">
+            <span class="v2-status-label">System Status</span><br>
+            <span class="v2-status-value">All Systems Operational</span>
+          </span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="v2-content">
+
+      <div class="v2-page-head">
+        <h1>Drivers</h1>
+        <p>Who drives what, who can be reached, and who is away.</p>
+      </div>
+
+      <div class="v2-sample-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+        <span><strong>Sample data.</strong> Invented drivers and fictional phone numbers &mdash; not connected to the fleet database. Numbers are shown in E.164, the format the database actually enforces.</span>
+      </div>
+
+      <!-- ══ Tier 1 · summary + add console ════════════════════════════════ -->
+      <section class="v2-console-row" aria-label="Driver summary and add">
+
+        <article class="v2-console v2-accent-cyan">
+          <div class="v2-console-head">
+            <span class="v2-console-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+            </span>
+            <h2>Driver roster</h2>
+          </div>
+          <div class="v2-console-body">
+            <!-- Assigned + unassigned = total. On vacation overlaps both:
+                 it is a state, not a fourth bucket. -->
+            <div class="v2-pulse-grid">
+              <div class="v2-pulse-stat v2-accent-cyan">
+                <span class="v2-pulse-num">46</span>
+                <span class="v2-pulse-label">Total drivers</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-green">
+                <span class="v2-pulse-num">39</span>
+                <span class="v2-pulse-label">Assigned</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-blue">
+                <span class="v2-pulse-num">7</span>
+                <span class="v2-pulse-label">Unassigned</span>
+              </div>
+              <div class="v2-pulse-stat v2-accent-amber">
+                <span class="v2-pulse-num">4</span>
+                <span class="v2-pulse-label">On vacation</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <!-- Production's add form has ONE field: full name. doAddDriver()
+             reads d-name and calls addDriver(name), nothing else.
+
+             Truck assignment lives on the VEHICLE in production (the v-driver
+             select), not on the driver, and a phone writes to the separate
+             admin-only driver_phones table. Both extra fields below are new
+             write paths, not existing ones. -->
+        <article class="v2-console v2-accent-amber">
+          <div class="v2-console-head">
+            <span class="v2-console-ic">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>
+            </span>
+            <h2>Add driver</h2>
+            <span class="v2-console-note">Admin only</span>
+          </div>
+          <div class="v2-console-body">
+            <div class="v2-add-grid">
+              <div class="v2-field">
+                <label for="d-name">Full name <span class="v2-field-req">*</span></label>
+                <input class="v2-input" id="d-name" type="text" placeholder="e.g. M. Webb">
+              </div>
+              <div class="v2-field">
+                <label for="d-truck">Assigned truck</label>
+                <span class="v2-select-wrap">
+                  <select class="v2-select" id="d-truck">
+                    <option value="">&mdash; optional &mdash;</option>
+                    <option>Truck #25046</option>
+                    <option>Truck #25141</option>
+                    <option>Truck #26127</option>
+                  </select>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+              </div>
+              <div class="v2-field">
+                <label for="d-phone">Cell number</label>
+                <input class="v2-input" id="d-phone" type="tel" placeholder="+12625550142"
+                       pattern="\+[1-9][0-9]{7,14}"
+                       title="E.164 format, e.g. +12625550142">
+              </div>
+            </div>
+            <div class="v2-add-foot">
+              <button class="v2-btn-primary" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                Add driver
+              </button>
+            </div>
+            <p class="v2-add-hint">Cell numbers are stored in E.164 (<code>+12625550142</code>) &mdash; the database rejects other formats. They are written to the admin-only <code>driver_phones</code> table, never to the driver record.</p>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ══ Tier 2 · driver directory ═════════════════════════════════════
+           Production columns are Driver, Assigned Truck, Dispatcher, Actions.
+           The Cell column is an addition — see the note in v2-drivers.css:
+           driver_phones is admin-only by RLS, and js/app.js never reads it.
+
+           Truck and dispatcher are both DERIVED, not stored on the driver:
+
+             trucks      VEHICLES.filter(v => v.assignedDriverId === d.id)
+             dispatchers the distinct assignedDispatcher of those vehicles
+
+           So a driver can hold several trucks, and several dispatchers.
+           ══════════════════════════════════════════════════════════════ -->
+      <section class="v2-table-card" aria-label="Driver directory">
+        <div class="v2-table-wrap">
+          <table class="v2-table">
+            <thead>
+              <tr>
+                <th>Driver</th>
+                <th>
+                  <span class="v2-th-locked">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Cell / phone
+                  </span>
+                </th>
+                <th>Assigned truck</th>
+                <th>Dispatcher</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">MW</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">M. Webb</span>
+                      <span class="v2-drv-id">DRV-0114</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 262 555 0142</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for M. Webb">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-truck-list"><span class="v2-truck-chip">#26016</span></span></td>
+                <td>R. Alvarez</td>
+                <td><span class="v2-drv-status is-active">Active</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit M. Webb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete M. Webb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set M. Webb on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">DK</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">D. Kowalski</span>
+                      <span class="v2-drv-id">DRV-0087</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 262 555 0188</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for D. Kowalski">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-truck-list"><span class="v2-truck-chip">#26041</span></span></td>
+                <td>T. Nguyen</td>
+                <td><span class="v2-drv-status is-active">Active</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit D. Kowalski"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete D. Kowalski"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set D. Kowalski on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- Two trucks, two dispatchers — the derived case. -->
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">AF</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">A. Ferreira</span>
+                      <span class="v2-drv-id">DRV-0203</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 414 555 0271</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for A. Ferreira">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-truck-list">
+                    <span class="v2-truck-chip">#25873</span>
+                    <span class="v2-truck-chip">#25046</span>
+                  </span>
+                </td>
+                <td>R. Alvarez, M. Sokolov</td>
+                <td><span class="v2-drv-status is-active">Active</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit A. Ferreira"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete A. Ferreira"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set A. Ferreira on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- On vacation: row set aside, single Return action. -->
+              <tr class="is-vacation">
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">JB</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">J. Brennan</span>
+                      <span class="v2-drv-id">DRV-0158</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 414 555 0319</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for J. Brennan">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-truck-list"><span class="v2-truck-chip">#26102</span></span></td>
+                <td>M. Sokolov</td>
+                <td>
+                  <span class="v2-drv-status is-vacation">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg>
+                    Vacation
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act-return" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+                      Return
+                    </button>
+                  </span>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">PO</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">P. Ostrowski</span>
+                      <span class="v2-drv-id">DRV-0061</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 262 555 0204</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for P. Ostrowski">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-truck-list"><span class="v2-truck-chip">#25940</span></span></td>
+                <td>T. Nguyen</td>
+                <td><span class="v2-drv-status is-active">Active</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit P. Ostrowski"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete P. Ostrowski"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set P. Ostrowski on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <!-- No row in driver_phones: this driver cannot be sent a PTI
+                   link at all — the queue counts them under "noPhone". -->
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">RC</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">R. Castellanos</span>
+                      <span class="v2-drv-id">DRV-0240</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-none">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2 2 20 20"/><path d="M9.5 4.2A2 2 0 0 1 11.4 3h2.1a2 2 0 0 1 2 1.7l.3 2.3a2 2 0 0 1-.6 1.7l-1 1"/><path d="M8.1 8.1 7 9.2a14 14 0 0 0 7.8 7.8l1.1-1.1"/><path d="M16.5 16.5a2 2 0 0 1 2.2-.4l2.1.9a2 2 0 0 1 1.2 1.8v2.1a2 2 0 0 1-2.2 2A19 19 0 0 1 4 6"/></svg>
+                      No number on file
+                    </span>
+                  </span>
+                </td>
+                <td><span class="v2-cell-none">&mdash;</span></td>
+                <td><span class="v2-cell-none">&mdash;</span></td>
+                <td><span class="v2-drv-status is-unassigned">Unassigned</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit R. Castellanos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete R. Castellanos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set R. Castellanos on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <tr>
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">SW</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">S. Whitfield</span>
+                      <span class="v2-drv-id">DRV-0195</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 920 555 0166</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for S. Whitfield">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-cell-none">&mdash;</span></td>
+                <td><span class="v2-cell-none">&mdash;</span></td>
+                <td><span class="v2-drv-status is-unassigned">Unassigned</span></td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act" type="button" aria-label="Edit S. Whitfield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                    <button class="v2-act is-danger" type="button" aria-label="Delete S. Whitfield"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+                    <button class="v2-act is-vacation" type="button" aria-label="Set S. Whitfield on vacation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg></button>
+                  </span>
+                </td>
+              </tr>
+
+              <tr class="is-vacation">
+                <td>
+                  <span class="v2-drv">
+                    <span class="v2-drv-avatar">LD</span>
+                    <span class="v2-drv-meta">
+                      <span class="v2-drv-name">L. Duarte</span>
+                      <span class="v2-drv-id">DRV-0122</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-phone">
+                    <span class="v2-phone-num">+1 920 555 0233</span>
+                    <button class="v2-phone-edit" type="button" aria-label="Edit cell number for L. Duarte">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    </button>
+                  </span>
+                </td>
+                <td><span class="v2-truck-list"><span class="v2-truck-chip">#25141</span></span></td>
+                <td>M. Sokolov</td>
+                <td>
+                  <span class="v2-drv-status is-vacation">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/></svg>
+                    Vacation
+                  </span>
+                </td>
+                <td>
+                  <span class="v2-actions">
+                    <button class="v2-act-return" type="button">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+                      Return
+                    </button>
+                  </span>
+                </td>
+              </tr>
+
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+</div>
+
+</body>
+</html>

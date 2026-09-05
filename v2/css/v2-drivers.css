@@ -1,0 +1,210 @@
+/* ==========================================================================
+   FleetGuard v2 — Drivers page
+   --------------------------------------------------------------------------
+   STAGING ONLY. Reuses .v2-console (inspections), .v2-table (inspections) and
+   the shared field/button primitives; this file adds only what is specific to
+   the driver directory.
+
+   PHONE NUMBERS ARE A PRIVACY BOUNDARY, not just another column. Migration
+   002 puts them in a separate driver_phones table, deliberately:
+
+     "Isolated table: phone numbers NEVER on the drivers table.
+      Only admins and the Edge Function (service_role) can read."
+
+   RLS is is_admin() on select, insert, update and delete, so a dispatcher
+   cannot read them even by querying directly. js/app.js — which renders the
+   production Drivers page — never queries that table at all.
+
+   The column below therefore renders admin-only. Wire it to driver_phones,
+   never to a column on drivers, and keep it behind the same gate.
+   ========================================================================== */
+
+/* ── Driver cell ─────────────────────────────────────────────────────────── */
+
+.v2-drv { display: flex; align-items: center; gap: var(--v2-s3); min-width: 0; }
+.v2-drv-avatar {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-pill);
+  background: linear-gradient(140deg, var(--v2-cyan-deep), var(--v2-blue));
+  color: #fff;
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-bold);
+  letter-spacing: .02em;
+}
+.v2-drv-meta { min-width: 0; display: flex; flex-direction: column; }
+.v2-drv-name {
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+.v2-drv-id {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+
+/* ── Phone cell ──────────────────────────────────────────────────────────── */
+
+/* Stored E.164 (+12625550142, enforced by a CHECK constraint), rendered in
+   readable groups. The stored value is the source of truth — a US display
+   format like (262) 555-0142 would be rejected by the database. */
+.v2-phone { display: inline-flex; align-items: center; gap: var(--v2-s2); }
+.v2-phone-num {
+  font-size: var(--v2-fs-base);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .01em;
+  color: var(--v2-ink);
+  white-space: nowrap;
+}
+/* No row in driver_phones. Not cosmetic: the PTI queue skips these drivers
+   (counted as "noPhone" in the bulk-send summary), so they never get a link. */
+.v2-phone-none {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-surface-2);
+  border: 1px dashed var(--v2-line-strong);
+  color: var(--v2-ink-3);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  white-space: nowrap;
+}
+.v2-phone-none svg { width: 12px; height: 12px; }
+
+/* Inline edit affordance — appears on row hover, so the column reads as data
+   first and controls second. */
+.v2-phone-edit {
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--v2-r-xs);
+  color: var(--v2-ink-3);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--v2-t-fast), background var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-phone-edit svg { width: 13px; height: 13px; }
+.v2-table tbody tr:hover .v2-phone-edit { opacity: 1; }
+.v2-phone-edit:hover { background: var(--v2-surface-3); color: var(--v2-cyan); border-color: var(--v2-cyan-ring); }
+.v2-phone-edit:focus-visible { opacity: 1; }
+
+/* Admin-only marker on the column header. */
+.v2-th-locked { display: inline-flex; align-items: center; gap: var(--v2-s2); }
+.v2-th-locked svg { width: 12px; height: 12px; color: var(--v2-amber); }
+
+/* ── Truck / dispatcher cells ────────────────────────────────────────────── */
+
+/* A driver can hold more than one truck: production joins them with ", ".
+   Chips keep multiples readable instead of one long string. */
+.v2-truck-list, .v2-disp-list { display: flex; flex-wrap: wrap; gap: var(--v2-s2); }
+.v2-truck-chip {
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  background: var(--v2-cyan-soft);
+  border: 1px solid var(--v2-cyan-ring);
+  color: var(--v2-cyan-hi);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v2-cell-none { color: var(--v2-ink-3); }
+
+/* ── Status chips ────────────────────────────────────────────────────────── */
+
+.v2-drv-status {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  white-space: nowrap;
+}
+.v2-drv-status.is-active {
+  background: var(--v2-green-soft);
+  border: 1px solid var(--v2-green-ring);
+  color: var(--v2-green-hi);
+}
+.v2-drv-status.is-unassigned {
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  color: var(--v2-ink-2);
+}
+/* Solid amber: vacation changes what the fleet counts, so it is a state, not
+   a hint — see the note on the row rule below. */
+.v2-drv-status.is-vacation {
+  background: var(--v2-amber);
+  border: 1px solid var(--v2-amber);
+  color: var(--v2-ink-on-accent);
+}
+.v2-drv-status svg { width: 12px; height: 12px; }
+
+/* ── Vacation row state ──────────────────────────────────────────────────── */
+
+/* Production dims the whole row and tints it amber. That is doing real work:
+   a driver on vacation is excluded from the roadworthy/critical counts on the
+   dashboard, so their truck's overdue clocks are deliberately not counted
+   against the fleet. The row should look set aside. */
+.v2-table tbody tr.is-vacation { background: rgba(255, 138, 0, .04); }
+.v2-table tbody tr.is-vacation:hover { background: rgba(255, 138, 0, .08); }
+.v2-table tbody tr.is-vacation .v2-drv-name,
+.v2-table tbody tr.is-vacation .v2-phone-num { color: var(--v2-ink-2); }
+
+/* ── Action buttons ──────────────────────────────────────────────────────── */
+
+.v2-actions { display: flex; align-items: center; gap: var(--v2-s2); }
+
+.v2-act {
+  display: grid; place-items: center;
+  width: 30px; height: 30px;
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-xs);
+  color: var(--v2-ink-3);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-act svg { width: 14px; height: 14px; }
+.v2-act:hover { background: var(--v2-surface-3); color: var(--v2-ink); border-color: var(--v2-line-glass-hi); }
+.v2-act.is-danger:hover { color: var(--v2-red-hi); border-color: var(--v2-red-ring); background: var(--v2-red-soft); }
+.v2-act.is-vacation:hover { color: var(--v2-amber-hi); border-color: var(--v2-amber-ring); background: var(--v2-amber-soft); }
+
+/* Return-from-vacation replaces Edit/Delete/Vacation entirely in production —
+   an on-vacation row offers exactly one action. */
+.v2-act-return {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s3);
+  background: var(--v2-green-soft);
+  border: 1px solid var(--v2-green-ring);
+  border-radius: var(--v2-r-xs);
+  color: var(--v2-green-hi);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--v2-t-fast);
+}
+.v2-act-return:hover { background: var(--v2-green-ring); color: var(--v2-ink); }
+.v2-act-return svg { width: 13px; height: 13px; }
+
+/* ── Add Driver console ──────────────────────────────────────────────────── */
+
+.v2-add-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--v2-s4);
+  margin-bottom: var(--v2-s4);
+}
+.v2-add-foot { display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap; }
+.v2-add-hint {
+  margin: var(--v2-s3) 0 0;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-3);
+}
+
+@media (max-width: 620px) {
+  .v2-add-grid { grid-template-columns: minmax(0, 1fr); }
+}
