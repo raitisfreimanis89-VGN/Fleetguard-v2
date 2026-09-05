@@ -76,6 +76,29 @@
   --v2-amber-soft:      rgba(255, 138, 0, .12);
   --v2-amber-ring:      rgba(255, 138, 0, .42);
 
+  /* ── Brand primary ───────────────────────────────────────────────────────
+     The corporate logo orange, matching production's --primary (#da6536), so
+     the redesign reads as the same company as the app it replaces.
+
+     Deliberately SEPARATE from the amber family above rather than recolouring
+     it. Amber does double duty in this system: it is brand chrome AND the
+     "Warning" status signal — warning chips, health bars, severity rails,
+     score badges, thirteen places across five stylesheets. Recolouring amber
+     wholesale would repaint every Warning indicator in the corporate colour,
+     which both weakens it as a signal beside the red Criticals and makes the
+     brand mean "caution". Primary drives identity and interaction; amber
+     keeps meaning "warning".
+
+     -hover and -glow are the semantic aliases; -hi / -deep / -soft / -ring
+     match the structural naming every other accent family uses. */
+  --v2-primary:         #da6536;
+  --v2-primary-hi:      #f08a5d;   /* label text on a dark ground */
+  --v2-primary-deep:    #b04d24;   /* far end of a gradient fill    */
+  --v2-primary-soft:    rgba(218, 101, 54, .14);
+  --v2-primary-ring:    rgba(218, 101, 54, .45);
+  --v2-primary-hover:   var(--v2-primary-hi);
+  --v2-primary-glow:    var(--v2-primary-ring);
+
   --v2-cyan:            #00d4ff;
   --v2-cyan-hi:         #5ce4ff;
   --v2-cyan-deep:       #0092b3;

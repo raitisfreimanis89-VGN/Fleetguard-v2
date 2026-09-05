@@ -111,9 +111,9 @@ a { color: inherit; text-decoration: none; }
 .v2-nav-item:hover { background: var(--v2-surface-2); color: var(--v2-ink); }
 
 .v2-nav-item.is-active {
-  background: var(--v2-amber-soft);
-  border-color: var(--v2-amber-ring);
-  color: var(--v2-amber-hi);
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
   font-weight: var(--v2-fw-semibold);
 }
 

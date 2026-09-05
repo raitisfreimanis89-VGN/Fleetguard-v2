@@ -48,9 +48,9 @@
 .v2-tab:hover:not(:disabled) { background: var(--v2-surface-2); color: var(--v2-ink); }
 
 .v2-tab.is-active {
-  background: var(--v2-amber-soft);
-  border-color: var(--v2-amber-ring);
-  color: var(--v2-amber-hi);
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
   font-weight: var(--v2-fw-semibold);
 }
 
@@ -67,9 +67,9 @@
   color: var(--v2-ink-3);
 }
 .v2-tab.is-active .v2-tab-n {
-  background: var(--v2-amber-soft);
-  border-color: var(--v2-amber-ring);
-  color: var(--v2-amber-hi);
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
 }
 
 /* ── Sort ────────────────────────────────────────────────────────────────── */
@@ -133,7 +133,7 @@
 .v2-empty button {
   margin-top: var(--v2-s2);
   padding: var(--v2-s2) var(--v2-s4);
-  background: var(--v2-amber);
+  background: var(--v2-primary);
   border: 0; border-radius: var(--v2-r-md);
   color: var(--v2-ink-on-accent);
   font: inherit; font-size: var(--v2-fs-sm); font-weight: 700;

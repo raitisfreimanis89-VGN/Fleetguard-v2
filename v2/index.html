@@ -230,7 +230,14 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/><path d="m9 12 2 2 4-4"/></svg>
           </span>
           <div class="v2-stat-body">
-            <span class="v2-stat-num">27</span>
+            <!-- 39, not 27. The old figure predated v2/tools/fleet-sample.js
+                 and matched no calculation once the fixture existed. The
+                 Dashboard counts !critical && !tyreOverdue over ACTIVE
+                 vehicles — 43 of the 45 trucks, the other two parked with
+                 vacationing drivers — which gives 39. Reports runs the
+                 identical test over all 45 and gets 40; that population
+                 difference is real and is stated on the Reports card. -->
+            <span class="v2-stat-num">39</span>
             <span class="v2-stat-label">Roadworthy</span>
           </div>
         </article>

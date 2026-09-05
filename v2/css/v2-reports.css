@@ -69,11 +69,11 @@
 .v2-rep-btn:hover { background: var(--v2-surface-3); border-color: var(--v2-line-glass-hi); }
 
 .v2-rep-btn.is-primary {
-  background: var(--v2-amber);
-  border-color: var(--v2-amber);
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
   color: var(--v2-ink-on-accent);
 }
-.v2-rep-btn.is-primary:hover { filter: brightness(1.08); background: var(--v2-amber); }
+.v2-rep-btn.is-primary:hover { filter: brightness(1.08); background: var(--v2-primary); }
 
 /* ── Headline metrics ────────────────────────────────────────────────────── */
 
