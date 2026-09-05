@@ -147,6 +147,25 @@
 
 .v2-tool-art { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 
+.v2-tool-art::before {
+  content: ''; position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center right;
+  /* These photographs measure 20-53 mean brightness out of 255, so they need
+     lifting, not dimming — the overlay below does the darkening where it is
+     actually needed. Per-card tuning via --art-lift where one runs dark. */
+  filter: saturate(.8) contrast(1.06) brightness(var(--art-lift, 1.14));
+  transform: scale(1.02);
+  transition: transform var(--v2-t-base), filter var(--v2-t-base);
+}
+/* ── Per-card artwork ─────────────────────────────────────────────────────
+   These MUST come after .v2-tool-art::before above. Both are one class plus a
+   pseudo-element, so they carry identical specificity and the later rule wins.
+   While this block sat before the base rule, every background-position here
+   was silently overridden by the base right-anchor — including the PTI card,
+   whose `center` had never once taken effect despite the reasoning beside it.
+   Adding a card below the base rule is the only safe place to put it.        */
+
 /* Image URLs live here, not in a --art custom property on the element.
    A relative url() inside a custom property resolves against the stylesheet
    that CONSUMES it, not the document that declares it — so "../img/x.jpg"
@@ -164,22 +183,47 @@
   background-position: center;
 }
 .v2-art-toll::before    { background-image: url('https://images.unsplash.com/photo-1535953928289-6bac80e96f3c?auto=format&fit=crop&w=760&q=52'); }
-.v2-art-axle::before    { background-image: url('https://images.unsplash.com/photo-1585824856765-0cab8940a879?auto=format&fit=crop&w=760&q=52'); }
+
+/* Local asset, one fewer hotlink: this card no longer depends on Unsplash and
+   would survive the index.html CSP (img-src 'self') if that policy is ever
+   extended to this page. Four hotlinked cards remain.
+
+   `center`, not the ::before default of `center right`. Measured: the image is
+   2752x1536 (1.79:1) on a 350x285 card (1.23:1), so cover scales to 510.6 wide
+   and hides 31.5% of the width. Anchored right that trims everything left of
+   x=866 — which is the whole tractor, leaving a disembodied box trailer.
+   Centred it trims 15.7% off each edge instead (visible x 433..2319) and every
+   subject survives: tractor, tandem axle group, the 53FT marking and the rear
+   doors. Same lesson as the PTI card above — losing the tractor costs the
+   thing that reads as "truck" at card size. */
+/* Tuning vars go on the ELEMENT, not on ::before. --art-lift is read by
+   ::before but --art-scrim-* is read by ::after, and the two pseudo-elements
+   are siblings — a custom property set on one is invisible to the other. */
+.v2-art-axle {
+  /* Dimmed, not lifted. The base filter lifts by 1.14 because the Unsplash
+     crops measure 20-53 mean brightness; this dusk shot measures 82 and its
+     trailer panel is a near-white 249, which 1.14 simply clips. */
+  --art-lift: .85;
+  /* The copy column also needs a stronger scrim than the base gradient gives.
+     Measured against real glyph line boxes, the stock .94/.6/.24/.06 left the
+     description at 1.36:1 against that white panel — the base is tuned for
+     dark photographs and silently under-protects a bright one. These stops
+     put the worst-case text near 5:1, an 11% margin over AA, while keeping the
+     right edge open at .35 so the rig still reads. */
+  --art-scrim-28: .97;
+  --art-scrim-54: .90;
+  --art-scrim-80: .78;
+  --art-scrim-100: .35;
+}
+.v2-art-axle::before {
+  background-image: url('../img/card-axle-limits.jpg');
+  background-position: center;
+}
+
 .v2-art-scale::before   { background-image: url('https://images.unsplash.com/photo-1573004814905-55057414ebe2?auto=format&fit=crop&w=760&q=52'); }
 .v2-art-traffic::before { background-image: url('https://images.unsplash.com/photo-1686006354746-2b243585a692?auto=format&fit=crop&w=760&q=52'); }
 .v2-art-states::before  { background-image: url('https://images.unsplash.com/photo-1506747111041-18b1844bf60f?auto=format&fit=crop&w=760&q=52'); }
 
-.v2-tool-art::before {
-  content: ''; position: absolute; inset: 0;
-  background-size: cover;
-  background-position: center right;
-  /* These photographs measure 20-53 mean brightness out of 255, so they need
-     lifting, not dimming — the overlay below does the darkening where it is
-     actually needed. Per-card tuning via --art-lift where one runs dark. */
-  filter: saturate(.8) contrast(1.06) brightness(var(--art-lift, 1.14));
-  transform: scale(1.02);
-  transition: transform var(--v2-t-base), filter var(--v2-t-base);
-}
 .v2-tool-card:hover .v2-tool-art::before {
   transform: scale(1.06);
   filter: saturate(.92) contrast(1.08) brightness(calc(var(--art-lift, 1.14) * 1.08));
@@ -196,10 +240,10 @@
       rgba(var(--v2-surface-rgb), .9) 100%),
     linear-gradient(90deg,
       rgb(var(--v2-surface-rgb)) 0%,
-      rgba(var(--v2-surface-rgb), .94) 28%,
-      rgba(var(--v2-surface-rgb), .6) 54%,
-      rgba(var(--v2-surface-rgb), .24) 80%,
-      rgba(var(--v2-surface-rgb), .06) 100%);
+      rgba(var(--v2-surface-rgb), var(--art-scrim-28, .94)) 28%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-54, .6)) 54%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-80, .24)) 80%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-100, .06)) 100%);
 }
 
 .v2-tool-art svg {
