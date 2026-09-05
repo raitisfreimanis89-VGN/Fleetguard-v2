@@ -216,7 +216,11 @@
 
 /* ── Truck rows ───────────────────────────────────────────────────────────── */
 
-.v2-truck-list { display: flex; flex-direction: column; }
+/* NOT .v2-truck-list — v2-drivers.css already owns that name for its wrapping
+   chip container, and every page loads both sheets. The collision leaked
+   flex-wrap:wrap and an 8px gap into these rows, which are meant to sit flush
+   and be separated by their own hairline borders. */
+.v2-fleet-list { display: flex; flex-direction: column; }
 
 .v2-truck-row {
   position: relative;
