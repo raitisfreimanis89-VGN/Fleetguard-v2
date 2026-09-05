@@ -148,7 +148,14 @@ a { color: inherit; text-decoration: none; }
   display: grid; place-items: center;
   border-radius: var(--v2-r-pill);
   background: linear-gradient(140deg, var(--v2-cyan-deep), var(--v2-blue));
-  color: #fff; font-size: var(--v2-fs-xs); font-weight: 700;
+  /* White on this gradient is 3.64:1 at 12px — under the 4.5 AA floor, and at
+     BOTH stops (#0092b3 3.64, #3b82f6 3.68), so no gradient angle rescues it.
+     --v2-ink-on-accent is the system's rule for text on a filled accent and
+     clears it at 5.56:1. Contrast sweeps missed this until they were taught to
+     read gradients: getComputedStyle reports backgroundColor 'transparent' on
+     a gradient-filled box, so the check walked past it to the sidebar plane
+     and scored a pairing that is never actually painted. */
+  color: var(--v2-ink-on-accent); font-size: var(--v2-fs-xs); font-weight: 700;
 }
 .v2-user-meta { min-width: 0; line-height: 1.25; }
 .v2-user-name { font-size: var(--v2-fs-sm); font-weight: 600; color: var(--v2-ink); }
