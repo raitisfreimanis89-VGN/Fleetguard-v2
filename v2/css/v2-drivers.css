@@ -27,7 +27,12 @@
   display: grid; place-items: center;
   border-radius: var(--v2-r-pill);
   background: linear-gradient(140deg, var(--v2-cyan-deep), var(--v2-blue));
-  color: #fff;
+  /* Same gradient, same fix as .v2-user-avatar in v2-shell.css: white here is
+     3.64:1 at 11px, under the 4.5 AA floor, and fails at both gradient stops.
+     --v2-ink-on-accent is the system's rule for text on a filled accent and
+     clears it at 5.56:1. This instance was missed when the sidebar one was
+     corrected — the two are the only cyan-to-blue avatars in the system. */
+  color: var(--v2-ink-on-accent);
   font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-bold);
   letter-spacing: .02em;
 }
