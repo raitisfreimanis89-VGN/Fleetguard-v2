@@ -1,0 +1,325 @@
+/* ==========================================================================
+   FleetGuard v2 — Pre-Trip Inspections
+   --------------------------------------------------------------------------
+   STAGING ONLY. Three blocks: the pulse/send console, open defects, and the
+   submission history table.
+
+   Structure and rules follow renderInspections(), isOpenDefect(), inspDur()
+   and inspDT() in js/app.js.
+   ========================================================================== */
+
+/* ── Tier 1: console row ─────────────────────────────────────────────────── */
+
+.v2-console-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--v2-s5);
+  margin-bottom: var(--v2-s10);
+}
+
+.v2-console {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+.v2-console::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(420px 200px at 90% -35%, var(--tc-soft), transparent 68%);
+}
+
+.v2-console-head {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding: var(--v2-s4) var(--v2-s5);
+  border-bottom: 1px solid var(--v2-line);
+  background: linear-gradient(180deg, var(--tc-soft), transparent);
+}
+.v2-console-ic {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--v2-r-sm);
+  background: var(--tc-soft); color: var(--tc);
+  border: 1px solid var(--tc-ring);
+}
+.v2-console-ic svg { width: 17px; height: 17px; }
+.v2-console-head h2 {
+  margin: 0; flex: 1;
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+}
+.v2-console-note {
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+.v2-console-body { padding: var(--v2-s5); flex: 1; display: flex; flex-direction: column; }
+
+/* ── Pulse counters ──────────────────────────────────────────────────────── */
+
+.v2-pulse-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--v2-s3);
+}
+.v2-pulse-stat {
+  display: flex; flex-direction: column; gap: var(--v2-s1);
+  padding: var(--v2-s4) var(--v2-s3);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-sm);
+}
+.v2-pulse-num {
+  font-size: var(--v2-fs-xl); line-height: var(--v2-lh-xl);
+  font-weight: var(--v2-fw-bold);
+  letter-spacing: var(--v2-track-tight);
+  font-variant-numeric: tabular-nums;
+  color: var(--tc-hi);
+  /* The "glow" is a soft accent halo behind the glyph, not a blur on it —
+     blurring the text itself costs legibility at this size. */
+  text-shadow: 0 0 18px var(--tc-ring);
+}
+.v2-pulse-label {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-medium);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+/* A live count of today's submissions gets a pulsing dot. */
+.v2-pulse-live {
+  display: inline-block;
+  width: 6px; height: 6px; margin-right: var(--v2-s2);
+  border-radius: var(--v2-r-pill);
+  background: var(--tc);
+  box-shadow: 0 0 0 3px var(--tc-soft);
+  animation: v2-pulse 2.4s var(--v2-ease) infinite;
+  vertical-align: middle;
+}
+@media (prefers-reduced-motion: reduce) { .v2-pulse-live { animation: none; } }
+
+/* ── Send-link console ───────────────────────────────────────────────────── */
+
+.v2-send-row {
+  display: flex; align-items: flex-end; gap: var(--v2-s3); flex-wrap: wrap;
+  margin-bottom: var(--v2-s4);
+}
+.v2-send-row .v2-field { flex: 1; min-width: 200px; }
+
+.v2-btn-send {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s3) var(--v2-s5);
+  background: var(--v2-amber);
+  border: 0; border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-on-accent);
+  font: inherit;
+  font-size: var(--v2-fs-base); font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 14px -4px var(--v2-amber);
+  transition: filter var(--v2-t-fast), transform var(--v2-t-fast), box-shadow var(--v2-t-base);
+}
+.v2-btn-send:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px -4px var(--v2-amber);
+}
+.v2-btn-send:active { transform: translateY(0); }
+
+.v2-btn-ghost {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: transparent;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-2);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-btn-ghost:hover { background: var(--v2-surface-2); border-color: var(--v2-line-glass-hi); color: var(--v2-ink); }
+.v2-btn-ghost svg { width: 14px; height: 14px; }
+
+/* The send policy is a real commitment, not decoration: links never go out
+   automatically, and bulk sends are rate-limited. Keep this visible. */
+.v2-send-notice {
+  display: flex; align-items: flex-start; gap: var(--v2-s2);
+  margin-top: auto;
+  padding-top: var(--v2-s4);
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-3);
+}
+.v2-send-notice svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Tier 2: open defect cards ───────────────────────────────────────────── */
+
+.v2-defect-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--v2-s5);
+  margin-bottom: var(--v2-s10);
+}
+
+.v2-defect {
+  position: relative;
+  overflow: hidden;
+  display: flex; flex-direction: column; gap: var(--v2-s4);
+  padding: var(--v2-s5) var(--v2-s5) var(--v2-s5) var(--v2-s6);
+  background: linear-gradient(180deg, var(--tc-soft), transparent 60%), var(--v2-surface);
+  border: 1px solid var(--tc-ring);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+/* Accent spine, full height — severity read peripherally. */
+.v2-defect::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: var(--tc);
+}
+
+.v2-defect-head { display: flex; align-items: flex-start; gap: var(--v2-s3); }
+.v2-defect-id { flex: 1; min-width: 0; }
+.v2-defect-truck {
+  display: block;
+  font-size: var(--v2-fs-lg); line-height: var(--v2-lh-lg);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink);
+}
+.v2-defect-when {
+  display: block;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-3);
+}
+
+.v2-defect-meta { display: flex; flex-direction: column; gap: var(--v2-s2); }
+.v2-defect-line {
+  display: flex; align-items: center; gap: var(--v2-s2);
+  font-size: var(--v2-fs-base);
+  color: var(--v2-ink-2);
+}
+.v2-defect-line svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--v2-ink-3); }
+.v2-defect-issues { color: var(--tc-hi); font-weight: var(--v2-fw-semibold); }
+
+.v2-defect-foot { display: flex; align-items: center; gap: var(--v2-s3); flex-wrap: wrap; }
+/* Green, deliberately: the button resolves the problem, so it should not
+   inherit the card's alarm colour. */
+.v2-btn-repair {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: var(--v2-green);
+  border: 0; border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-on-accent);
+  font: inherit;
+  font-size: var(--v2-fs-base); font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 2px 12px -4px var(--v2-green);
+  transition: filter var(--v2-t-fast), transform var(--v2-t-fast);
+}
+.v2-btn-repair:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.v2-btn-repair:active { transform: translateY(0); }
+
+/* ── Tier 3: history table ───────────────────────────────────────────────── */
+
+.v2-table-card {
+  overflow: hidden;
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line-glass);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow);
+}
+/* Wide table on a narrow screen scrolls inside its own card rather than
+   pushing the page sideways. */
+.v2-table-wrap { overflow-x: auto; }
+
+.v2-table { width: 100%; border-collapse: collapse; min-width: 880px; }
+
+.v2-table thead th {
+  position: sticky; top: 0; z-index: 1;
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface-2);
+  border-bottom: 1px solid var(--v2-line);
+  text-align: left;
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+.v2-table thead th:first-child { padding-left: var(--v2-s5); }
+.v2-table thead th:last-child  { padding-right: var(--v2-s5); }
+
+.v2-table tbody td {
+  padding: var(--v2-s4);
+  border-bottom: 1px solid var(--v2-line);
+  font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
+  color: var(--v2-ink-2);
+  vertical-align: middle;
+}
+.v2-table tbody td:first-child { padding-left: var(--v2-s5); }
+.v2-table tbody td:last-child  { padding-right: var(--v2-s5); }
+.v2-table tbody tr:last-child td { border-bottom: 0; }
+
+.v2-table tbody tr { cursor: pointer; transition: background var(--v2-t-fast); }
+.v2-table tbody tr:hover { background: var(--v2-surface-2); }
+
+.v2-td-when, .v2-td-truck, .v2-td-dur, .v2-td-ref { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.v2-td-truck { font-weight: var(--v2-fw-semibold); color: var(--v2-ink); }
+/* The table already scrolls inside its own card, so a name should stay on one
+   line rather than wrapping to "P." / "Ostrowski". */
+.v2-td-driver { color: var(--v2-ink); white-space: nowrap; }
+.v2-td-ref { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+
+/* ── Result / status chips ───────────────────────────────────────────────── */
+
+.v2-chip-status {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Solid for a verdict, outline for a measurement. */
+.v2-chip-status.is-pass   { background: var(--v2-green); color: var(--v2-ink-on-accent); }
+.v2-chip-status.is-minor  { background: var(--v2-amber); color: var(--v2-ink-on-accent); }
+.v2-chip-status.is-defect { background: var(--v2-red);   color: var(--v2-ink-on-accent); }
+.v2-chip-status.is-ok {
+  background: var(--v2-green-soft);
+  border: 1px solid var(--v2-green-ring);
+  color: var(--v2-green-hi);
+}
+.v2-chip-status.is-flag {
+  background: var(--v2-red-soft);
+  border: 1px solid var(--v2-red-ring);
+  color: var(--v2-red-hi);
+}
+.v2-chip-status.is-dur {
+  background: transparent;
+  border: 1px solid var(--v2-line-strong);
+  color: var(--v2-ink-2);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* Production flags a walk-around under 120 seconds — too quick to have been
+   done properly. The chip turns amber and carries a warning glyph. */
+.v2-chip-status.is-dur.is-quick {
+  background: var(--v2-amber-soft);
+  border-color: var(--v2-amber-ring);
+  color: var(--v2-amber-hi);
+}
+.v2-chip-status.is-dur.is-quick svg { width: 12px; height: 12px; }
+
+@media (max-width: 620px) {
+  .v2-console-row, .v2-defect-grid { grid-template-columns: minmax(0, 1fr); }
+}
