@@ -266,8 +266,62 @@
   background-position: center;
 }
 
-.v2-art-scale { --art-lift: 1.4; }
-.v2-art-scale::before   { background-image: url('https://images.unsplash.com/photo-1573004814905-55057414ebe2?auto=format&fit=crop&w=760&q=52'); }
+/* CAT Scale locator. Local asset, one fewer hotlink; three cards still remote.
+   Framing: cover + center. The image is 1.79:1 on a ~1.23:1 card, so cover
+   keeps the full HEIGHT and trims 31.5% of the width, 15.75% from each edge.
+   Measured against that window, the sign banner occupies card x 16.8-74.8%
+   and the tractor-trailer x 43-76%, so both sit entirely inside the visible
+   region — nothing of either is cropped. contain was rejected: it would fit
+   the width instead and letterbox 90px of dead card above and below.
+
+   NO OVERLAY ACROSS THE SIGN. The banner sits at card y 5.8-27.3%, so every
+   vertical stop is zero until --art-v-start, well below it, and the darkening
+   that remains is weighted to the bottom where the copy sits. */
+/* CAT Scale locator.
+
+   FRAMING: contain, anchored top. Not cover — cover would trim 31.5% of the
+   width and, more importantly, keep the image at full card height, which puts
+   the sign banner at y 5.8-27.4% where it collides with the title at 25.7%.
+   Protecting the title would then mean dimming the sign, which is the one
+   thing this card must not do. contain fits the whole frame instead: NOTHING
+   is cropped, the image occupies y 0-77.4%, and the banner lifts to y
+   4.5-21.2% — a clear 4.5-point gap above the title. The tractor-trailer sits
+   at y 36.8-60.4%, also complete.
+
+   ZERO OVERLAY ON THE SIGN. Every horizontal stop is 0, so nothing darkens by
+   column; the only overlay is vertical and it starts at 22%, which is 0.8
+   points BELOW the bottom of the banner. Measured row by row, the sign's
+   lettering runs from y 6.7% to 21.2% and every one of those rows is fully
+   unobscured. It ramps to .7 by 28%, before the title, and holds.
+
+   The tag is the only text that lands on the banner, at y 11.6-16.4%. It is
+   fixed by deepening its own pill ground to .74 rather than by shadowing the
+   photograph — a small chip on the sign instead of a wash across it.
+
+   The meta pills fall at y 81.3-86.2%, below where the image ends, so they sit
+   on plain card surface and need nothing. */
+.v2-art-scale {
+  --art-lift: 1;
+  --art-v-top: 0;
+  --art-veil: 0;
+  --art-v-plateau: 22%;
+  --art-v-start: 22%;
+  --art-v-mid:.75;
+  --art-v-knee:27%;
+  --art-v-end:.75;
+  --art-scrim-0: 0;
+  --art-scrim-28: 0;
+  --art-scrim-54: 0;
+  --art-scrim-80: 0;
+  --art-scrim-100: 0;
+  --tag-ground:.80;
+}
+.v2-art-scale::before {
+  background-image: url('../img/card-cat-scale.jpg');
+  background-size: contain;
+  background-position: top center;
+  background-repeat: no-repeat;
+}
 .v2-art-traffic { --art-lift: 1.7; }
 .v2-art-traffic::before { background-image: url('https://images.unsplash.com/photo-1686006354746-2b243585a692?auto=format&fit=crop&w=760&q=52'); }
 .v2-art-states { --art-lift: 1.2; }
@@ -292,7 +346,7 @@
       rgba(var(--v2-surface-rgb), var(--art-v-top, 0)) 0%,
       rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-plateau, 20%),
       rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-start, 46%),
-      rgba(var(--v2-surface-rgb), var(--art-v-mid, .66)) 84%,
+      rgba(var(--v2-surface-rgb), var(--art-v-mid, .66)) var(--art-v-knee, 84%),
       rgba(var(--v2-surface-rgb), var(--art-v-end, .9)) 100%),
     linear-gradient(90deg,
       rgba(var(--v2-surface-rgb), var(--art-scrim-0, 1)) 0%,
@@ -328,7 +382,7 @@
   letter-spacing: var(--v2-track-micro); text-transform: uppercase;
   /* Outline pill: accent hairline, accent text, near-transparent ground.
      Reads as a label on the photograph rather than a filled block. */
-  background: rgba(0, 5, 13, .62);
+  background: rgba(0, 5, 13, var(--tag-ground, .62));
   border: 1px solid var(--tc-ring);
   color: var(--tc-hi);
   backdrop-filter: blur(8px);
@@ -372,7 +426,7 @@
   padding: var(--v2-s1) var(--v2-s2);
   /* Same tinted-glass treatment as .v2-tag, minus the accent, so pills stay
      readable where they overlap the artwork at the foot of a card. */
-  background: rgba(0, 5, 13, .52);
+  background: rgba(0, 5, 13, var(--meta-ground, .52));
   border: 1px solid var(--v2-line-glass);
   backdrop-filter: blur(6px);
   border-radius: var(--v2-r-xs);
