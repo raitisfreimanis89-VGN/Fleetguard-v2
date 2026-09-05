@@ -178,27 +178,40 @@
    frame. Zooming past cover to push the cab rightward cut the tractor's nose
    off entirely (it sits in the first 20% of the image), which is worse: the
    nose is the part that reads as a truck at card size. */
-/* Scrim cut back hard. Measured behind this card's copy, the photograph has a
-   MEAN luminance of 0.011 — it is already almost black there, so most of the
-   old gradient was darkening nothing. Only a specular highlight (peak 0.576)
-   crosses the title, which the horizontal ramp alone handles. No flat veil at
-   all, so the right-hand side of the frame is completely unobstructed. */
+/* NO VERTICAL OVERLAY AT ALL — every vertical stop is zero, so the only
+   darkening is the left-to-right ramp, and it reaches nothing past 80%.
+   Photograph visible across 59.1% of the card, up from 29.1%.
+
+   Measured behind this card's copy the photograph has a MEAN luminance of
+   0.011: it is already almost black there, so most of the old gradient was
+   darkening nothing. Only a specular highlight (peak 0.576) crosses the title,
+   and the horizontal ramp alone handles it.
+
+   Stops solved by constrained coordinate descent over all nine overlay values,
+   maximising visible photograph subject to >= 4.77:1 on every text run in BOTH
+   the rest and hover states — hover matters because it brightens the image a
+   further 1.08x and scales it 1.06. Worst run is the body at 4.84:1.
+   Monotonicity is enforced: an unconstrained solve wanted .25 -> .68 -> .43
+   across the width, which passes but renders as a dark band with a brighter
+   left edge rather than a vignette. */
 .v2-art-pti {
   --art-lift: 1.35;
-  --art-veil: .10;
+  --art-veil: 0;
   --art-v-start: 55%;
-  --art-v-mid: .26;
-  --art-v-end: .35;
-  --art-scrim-0: .75;
-  --art-scrim-28: .68;
-  --art-scrim-54: .45;
-  --art-scrim-80: .19;
+  --art-v-mid: 0;
+  --art-v-end: 0;
+  --art-scrim-0: .72;
+  --art-scrim-28: .72;
+  --art-scrim-54: .43;
+  --art-scrim-80: 0;
   --art-scrim-100: 0;
+  --art-v-top: 0;
 }
 .v2-art-pti::before {
   background-image: url('../img/card-pti-truck.jpg');
   background-position: center;
 }
+.v2-art-toll { --art-lift: 1.45; }
 .v2-art-toll::before    { background-image: url('https://images.unsplash.com/photo-1535953928289-6bac80e96f3c?auto=format&fit=crop&w=760&q=52'); }
 
 /* Local asset, one fewer hotlink: this card no longer depends on Unsplash and
@@ -225,31 +238,39 @@
    the description, the trailer panel peaks at pure white, rgb(255,255,255),
    luminance 1.0, against a mean of 0.28. Near-white text needs its background
    under luminance 0.163 to clear 4.5:1, so that region has to come down by
-   roughly 6x. A flat veil of .38 is the lightest that manages it; below that
-   the title drops under AA. Solved numerically over veil x ramp rather than
-   dialled in by eye.
+   roughly 6x. A flat .23 veil below the top band is the lightest that manages
+   it, and the top 20% carries no text at all — the tag sits on its own ground
+   — so that band stays completely clear.
+
+   Photograph visible across 49.0% of the card, up from 29.1%. Worst text run
+   is 4.77:1 on hover. Same constrained solve as the PTI card above; this one
+   simply has less room to give.
 
    The durable fix is structural — copy on solid ground rather than on the
    photograph — which makes contrast independent of whichever image is used. */
 .v2-art-axle {
   --art-lift: 1;
-  --art-veil: .40;
+  --art-veil: .23;
   --art-v-start: 55%;
-  --art-v-mid: .56;
-  --art-v-end: .65;
-  --art-scrim-0: .60;
-  --art-scrim-28: .54;
-  --art-scrim-54: .36;
-  --art-scrim-80: .15;
+  --art-v-mid: .23;
+  --art-v-end: .23;
+  --art-scrim-0: .49;
+  --art-scrim-28: .49;
+  --art-scrim-54: .49;
+  --art-scrim-80: .23;
   --art-scrim-100: 0;
+  --art-v-top: 0;
 }
 .v2-art-axle::before {
   background-image: url('../img/card-axle-limits.jpg');
   background-position: center;
 }
 
+.v2-art-scale { --art-lift: 1.4; }
 .v2-art-scale::before   { background-image: url('https://images.unsplash.com/photo-1573004814905-55057414ebe2?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-traffic { --art-lift: 1.7; }
 .v2-art-traffic::before { background-image: url('https://images.unsplash.com/photo-1686006354746-2b243585a692?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-states { --art-lift: 1.2; }
 .v2-art-states::before  { background-image: url('https://images.unsplash.com/photo-1506747111041-18b1844bf60f?auto=format&fit=crop&w=760&q=52'); }
 
 .v2-tool-card:hover .v2-tool-art::before {
@@ -262,8 +283,14 @@
 .v2-tool-art::after {
   content: ''; position: absolute; inset: 0; z-index: 1;
   background:
+    /* Five stops, not three. The top band carries no text — the tag sits on its
+       own ground — so it can stay lighter than the title/body band below it.
+       Splitting them is worth several points of visible photograph. Defaults
+       (0, 0, 0 through 46%) reproduce the original `transparent 46%` exactly,
+       so the four cards that set nothing are pixel-identical. */
     linear-gradient(180deg,
-      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-v-top, 0)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-plateau, 20%),
       rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-start, 46%),
       rgba(var(--v2-surface-rgb), var(--art-v-mid, .66)) 84%,
       rgba(var(--v2-surface-rgb), var(--art-v-end, .9)) 100%),
