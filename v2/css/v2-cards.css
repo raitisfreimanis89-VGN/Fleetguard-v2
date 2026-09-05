@@ -178,6 +178,23 @@
    frame. Zooming past cover to push the cab rightward cut the tractor's nose
    off entirely (it sits in the first 20% of the image), which is worse: the
    nose is the part that reads as a truck at card size. */
+/* Scrim cut back hard. Measured behind this card's copy, the photograph has a
+   MEAN luminance of 0.011 — it is already almost black there, so most of the
+   old gradient was darkening nothing. Only a specular highlight (peak 0.576)
+   crosses the title, which the horizontal ramp alone handles. No flat veil at
+   all, so the right-hand side of the frame is completely unobstructed. */
+.v2-art-pti {
+  --art-lift: 1.35;
+  --art-veil: .10;
+  --art-v-start: 55%;
+  --art-v-mid: .26;
+  --art-v-end: .35;
+  --art-scrim-0: .75;
+  --art-scrim-28: .68;
+  --art-scrim-54: .45;
+  --art-scrim-80: .19;
+  --art-scrim-100: 0;
+}
 .v2-art-pti::before {
   background-image: url('../img/card-pti-truck.jpg');
   background-position: center;
@@ -199,23 +216,32 @@
    (Asset is currently 760x424, 43KB, downsampled from a 2752x1536 original.
    760 covers the 350-wide art box at better than 2x for retina.) */
 /* Tuning vars go on the ELEMENT, not on ::before. --art-lift is read by
-   ::before but --art-scrim-* is read by ::after, and the two pseudo-elements
-   are siblings — a custom property set on one is invisible to the other. */
+   ::before but --art-veil / --art-scrim-* are read by ::after, and the two
+   pseudo-elements are siblings — a property set on one is invisible to the
+   other.
+
+   This card CANNOT go as light as the PTI one, and the reason is in the
+   photograph rather than the design. Measured directly behind the title and
+   the description, the trailer panel peaks at pure white, rgb(255,255,255),
+   luminance 1.0, against a mean of 0.28. Near-white text needs its background
+   under luminance 0.163 to clear 4.5:1, so that region has to come down by
+   roughly 6x. A flat veil of .38 is the lightest that manages it; below that
+   the title drops under AA. Solved numerically over veil x ramp rather than
+   dialled in by eye.
+
+   The durable fix is structural — copy on solid ground rather than on the
+   photograph — which makes contrast independent of whichever image is used. */
 .v2-art-axle {
-  /* Dimmed, not lifted. The base filter lifts by 1.14 because the Unsplash
-     crops measure 20-53 mean brightness; this dusk shot measures 82 and its
-     trailer panel is a near-white 249, which 1.14 simply clips. */
-  --art-lift: .85;
-  /* The copy column also needs a stronger scrim than the base gradient gives.
-     Measured against real glyph line boxes, the stock .94/.6/.24/.06 left the
-     description at 1.36:1 against that white panel — the base is tuned for
-     dark photographs and silently under-protects a bright one. These stops
-     put the worst-case text near 5:1, an 11% margin over AA, while keeping the
-     right edge open at .35 so the rig still reads. */
-  --art-scrim-28: .97;
-  --art-scrim-54: .90;
-  --art-scrim-80: .78;
-  --art-scrim-100: .35;
+  --art-lift: 1;
+  --art-veil: .40;
+  --art-v-start: 55%;
+  --art-v-mid: .56;
+  --art-v-end: .65;
+  --art-scrim-0: .60;
+  --art-scrim-28: .54;
+  --art-scrim-54: .36;
+  --art-scrim-80: .15;
+  --art-scrim-100: 0;
 }
 .v2-art-axle::before {
   background-image: url('../img/card-axle-limits.jpg');
@@ -237,11 +263,12 @@
   content: ''; position: absolute; inset: 0; z-index: 1;
   background:
     linear-gradient(180deg,
-      transparent 46%,
-      rgba(var(--v2-surface-rgb), .66) 84%,
-      rgba(var(--v2-surface-rgb), .9) 100%),
+      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-veil, 0)) var(--art-v-start, 46%),
+      rgba(var(--v2-surface-rgb), var(--art-v-mid, .66)) 84%,
+      rgba(var(--v2-surface-rgb), var(--art-v-end, .9)) 100%),
     linear-gradient(90deg,
-      rgb(var(--v2-surface-rgb)) 0%,
+      rgba(var(--v2-surface-rgb), var(--art-scrim-0, 1)) 0%,
       rgba(var(--v2-surface-rgb), var(--art-scrim-28, .94)) 28%,
       rgba(var(--v2-surface-rgb), var(--art-scrim-54, .6)) 54%,
       rgba(var(--v2-surface-rgb), var(--art-scrim-80, .24)) 80%,
@@ -296,7 +323,12 @@
   /* Body 1: 14/20 Regular, in the one secondary tone. */
   font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);
   font-weight: var(--v2-fw-regular);
-  color: var(--v2-ink-2);
+  /* Near-white, not the secondary tone. Body copy here sits ON a photograph,
+     and --v2-ink-2 needs its background under luminance 0.041 to clear 4.5:1
+     where --v2-ink needs only 0.163 — four times more permissive. That single
+     step is what lets the scrim come off. Brighter text cannot reduce contrast
+     on any card, so the four hotlinked cards can only benefit. */
+  color: var(--v2-ink);
 }
 
 /* ── Card footer: meta pills + action ────────────────────────────────────── */
