@@ -57,8 +57,13 @@
    surfaces. Scoped to the region a ported render actually occupies, so the
    rest of the app keeps production's own background.
 
-   This is transitional. Once every page is ported the ground moves up to the
-   shell and this rule goes away. */
+   This is transitional, and now doubly so. Since v2-skin.css remaps --bg to
+   var(--v2-bg), production's content ground already IS #00050d and this rule
+   paints the colour that is there anyway — measured: .v2-region and body both
+   resolve to rgb(0, 5, 13). It stays because it is what keeps a ported region
+   correct on its own terms, without depending on the skin being loaded, and
+   because the negative margin still does real work. It retires when the shell
+   is adopted, not before. */
 .v2-region {
   background: var(--v2-bg);
   color: var(--v2-ink);

@@ -12,6 +12,31 @@ edge functions or the schema. Those are the parts the DOT audit depends on.
 
 ---
 
+## 0. Skin first, port second
+
+The upgrade splits into two jobs with wildly different costs, and it is worth
+being deliberate about which one a given page actually needs.
+
+**The skin — `v2/css/v2-skin.css`.** `css/styles.css` is already fully
+tokenised: `.card` reads `var(--surface-container)`, `.btn-primary` reads
+`var(--primary)`, `.badge-green` reads `var(--success)`. Remapping ~30 token
+values repaints every one of those rules, on **every page at once**, including
+the ones nobody has ported. No JavaScript, no markup, no element ids, no
+handlers — therefore none of the contract risk that section 3 exists to
+manage. Measured across eight views: **0 new contrast failures, 4 pre-existing
+ones fixed.**
+
+**The port — a render function rewritten to emit v2 markup.** This is the only
+way to get the things tokens cannot express: the Dashboard's stat tiles, the
+Inspections defect cards, the Drivers status column, the fleet grid. It costs
+a per-page rewrite and carries every risk in sections 3 and 4.
+
+Do the skin once, then port only where the new *structure* earns it. A page
+whose layout is already fine gets most of the visual upgrade from the skin
+alone, and porting it spends real risk for very little.
+
+---
+
 ## 1. Which stylesheets may be loaded into `index.html`
 
 **All of them except one.**

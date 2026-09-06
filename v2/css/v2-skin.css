@@ -1,0 +1,115 @@
+/* ==========================================================================
+   FleetGuard — v2 skin for the LIVE application
+   --------------------------------------------------------------------------
+   Gives every page of the running app the v2 palette, depth and radii without
+   touching a single line of JavaScript, a single element id, or a single
+   render function.
+
+   HOW THIS WORKS
+   css/styles.css is already fully tokenised — .card reads var(--surface-container),
+   .btn-primary reads var(--primary), .badge-green reads var(--success). None of
+   those rules need rewriting. Remapping the token VALUES repaints all of them at
+   once, on every page, including the ones no one has ported.
+
+   This is the cheap half of the v2 upgrade and it carries almost no risk,
+   because it changes no structure. The expensive half — the stat tiles, the
+   defect cards, the timeline — needs new markup and is done per page by
+   rewriting a render function. See v2/PORTING.md.
+
+   WHY :root:not(.light) AND NOT :root
+   Production supports a light theme, declared as `.light { --bg: #f0f2f7; ... }`.
+   `:root` and `.light` have the same specificity (0,1,0), so a bare `:root`
+   block in this file — which loads after styles.css — would win in BOTH themes
+   and paint the light theme dark. Measured, not assumed: with a bare :root the
+   light theme's --surface-container resolved to #030c19 instead of #ffffff.
+   `:root:not(.light)` is 0,2,0, so it beats .light in dark mode and simply does
+   not match when the light theme is on.
+
+   The light theme is therefore left exactly as production has it. v2 has no
+   light palette — it was only ever designed dark — and a half-converted light
+   mode would be worse than an untouched one. If v2 gains a light palette later
+   it belongs in a `.light` block here, not in the dark one below.
+
+   VALUES COME FROM v2-tokens.css BY REFERENCE
+   Every mapping below is a var(--v2-*) lookup rather than a copied hex, so the
+   skin follows the v2 token set instead of drifting from it. v2-tokens.css must
+   be linked before this file is useful; index.html links both.
+
+   NOT REMAPPED: the --primary family and the sidebar's active colours. They are
+   already the corporate orange #da6536 in both themes, set deliberately, and
+   identical to --v2-primary. Leaving them alone keeps the brand accent as the
+   single thing that did not move.
+   ========================================================================== */
+
+/* ── Dark theme: the v2 palette ───────────────────────────────────────────── */
+
+:root:not(.light) {
+
+  /* Grounds and surfaces. v2 runs darker and bluer than production's neutral
+     greys, which is most of what reads as "the new look". */
+  --bg:                 var(--v2-bg);           /* #10131a -> #00050d */
+  --surface:            var(--v2-bg);
+  --surface-low:        var(--v2-surface);      /* #191c22 -> #030c19 */
+  --surface-container:  var(--v2-surface);      /* card ground            */
+  --surface-high:       var(--v2-surface-2);    /* hover / raised         */
+  --surface-highest:    var(--v2-surface-3);
+  --surface3:           var(--v2-surface-3);
+
+  /* Lines. v2 uses solid hairlines rather than translucent greys, which keeps
+     card edges crisp against the much darker ground. */
+  --border:             var(--v2-line);
+  --border-strong:      var(--v2-line-strong);
+
+  /* Type. Slightly cooler and a step brighter, for contrast on the darker bg. */
+  --text:               var(--v2-ink);          /* #e1e2eb -> #f1f5f9 */
+  --text2:              var(--v2-ink-2);
+  --text3:              var(--v2-ink-3);        /* #5b6478 -> #74869f, a contrast gain */
+
+  /* Status colours. These carry meaning across the compliance UI — green is
+     roadworthy, amber is due soon, red is overdue — so only the shade moves,
+     never which state gets which hue. */
+  --success:            var(--v2-green-hi);
+  --success-bg:         var(--v2-green-soft);
+  --warning:            var(--v2-amber-hi);
+  --warning-bg:         var(--v2-amber-soft);
+  --danger:             var(--v2-red-hi);
+  --danger-bg:          var(--v2-red-soft);
+  /* --danger-text is deliberately NOT remapped. It is a text-on-dark tint,
+     not a status hue: styles.css uses it for the label inside a translucent
+     red chip (.cal-event-brake, .badge-red). Production's #ffb4ab is a pale
+     salmon chosen for exactly that. The nearest v2 red, --v2-red-hi #f87171,
+     is a mid-tone and dropped .cal-event-brake to 4.23:1 when it was mapped
+     here — measured, and the only contrast regression the whole skin caused.
+     v2 has no red this pale, so the right answer is to leave it alone. */
+
+  /* Chrome. */
+  --sidebar-bg:         var(--v2-bg-sidebar);
+  --sidebar-border:     var(--v2-line);
+  --sidebar-hover-bg:   var(--v2-surface-2);
+  --sidebar-text:       var(--v2-ink-2);        /* #7a8599 -> #94a3b8, a contrast gain */
+  --topbar-bg:          var(--v2-bg);
+  --topbar-border:      var(--v2-line);
+
+  /* Inputs. */
+  --input-bg:           var(--v2-surface-2);
+  --input-border:       var(--v2-line-strong);
+
+  --row-stripe:         rgba(255, 255, 255, .02);
+
+  /* Depth. Layered rather than single-drop: a tight contact shadow seats the
+     card, a wide soft one lifts it. Only defined for dark — .light declares its
+     own, lighter shadows and keeps them. */
+  --shadow:             var(--v2-shadow-sm);
+  --shadow-card:        var(--v2-shadow);
+  --shadow-lg:          var(--v2-shadow-hover);
+}
+
+/* ── Both themes: geometry ────────────────────────────────────────────────
+   Radii are not a colour and .light does not redefine them, so a plain :root
+   is correct here and keeps the two themes the same shape. v2 is rounder. */
+
+:root {
+  --radius:    var(--v2-r-md);   /* 10px -> 12px */
+  --radius-lg: var(--v2-r-lg);   /* 14px -> 16px */
+  --radius-xl: var(--v2-r-xl);   /* 18px -> 24px */
+}
