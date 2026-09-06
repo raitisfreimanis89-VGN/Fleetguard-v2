@@ -19,20 +19,23 @@
    reproduced here.
 
    WHAT MUST NOT BE LOADED
-   v2-shell.css. It is the staging pages' global reset and it would damage the
-   live app:
+   v2-staging-reset.css, and only that. It holds the four global rules
+   (*, [hidden], body, a) that the standalone v2/*.html pages need because
+   they own their <body>. In the live app the same rules would repaint the
+   application from #10131a to #00050d, break the .light theme production
+   supports and v2 never had, and strip link styling app-wide.
 
-     body { background: var(--v2-bg); color: var(--v2-ink); ... }
-       -> repaints the whole application from #10131a to #00050d and breaks
-          the .light theme, which production supports and v2 never did
-     a { color: inherit; text-decoration: none; }
-       -> strips link styling everywhere in the live UI
-     [hidden] { display: none !important; }
-     *, *::before, *::after { box-sizing: border-box; }
-       -> production already sets this in styles.css
+   Every other v2 sheet — including v2-shell.css, which used to carry those
+   four rules — is now .v2- prefixed or .v2-app scoped throughout and is safe
+   to link here.
 
-   Anything the ported pages need from the shell layer belongs here instead,
-   scoped so it cannot leak.
+   WHY THIS FILE STILL EXISTS
+   The ported pages render v2 components inside production's OWN shell, not
+   inside .v2-app, so the .v2-app-scoped rules in v2-shell.css do not reach
+   them. .v2-region is that shell's stand-in: it re-establishes the ground and
+   the anchor reset for the subtree a ported render occupies. When the live app
+   eventually adopts the v2 shell, .v2-app supplies both and this file's
+   region rules retire.
    ========================================================================== */
 
 /* ── Accent indirection ───────────────────────────────────────────────────

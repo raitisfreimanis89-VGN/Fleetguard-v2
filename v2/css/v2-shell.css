@@ -1,32 +1,40 @@
 /* ==========================================================================
    FleetGuard v2 — application shell
    --------------------------------------------------------------------------
-   STAGING ONLY. Sidebar, topbar and page header. Section content (hero
-   widgets, filter bar, card grids, document rows) lands in later steps and
-   gets its own stylesheet — this file stays the frame, not the contents.
+   Sidebar, topbar and page header — the frame, not the contents. Section
+   content (hero widgets, filter bar, card grids, document rows) has its own
+   stylesheets.
 
-   Every selector is .v2- prefixed. css/styles.css owns the unprefixed names
-   (.card, .tab, .grid, .badge, .brand) and must not be shadowed.
+   SAFE TO LOAD IN PRODUCTION. Every selector here is .v2- prefixed or scoped
+   under .v2-app, so linking this file into the live index.html cannot change
+   a single pixel outside a .v2-app subtree. css/styles.css keeps sole
+   ownership of the unprefixed names (.card, .tab, .grid, .badge, .brand).
+
+   The four global rules this file used to carry (*, [hidden], body, a) moved
+   to v2-staging-reset.css, which only v2/*.html links. They were the one and
+   only thing keeping the entire shell layer out of the live app: 57 selectors
+   held back by 4 lines. Their scoped equivalents are immediately below.
    ========================================================================== */
 
-*, *::before, *::after { box-sizing: border-box; }
+/* Scoped box model. Production's styles.css already sets this globally and
+   the standalone pages get it from v2-staging-reset.css; this makes the shell
+   correct on its own terms wherever it is dropped, including inside a host
+   page that never established border-box. */
+.v2-app, .v2-app *, .v2-app *::before, .v2-app *::after { box-sizing: border-box; }
 
 /* The UA's [hidden] rule is a bare attribute selector, so any class that sets
    display (and most of the layout below does) silently beats it and the
-   element stays visible. Anything toggled with el.hidden needs this. */
-[hidden] { display: none !important; }
+   element stays visible. Anything toggled with el.hidden needs this. Scoped:
+   an app-wide [hidden]{display:none!important} would override host code that
+   legitimately shows a [hidden] element by writing style.display. */
+.v2-app [hidden] { display: none !important; }
 
-body {
-  margin: 0;
-  background: var(--v2-bg);
-  color: var(--v2-ink);
-  font-family: var(--v2-font-body);
-  font-size: var(--v2-fs-base);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a { color: inherit; text-decoration: none; }
+/* Rows, cards and nav items are anchors so they keep keyboard focus and the
+   browser's own affordances; they are not meant to look like body links.
+   Scoped to the frame so a host page's link styling survives untouched —
+   v2-bridge.css applies the same rule to .v2-region for pages that render v2
+   components inside production's existing shell. */
+.v2-app a { color: inherit; text-decoration: none; }
 
 /* Visible focus for keyboard users on every interactive element in the shell. */
 .v2-app :is(a, button, input):focus-visible {
@@ -50,15 +58,26 @@ a { color: inherit; text-decoration: none; }
   padding: var(--v2-s2) var(--v2-s4);
   font-weight: 600; font-size: var(--v2-fs-sm);
   transition: top var(--v2-t-base);
+  /* Outside .v2-app, so the scoped anchor reset above does not reach it. */
+  text-decoration: none;
 }
 .v2-skip:focus { top: var(--v2-s4); }
 
 /* ── Frame ───────────────────────────────────────────────────────────────── */
 
+/* The frame paints its own ground and sets its own base type rather than
+   inheriting them from body, so the shell renders identically whether it is
+   the whole document (v2/*.html) or a subtree of a host page that has its
+   own background and font stack. That independence is what makes the shell
+   adoptable by the live app. */
 .v2-app {
   display: grid;
   grid-template-columns: var(--v2-sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
+  background: var(--v2-bg);
+  color: var(--v2-ink);
+  font-family: var(--v2-font-body);
+  font-size: var(--v2-fs-base);
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
