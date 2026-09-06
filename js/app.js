@@ -1523,43 +1523,95 @@ async function doDeleteDOT(id){if(!isAdmin())return;const ok=await confirm2('Del
 // DRIVERS
 // ═══════════════════════════════════════════════════════
 function renderDrivers(){
-  let html='';
+  // v2 components against live data. Styles: v2-tokens + v2-bridge +
+  // v2-drivers.css (+ v2-vehicles.css for the form controls, v2-inspections.css
+  // for the table shell).
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'2')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    edit:'<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    trash:'<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    palm:'<path d="M2 21h20"/><path d="M12 21V10"/><path d="M12 10c0-4 3-7 7-7-1 4-3 7-7 7Z"/><path d="M12 10c0-4-3-7-7-7 1 4 3 7 7 7Z"/>',
+    back:'<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>',
+    user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+  };
+  // Initials for the avatar, derived from the name already on screen.
+  const _ini=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+
+  let html='<div class="v2-region">';
+
   if(isAdmin()){
-    html+=`<div class="card mb-4" style="margin-bottom:20px;max-width:480px"><div class="card-header">👤 Add Driver</div><div class="card-body">
-      <div style="display:flex;gap:10px"><input type="text" id="d-name" placeholder="Full name" style="flex:1" onkeydown="if(event.key==='Enter')doAddDriver()"/><button class="btn btn-primary" onclick="doAddDriver()">+ Add</button></div>
-    </div></div>`;
-  } else {html+=dispatcherNotice();}
-  html+=`<div class="card" style="max-width:640px"><div class="card-header">All Drivers (${DRIVERS.length})</div><div class="card-body" style="padding:0">`;
-  html+=`<div class="table-wrap"><table><thead><tr><th>Driver</th><th>Assigned Truck</th><th>Dispatcher</th>${isAdmin()?'<th>Actions</th>':''}</tr></thead><tbody>`;
-  if(DRIVERS.length===0) html+=`<tr><td colspan="${isAdmin()?4:3}" class="empty" style="padding:20px;text-align:center">No drivers added yet</td></tr>`;
+    html+='<section class="v2-form-card v2-accent-primary" aria-label="Add driver">'
+      +'<div class="v2-form-head"><span class="v2-form-ic">'+_sv(_IC.user)+'</span>'
+      +'<h2>Add driver</h2></div>'
+      +'<div class="v2-form-body"><div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="d-name">Full name <span class="v2-field-req">*</span></label>'
+        // id, the Enter binding and doAddDriver() are all load-bearing
+        +'<input class="v2-input" id="d-name" type="text" placeholder="Full name" onkeydown="if(event.key===\'Enter\')doAddDriver()"/></div>'
+      +'</div>'
+      +'<div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddDriver()">'
+      +_sv(_IC.plus,'2.2')+'Add driver</button></div>'
+      +'</div></section>';
+  } else {
+    html+=dispatcherNotice();
+  }
+
+  html+='<section class="v2-table-card" aria-label="Driver directory">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.users)+'</span>'
+    +'<h2>All drivers</h2><span class="v2-console-note">'+DRIVERS.length+' total</span></div>'
+    +'<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
+    +'<th>Driver</th><th>Assigned truck</th><th>Dispatcher</th><th>Status</th>'
+    +(isAdmin()?'<th>Actions</th>':'')
+    +'</tr></thead><tbody>';
+
+  if(DRIVERS.length===0){
+    html+='<tr><td colspan="'+(isAdmin()?5:4)+'" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No drivers added yet</td></tr>';
+  }
+
   DRIVERS.forEach(d=>{
     const assignedVehicles=VEHICLES.filter(v=>v.assignedDriverId===d.id);
-    const truckNames=assignedVehicles.map(v=>`Truck #${esc(v.truckNumber)}`).join(', ')||'—';
-    const dispatchers=[...new Set(assignedVehicles.map(v=>v.assignedDispatcher).filter(Boolean))].map(esc).join(', ')||'—';
+    const trucks=assignedVehicles.map(v=>'<span class="v2-truck-chip">#'+esc(v.truckNumber)+'</span>').join('');
+    const dispatchers=[...new Set(assignedVehicles.map(v=>v.assignedDispatcher).filter(Boolean))].map(esc).join(', ');
     const isVac=!!d.on_vacation;
-    html+=`<tr id="driver-row-${d.id}" style="${isVac?'opacity:.6;background:rgba(245,158,11,.04)':''}">
-      <td>
-        <div id="driver-view-${d.id}" style="display:flex;align-items:center;gap:8px">
-          <span class="fw-600" style="color:${isVac?'var(--text3)':''}">${esc(d.name)}</span>
-          ${isVac?'<span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">🏖️ Vacation</span>':''}
-        </div>
-        <div id="driver-edit-${d.id}" style="display:none;gap:8px;align-items:center">
-          <input type="text" value="${d.name}" id="dedit-${d.id}" style="flex:1;min-width:120px"/>
-          <button class="btn btn-success btn-sm" onclick="doUpdateDriver('${d.id}')">Save</button>
-          <button class="btn btn-ghost btn-sm" onclick="cancelEditDriver('${d.id}')">Cancel</button>
-        </div>
-      </td>
-      <td class="text-sm">${truckNames}</td>
-      <td class="text-sm">${dispatchers}</td>
-      ${isAdmin()?`<td><div style="display:flex;gap:6px" id="driver-btns-${d.id}">${isVac
-        ?`<button class="btn btn-sm" onclick="toggleDriverVacation('${d.id}',false)" style="background:rgba(120,220,119,.1);border:1px solid rgba(120,220,119,.4);color:var(--success);font-size:11.5px">↩ Return</button>`
-        :`<button class="btn btn-ghost btn-sm" onclick="startEditDriver('${d.id}')">✏ Edit</button><button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDriver('${d.id}','${d.name.replace(/'/g,"\\'")}')">🗑</button><button class="btn btn-sm" onclick="toggleDriverVacation('${d.id}',true)" style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.35);color:var(--warning);font-size:11px;font-weight:700" title="Set on vacation">🏖️</button>`
-      }</div></td>`:''}
-    </tr>`;
+    // Three states, all from data the page already has: the vacation flag, and
+    // whether any vehicle points at this driver.
+    const st=isVac?['is-vacation','Vacation']:assignedVehicles.length?['is-active','Active']:['is-unassigned','Unassigned'];
+    html+='<tr id="driver-row-'+d.id+'" class="v2-drv-row'+(isVac?' is-vacation':'')+'">'
+      +'<td>'
+        // .v2-drv is display:flex, which is what startEditDriver forces it back to
+        +'<div id="driver-view-'+d.id+'" class="v2-drv">'
+          +'<span class="v2-drv-avatar">'+esc(_ini(d.name))+'</span>'
+          +'<span class="v2-drv-meta"><span class="v2-drv-name">'+esc(d.name)+'</span></span>'
+        +'</div>'
+        +'<div id="driver-edit-'+d.id+'" style="display:none;gap:var(--v2-s2);align-items:center">'
+          +'<input class="v2-input" type="text" value="'+esc(d.name)+'" id="dedit-'+d.id+'" style="flex:1;min-width:120px"/>'
+          +'<button class="v2-btn-primary" type="button" onclick="doUpdateDriver(\''+d.id+'\')">Save</button>'
+          +'<button class="v2-btn-ghost" type="button" onclick="cancelEditDriver(\''+d.id+'\')">Cancel</button>'
+        +'</div>'
+      +'</td>'
+      +'<td>'+(trucks?'<span class="v2-truck-list">'+trucks+'</span>':'<span class="v2-cell-none">&mdash;</span>')+'</td>'
+      +'<td>'+(dispatchers?'<span class="v2-disp-list">'+dispatchers+'</span>':'<span class="v2-cell-none">&mdash;</span>')+'</td>'
+      +'<td><span class="v2-drv-status '+st[0]+'">'+st[1]+'</span></td>';
+    if(isAdmin()){
+      // .v2-actions is display:flex, which cancelEditDriver forces it back to
+      html+='<td><span class="v2-actions" id="driver-btns-'+d.id+'">'
+        +(isVac
+          ?'<button class="v2-act-return" type="button" onclick="toggleDriverVacation(\''+d.id+'\',false)" title="Return from vacation" aria-label="Return '+esc(d.name)+' from vacation">'+_sv(_IC.back,'2')+'Return</button>'
+          :'<button class="v2-act" type="button" onclick="startEditDriver(\''+d.id+'\')" title="Edit" aria-label="Edit '+esc(d.name)+'">'+_sv(_IC.edit)+'</button>'
+           // the single-quote escape here is the production original, kept as-is
+           +'<button class="v2-act is-danger" type="button" onclick="doDeleteDriver(\''+d.id+'\',\''+d.name.replace(/'/g,"\\'")+'\')" title="Delete" aria-label="Delete '+esc(d.name)+'">'+_sv(_IC.trash)+'</button>'
+           +'<button class="v2-act is-vacation" type="button" onclick="toggleDriverVacation(\''+d.id+'\',true)" title="Set on vacation" aria-label="Set '+esc(d.name)+' on vacation">'+_sv(_IC.palm)+'</button>')
+        +'</span></td>';
+    }
+    html+='</tr>';
   });
-  html+=`</tbody></table></div></div></div>`;
+
+  html+='</tbody></table></div></section>';
+  html+='</div>';
   return html;
 }
+
 async function doAddDriver(){if(!isAdmin())return;const name=document.getElementById('d-name').value.trim();if(!name){showToast('Enter a driver name','danger');return;}await addDriver(name);document.getElementById('d-name').value='';showToast('Driver added!','success');render();}
 function startEditDriver(id){document.getElementById('driver-view-'+id).style.display='none';document.getElementById('driver-edit-'+id).style.display='flex';document.getElementById('driver-btns-'+id).style.display='none';document.getElementById('dedit-'+id).focus();}
 function cancelEditDriver(id){document.getElementById('driver-view-'+id).style.display='flex';document.getElementById('driver-edit-'+id).style.display='none';document.getElementById('driver-btns-'+id).style.display='flex';}

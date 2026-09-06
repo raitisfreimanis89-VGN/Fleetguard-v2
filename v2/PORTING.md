@@ -37,7 +37,7 @@ node v2/tools/check-isolation.js
 ## 2. The two integration modes
 
 **`.v2-region` — a page ported inside production's existing shell.** What the
-three shipped ports do. The render function returns v2 markup wrapped in
+four shipped ports do. The render function returns v2 markup wrapped in
 `.v2-region`, which `v2-bridge.css` gives the v2 ground and the anchor reset,
 because production's sidebar and topbar are still the ones on screen. This is
 the incremental mode: one page at a time, no chrome change, nothing else on the
@@ -84,9 +84,21 @@ still breaks.
   admin branch of `renderInspections`.
 - **Role gates stay where they are.** `isAdmin()` wraps the send console and
   the repair button. A v2 layout must not hoist a control out of its gate.
-- **`renderDrivers` additionally**: the phone column is admin-gated, backed by
-  the `driver_phones` RLS policy and an E.164 `CHECK` constraint. Presentation
-  only — do not touch the query or the format.
+- **Toggled elements must keep their display type.** `startEditDriver` sets
+  `driver-edit-<id>` to `display:flex` and `cancelEditDriver` sets
+  `driver-view-<id>` and `driver-btns-<id>` back to `flex`; `startEditVehicle`
+  uses `block` for `vview-<id>`. The handler hardcodes the value, so a v2 class
+  that lays the element out as a grid will be overridden into flex the first
+  time someone clicks Edit, and the layout will break only in that state.
+  `.v2-drv` and `.v2-actions` are both `display:flex`, which is why the Drivers
+  port could use them directly.
+- **A v2 mockup may show data the live page does not have.** The v2 Drivers
+  design has a Cell column and `d-truck` / `d-phone` inputs. `loadAll()` never
+  fetches `driver_phones` — it is admin-only by RLS and belongs to the Reminders
+  page and the edge functions — and `doAddDriver()` reads only `d-name`. Porting
+  those controls would have produced a column that renders empty and two inputs
+  that silently discard what you type. They were left out. Adding them is a
+  feature with a data change behind it, not a port.
 
 ## 4. Verifying a port changed nothing but pixels
 
@@ -100,10 +112,10 @@ node v2/tools/check-contracts.js           # no DOM hook was dropped
 
 **`verify-logic-untouched.js`** extracts each named function from
 `main:js/app.js` and from the working tree and byte-compares them, grouped so a
-failure names the capability at risk. The three shipped ports return **41 of 41
+failure names the capability at risk. The four shipped ports return **40 of 40
 byte-identical, unexpected changes: NONE** — PTI/SMS sending, the defect repair
 flow, driver portal submissions, the compliance engine, all 10 database writes,
-auth/load/routing, and the six render functions not yet ported.
+auth/load/routing, and the five render functions not yet ported.
 `js/reminders.js`, the 11 edge functions and `gvoice-sms-service/` are untouched
 by a port and so are out of its scope.
 
@@ -113,8 +125,8 @@ contract surface — ids, `data-*` attributes, inline handlers, and the classes
 the codebase actually queries — from the baseline and from the port, and reports
 what the baseline emitted and the port no longer does. Styling classes are
 ignored, because `.btn` becoming `.v2-btn-send` is the work; `.mark-repaired-btn`
-is not, because `render()` binds it by `querySelectorAll`. The three shipped
-ports keep **29 of 29 contracts, dropped: NONE**.
+is not, because `render()` binds it by `querySelectorAll`. The four shipped
+ports keep **43 of 43 contracts, dropped: NONE**.
 
 It also resolves every literal `getElementById` in the codebase against the
 markup something actually emits. Five currently do not resolve; `login-db-setup`
@@ -141,7 +153,7 @@ dispatcher-versus-admin split still need a human with a session.
 | Dashboard | `renderDashboard` | ported |
 | Vehicles | `renderVehicles` | ported |
 | Inspections | `renderInspections` | ported |
-| Drivers | `renderDrivers` | v2 design exists — not ported |
+| Drivers | `renderDrivers` | ported |
 | Calendar | `renderCalendar` | v2 design exists — not ported |
 | Reports | `renderReports` | v2 design exists — not ported |
 | Dispatch Board | `renderDispatcherBoard` | v2 design exists — not ported |

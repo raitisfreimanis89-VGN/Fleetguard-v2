@@ -53,12 +53,13 @@ const GROUPS = {
   'Database writes':              ['addVehicle', 'updateVehicle', 'deleteVehicle', 'addDriver', 'updateDriver', 'deleteDriver',
                                    'addBrakeTest', 'addServiceRecord', 'addDOTInspection', 'addMaintenance'],
   'Auth / data load / routing':   ['signIn', 'signOut', 'loadAll', 'init', 'navigate', 'render'],
-  'Render functions not yet ported': ['renderDrivers', 'renderCalendar', 'renderReports',
+  'Render functions not yet ported': ['renderCalendar', 'renderReports',
                                       'renderDispatcherBoard', 'renderVehicleDetail', 'renderUsers'],
 };
 
-/* Ported deliberately — expected to differ, and listed so the count is honest. */
-const PORTED = ['renderDashboard', 'renderVehicles', 'renderInspections'];
+/* Ported deliberately — expected to differ, and listed so the count is honest.
+   Move a name here as its port lands, and out of the group above. */
+const PORTED = ['renderDashboard', 'renderVehicles', 'renderInspections', 'renderDrivers'];
 
 console.log('  baseline: ' + BASE + ':' + FILE + '\n');
 let total = 0, identical = 0;
