@@ -58,11 +58,22 @@ the ground and the anchor reset for everything inside it.
 
 Presentation changes. Everything the rest of the app reaches for stays.
 
+This list is enforced, not just documented — `check-contracts.js` in section 4
+fails the build on any of it. Read it anyway, because knowing *why* a hook is
+load-bearing is what stops you writing a port that satisfies the checker and
+still breaks.
+
 - **Element ids are API.** Other functions do `getElementById`. `renderVehicles`
   keeps `v-truck`, `v-trailer`, `v-driver`, `v-dispatcher`, `v-annual`,
   `vcard-<id>`, `vview-<id>`, `vedit-<id>`, `ve-*-<id>`; `renderInspections`
   keeps `sl-vehicle`, `pti-bulk-btn`, `pti-queue-status`. Rename one and the
-  feature dies silently — no error, just a button that does nothing.
+  feature dies silently — no error, just a button that does nothing. The guard
+  in `loadPtiQueueStatus()` is the shape to keep in mind:
+
+  ```js
+  const el = document.getElementById('pti-queue-status');
+  if (!el || !sb || !isAdmin()) return;        // typo the id and this is a no-op
+  ```
 - **Delegated hooks are API.** `render()` binds `.mark-repaired-btn` by
   `querySelectorAll` after every render and reads `dataset.insp`. The class and
   the `data-insp` attribute are both load-bearing.
@@ -79,21 +90,49 @@ Presentation changes. Everything the rest of the app reaches for stays.
 
 ## 4. Verifying a port changed nothing but pixels
 
+Three checks, all exit non-zero on failure. Run them after every port.
+
 ```bash
-node v2/tools/verify-logic-untouched.js        # byte-compares every named function against main
+node v2/tools/check-isolation.js           # no v2 sheet can leak into the live app
+node v2/tools/verify-logic-untouched.js    # no logic moved while markup moved
+node v2/tools/check-contracts.js           # no DOM hook was dropped
 ```
 
-It extracts each named function from `main:js/app.js` and from the working tree
-and byte-compares them, grouped so a failure names the capability at risk. The
-three shipped ports return **41 of 41 byte-identical, unexpected changes:
-NONE** — PTI/SMS sending, the defect repair flow, driver portal submissions,
-the compliance engine, all 10 database writes, auth/load/routing, and the six
-render functions not yet ported. `js/reminders.js`, the 11 edge functions and
-`gvoice-sms-service/` are untouched by a port and so are out of its scope.
+**`verify-logic-untouched.js`** extracts each named function from
+`main:js/app.js` and from the working tree and byte-compares them, grouped so a
+failure names the capability at risk. The three shipped ports return **41 of 41
+byte-identical, unexpected changes: NONE** — PTI/SMS sending, the defect repair
+flow, driver portal submissions, the compliance engine, all 10 database writes,
+auth/load/routing, and the six render functions not yet ported.
+`js/reminders.js`, the 11 edge functions and `gvoice-sms-service/` are untouched
+by a port and so are out of its scope.
 
-Re-run it after every port; it exits non-zero on any unexpected change. A diff
-in anything other than the render function you are porting means the port went
-too far.
+**`check-contracts.js`** is the one that catches the silent failures. A port is
+*supposed* to rewrite markup, so a diff tells you nothing; this extracts the
+contract surface — ids, `data-*` attributes, inline handlers, and the classes
+the codebase actually queries — from the baseline and from the port, and reports
+what the baseline emitted and the port no longer does. Styling classes are
+ignored, because `.btn` becoming `.v2-btn-send` is the work; `.mark-repaired-btn`
+is not, because `render()` binds it by `querySelectorAll`. The three shipped
+ports keep **29 of 29 contracts, dropped: NONE**.
+
+It also resolves every literal `getElementById` in the codebase against the
+markup something actually emits. Five currently do not resolve; `login-db-setup`
+is a documented guard for a removed element (`js/app.js:71`) and the other four
+belong to two orphaned functions covered by a separate cleanup — see section 6.
+
+Verify the checkers themselves after changing them. Both have been confirmed to
+fail on injected faults: `check-isolation.js` on a `body` rule, an `a` rule, a
+`.light .card` rule and an `h1` nested inside `@media`; `check-contracts.js` on
+a typo'd id, a dropped delegated class and an emptied inline handler.
+
+A diff in anything other than the render function you are porting means the port
+went too far.
+
+**None of this replaces logging in.** These checks prove a port did not change
+behaviour; they cannot prove the behaviour was right to begin with, and they
+never see real data. Empty states, long names, null `assignedDriverId`, and the
+dispatcher-versus-admin split still need a human with a session.
 
 ## 5. State
 
@@ -116,6 +155,24 @@ Add the page's component sheet to the `<link>` block in `index.html` as its
 port lands; that block is ordered after `css/styles.css` so the `--v2-*` tokens
 resolve.
 
-**Open item:** the standalone `v2/*.html` pages are published and serve invented
-fleet data to anyone who finds them. Retire them once the pages they mock have
-been ported.
+## 6. Open items
+
+- **The ported pages have not been seen with real data.** Dashboard, Vehicles
+  and Inspections were verified against synthetic fixtures and by the three
+  checkers above. Nobody has logged in and looked at them. This is the blocker
+  before merging to `main`.
+- **The standalone `v2/*.html` pages are published and serve invented fleet
+  data** to anyone who finds the URL. They are reference designs now, not
+  products. Retire each one as the real page it mocks is ported, or drop them
+  from the deploy in the meantime.
+- **Two orphaned functions in `js/app.js`.** `doAddMaintenance` (line 1510) and
+  `doAddMileage` (line 1515) have no callers and read ids nothing emits —
+  `m-date`, `m-notes`, `mil-driver`, `mil-val`. `doAddMaintenance` was
+  superseded by `doAddUnifiedService` directly above it; `doAddMileage` would
+  throw on null if it were ever wired up. The database writes they wrap,
+  `addMaintenance()` and `addMileage()`, are both live and must stay. Pre-dates
+  the port; tracked separately.
+- **Pre-existing contrast**: `.nav-item.active` and `.nav-icon` sit at 3.56:1
+  in `css/styles.css`.
+- **Three Unsplash hotlinks** in `v2-cards.css` (toll, traffic, states) — remote
+  dependencies in a page that otherwise ships its own assets.
