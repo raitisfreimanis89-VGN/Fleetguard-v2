@@ -514,38 +514,14 @@ function renderInspections(){
 
   let html='<div class="v2-region">';
 
-  // ── Tier 1: open defects lead the page ───────────────────────────────────
-  // An unrepaired defect is the only thing here that needs action today, and
-  // it is what the CSA driver-observed category is scored on.
-  if(openRows.length){
-    html+='<section class="v2-defect-grid" aria-label="Open defects">';
-    openRows.forEach(r=>{
-      const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
-      const ageDays=r.submittedAt?daysBetween(String(r.submittedAt).split('T')[0],today()):null;
-      const flags=[];
-      if(r.tyresFlagged) flags.push(r.tyresFlagged+' tyre'+(r.tyresFlagged>1?'s':''));
-      if(r.checksFailed) flags.push(r.checksFailed+' check'+(r.checksFailed>1?'s':''));
-      const isDefect=r.overallResult==='defect';
-      html+='<article class="v2-defect '+(isDefect?'v2-accent-red':'v2-accent-amber')+'">'
-        +'<div class="v2-defect-head"><span class="v2-defect-id">'
-          +'<span class="v2-defect-truck">Truck #'+esc(r.truckNumber||'—')+'</span>'
-          +'<span class="v2-defect-when">Reported '+inspDT(r.submittedAt)+'</span>'
-        +'</span><span class="v2-chip-status '+(isDefect?'is-defect':'is-minor')+'">'+(isDefect?'Defect':'Minor')+'</span></div>'
-        +'<div class="v2-defect-meta">'
-          +'<span class="v2-defect-line">'+_sv(_IC.user)+(dName?esc(dName):'&mdash;')+'</span>'
-          +'<span class="v2-defect-line">'+_sv(_IC.alert)+'<span class="v2-defect-issues">'+(flags.join(' &middot; ')||'&mdash;')+'</span></span>'
-        +'</div>'
-        +'<div class="v2-defect-foot">'
-          // class AND data-insp both required: render() binds this by
-          // querySelectorAll('.mark-repaired-btn') and reads dataset.insp.
-          +(isAdmin()?'<button class="v2-btn-repair mark-repaired-btn" type="button" data-insp="'+esc(r.id)+'">'+_sv(_IC.check,'2.2')+'Mark repaired</button>':'')
-          +(ageDays>0?'<span class="v2-chip-status is-flag">'+ageDays+'d open</span>':'')
-        +'</div></article>';
-    });
-    html+='</section>';
-  }
 
-  // ── Tier 2: pulse counters + send console ────────────────────────────────
+  html+='<div class="v2-page-head"><h1>Pre-Trip Inspections</h1>'
+    +'<p>Driver walk-around submissions, and the defects still waiting on a repair.</p></div>';
+
+  // ── Tier 1: pulse counters + send console ────────────────────────────────
+  // The console leads, matching v2/inspections.html. It answers "what is the
+  // state of the fleet today" before the page shows individual faults, and it
+  // is where the only controls on the page live.
   html+='<section class="v2-console-row" aria-label="Inspection console">';
   html+='<article class="v2-console v2-accent-cyan"><div class="v2-console-head">'
     +'<span class="v2-console-ic">'+_sv(_IC.pulse)+'</span><h2>Live inspection pulse</h2></div>'
@@ -582,6 +558,37 @@ function renderInspections(){
     setTimeout(loadPtiQueueStatus,50);
   }
   html+='</section>';
+
+  // ── Tier 2: open defects ─────────────────────────────────────────────────
+  // An unrepaired defect is the only thing here that needs action today, and
+  // it is what the CSA driver-observed category is scored on.
+  if(openRows.length){
+    html+='<section class="v2-defect-grid" aria-label="Open defects">';
+    openRows.forEach(r=>{
+      const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
+      const ageDays=r.submittedAt?daysBetween(String(r.submittedAt).split('T')[0],today()):null;
+      const flags=[];
+      if(r.tyresFlagged) flags.push(r.tyresFlagged+' tyre'+(r.tyresFlagged>1?'s':''));
+      if(r.checksFailed) flags.push(r.checksFailed+' check'+(r.checksFailed>1?'s':''));
+      const isDefect=r.overallResult==='defect';
+      html+='<article class="v2-defect '+(isDefect?'v2-accent-red':'v2-accent-amber')+'">'
+        +'<div class="v2-defect-head"><span class="v2-defect-id">'
+          +'<span class="v2-defect-truck">Truck #'+esc(r.truckNumber||'—')+'</span>'
+          +'<span class="v2-defect-when">Reported '+inspDT(r.submittedAt)+'</span>'
+        +'</span><span class="v2-chip-status '+(isDefect?'is-defect':'is-minor')+'">'+(isDefect?'Defect':'Minor')+'</span></div>'
+        +'<div class="v2-defect-meta">'
+          +'<span class="v2-defect-line">'+_sv(_IC.user)+(dName?esc(dName):'&mdash;')+'</span>'
+          +'<span class="v2-defect-line">'+_sv(_IC.alert)+'<span class="v2-defect-issues">'+(flags.join(' &middot; ')||'&mdash;')+'</span></span>'
+        +'</div>'
+        +'<div class="v2-defect-foot">'
+          // class AND data-insp both required: render() binds this by
+          // querySelectorAll('.mark-repaired-btn') and reads dataset.insp.
+          +(isAdmin()?'<button class="v2-btn-repair mark-repaired-btn" type="button" data-insp="'+esc(r.id)+'">'+_sv(_IC.check,'2.2')+'Mark repaired</button>':'')
+          +(ageDays>0?'<span class="v2-chip-status is-flag">'+ageDays+'d open</span>':'')
+        +'</div></article>';
+    });
+    html+='</section>';
+  }
 
   // ── Tier 3: the full inspection stream ───────────────────────────────────
   html+='<section class="v2-table-card" aria-label="Pre-trip inspections">'
