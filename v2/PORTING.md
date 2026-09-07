@@ -211,6 +211,13 @@ resolve.
   land in the database. That closes the question of whether the element ids,
   the delegated `.mark-repaired-btn` binding and the inline handlers survived
   the ports.
+- **The PTI link send works from the ported page, so the SMS bot is intact.**
+  This was the highest-stakes contract in the whole exercise and the one whose
+  failure would have been silent: `#sl-vehicle`, `doSendLinkFromPicker()`,
+  `#pti-bulk-btn`, `#pti-queue-status` and the deferred
+  `setTimeout(loadPtiQueueStatus, 50)` all had to survive a full markup
+  rewrite, and a typo in any one of them would have produced a button that
+  simply did nothing. A link sent from the ported UI reached a real driver.
 - **The dispatcher path has still never run for real.** It is a materially
   different app — no add forms, no Cell column, no Reminders, dispatcherNotice
   banners in place of controls — and has only been exercised by overriding
