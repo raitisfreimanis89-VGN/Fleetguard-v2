@@ -109,7 +109,17 @@ for (const f of SOURCES) {
   baseSrc[f] = b;
   currSrc[f] = fs.readFileSync(f, 'utf8');
 }
-const queried = queriedClasses(Object.values(currSrc).concat(Object.values(baseSrc)));
+/* Only the CURRENT source decides what counts as a queried class, because the
+   current source is what will run. Including the baseline's queries made a
+   class look load-bearing after it had been retired along with its only
+   querier: renaming .rem-tab to .v2-subtab, and updating remSwitchTab in the
+   same commit, was reported as a dropped contract even though nothing looks
+   for .rem-tab any more.
+
+   This does not weaken the check that matters. Dropping a class from markup
+   while the code still queries it — the actual failure mode — is still caught,
+   because that query is still in the current source. */
+const queried = queriedClasses(Object.values(currSrc));
 
 /* ── 1. differential: what did a port drop? ──────────────────────────────── */
 console.log('  baseline: ' + BASE + '\n');

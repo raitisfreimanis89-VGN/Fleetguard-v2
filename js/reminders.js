@@ -33,33 +33,48 @@ function renderReminders() {
     return !notif || notif.status !== 'acknowledged';
   }).length;
 
-  return `
-<div id="view-reminders">
-  <div class="rem-tabs">
-    <button class="rem-tab ${remTab==='overview'?'active':''}" onclick="remSwitchTab('overview',this)">
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1">dashboard</span> Overview
-    </button>
-    <button class="rem-tab ${remTab==='history'?'active':''}" onclick="remSwitchTab('history',this)">
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1">history</span> SMS History
-    </button>
-    <button class="rem-tab ${remTab==='replies'?'active':''}" onclick="remSwitchTab('replies',this)">
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1">mark_chat_read</span>
-      Driver Replies ${pendingReplies > 0 ? `<span class="badge badge-green" style="margin-left:2px">${pendingReplies}</span>` : ''}
-    </button>
-    <button class="rem-tab ${remTab==='schedule'?'active':''}" onclick="remSwitchTab('schedule',this)">
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1">tune</span> Schedule Config
-    </button>
-  </div>
-  <div id="rem-tab-content">${remRenderTab()}</div>
-</div>`;
+  const _sv = d => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const IC = {
+    overview: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    history:  '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+    replies:  '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/><path d="m8 10 2.5 2.5L15 8"/>',
+    schedule: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
+  };
+  // remSwitchTab takes the button as its second argument and reads it to move
+  // the active class, so the handler shape here is load-bearing.
+  const tab = (key, icon, label, badge) =>
+    '<button class="v2-subtab' + (remTab === key ? ' is-active' : '') + '" type="button"' +
+    (remTab === key ? ' aria-current="page"' : '') +
+    ' onclick="remSwitchTab(\'' + key + '\',this)">' + _sv(icon) + label +
+    (badge ? '<span class="v2-subtab-badge">' + badge + '</span>' : '') + '</button>';
+
+  return '<div class="v2-region" id="view-reminders">' +
+    '<div class="v2-page-head"><h1>Reminders</h1>' +
+    '<p>Automated service reminders, the numbers they go to, and the schedules that trigger them.</p></div>' +
+    '<nav class="v2-subtabs" aria-label="Reminders sections">' +
+      tab('overview', IC.overview, 'Overview') +
+      tab('history',  IC.history,  'SMS History') +
+      tab('replies',  IC.replies,  'Driver Replies', pendingReplies > 0 ? pendingReplies : 0) +
+      tab('schedule', IC.schedule, 'Schedule Config') +
+    '</nav>' +
+    '<div id="rem-tab-content">' + remRenderTab() + '</div>' +
+  '</div>';
 }
 
-function remSwitchTab(tab) {
+// Takes the clicked button so the active state does not depend on matching the
+// tab key against the label text. The old text match worked only because every
+// label happened to contain its key — "SMS History" contains "history" — which
+// a rename would have broken silently. The text match is kept as a fallback for
+// any caller that does not pass the button.
+function remSwitchTab(tab, btn) {
   remTab = tab;
   const el = document.getElementById('rem-tab-content');
   if (el) el.innerHTML = remRenderTab();
-  document.querySelectorAll('.rem-tab').forEach(b => {
-    b.classList.toggle('active', b.textContent.toLowerCase().includes(tab));
+  document.querySelectorAll('.v2-subtab').forEach(b => {
+    const on = btn ? b === btn : b.textContent.toLowerCase().includes(tab);
+    b.classList.toggle('is-active', on);
+    if (on) b.setAttribute('aria-current', 'page');
+    else b.removeAttribute('aria-current');
   });
 }
 
@@ -366,119 +381,113 @@ function remRenderReplies() {
 // ── SCHEDULE CONFIG ───────────────────────────────────────────
 function remRenderSchedule() {
   const types = ['dot_inspection','brake_service','tyre_check']; // pm_service retired 2026-07-01 (not tracked)
-  const icons = { dot_inspection:'assignment_turned_in', brake_service:'construction', pm_service:'build_circle', tyre_check:'tire_repair' };
   const labels = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service', tyre_check:'Tyre Check' };
   const subtitles = { dot_inspection:'Yard inspection', brake_service:'Safety critical', pm_service:'Preventive maint.', tyre_check:'Tread photos' };
-  const iconBg = { dot_inspection:'var(--primary-dim)', brake_service:'var(--danger-bg)', pm_service:'var(--success-bg)', tyre_check:'var(--warning-bg)' };
-  const iconColor = { dot_inspection:'var(--primary-text)', brake_service:'var(--danger)', pm_service:'var(--success)', tyre_check:'var(--warning)' };
+  const tone = { dot_inspection:'v2-accent-blue', brake_service:'v2-accent-red', tyre_check:'v2-accent-amber' };
 
+  const _sv = (d,w) => '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
+  const IC = {
+    tune:  '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3"/><path d="M1 14h6M9 8h6M17 16h6"/>',
+    yard:  '<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    brake: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/>',
+    tyre:  '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
+    phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2Z"/>',
+    save:  '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+    trash: '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  };
+  const typeIcon = { dot_inspection:IC.yard, brake_service:IC.brake, tyre_check:IC.tyre };
   const overrides = REM_SCHEDULES.filter(s => s.vehicle_id !== null);
 
-  return `
-<div class="rem-grid" style="margin-bottom:16px">
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-accent"></div>
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:16px;color:var(--primary-text)">tune</span>
-      Global Defaults
-      <span class="badge badge-gray" style="margin-left:auto;font-weight:600">Applies to all vehicles</span>
-    </div>
-    <div class="card-body" style="padding:0">
-      <div class="table-wrap">
-      <table class="rem-sched-table">
-        <thead><tr>
-          <th>Service Type</th><th>Interval</th><th>Warn Before</th><th>Escalate After</th><th>On</th>
-        </tr></thead>
-        <tbody>
-          ${types.map(type => {
-            const s = REM_SCHEDULES.find(r => r.vehicle_id === null && r.reminder_type === type);
-            return `<tr>
-              <td>
-                <div style="display:flex;align-items:center;gap:9px">
-                  <div class="rem-type-icon" style="background:${iconBg[type]}">
-                    <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;color:${iconColor[type]}">${icons[type]}</span>
-                  </div>
-                  <div>
-                    <div style="font-weight:700;font-size:13px">${labels[type]}</div>
-                    <div style="font-size:10px;color:var(--text3)">${subtitles[type]}</div>
-                  </div>
-                </div>
-              </td>
-              <td><input type="number" value="${s?.interval_days??30}" min="1" max="365" onchange="remSaveSchedule(null,'${type}','interval_days',+this.value)"/> d</td>
-              <td><input type="number" value="${s?.warning_days_before??7}" min="1" max="30" onchange="remSaveSchedule(null,'${type}','warning_days_before',+this.value)"/> d</td>
-              <td><input type="number" value="${s?.escalation_hours??48}" min="1" max="168" onchange="remSaveSchedule(null,'${type}','escalation_hours',+this.value)"/> h</td>
-              <td><input type="checkbox" ${s?.enabled!==false?'checked':''} onchange="remSaveSchedule(null,'${type}','enabled',this.checked)"/></td>
-            </tr>`;
-          }).join('')}
-        </tbody>
-      </table>
-      </div>
-      <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
-        <button class="btn btn-primary btn-sm" onclick="remSaveAllSchedules()">
-          <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:14px">save</span> Save Defaults
-        </button>
-      </div>
-    </div>
-  </div>
+  // Every driver, not the first ten. Production sliced to 10 of 46 with nothing
+  // saying so, which reads as "these are the numbers on file" when it is not.
+  // .v2-phone-list is a plain column, so the panel simply grows.
+  const withPhone = DRIVERS.filter(d => DRIVER_PHONES.some(p => p.driver_id === d.id)).length;
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-accent"></div>
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:16px;color:var(--primary-text)">contacts</span>
-      Driver Phone Numbers
-    </div>
-    <div class="card-body" style="padding:0">
-      ${DRIVERS.slice(0, 10).map(d => {
-        const phone = DRIVER_PHONES.find(p => p.driver_id === d.id);
-        const v     = VEHICLES.find(x => x.assignedDriverId === d.id);
-        return `
-<div class="rem-phone-row" style="padding:10px 18px">
-  <div>
-    <div class="rem-phone-name">${esc(d.name)}</div>
-    <div class="rem-phone-truck">${v ? `Truck #${esc(v.truckNumber)}` : 'Unassigned'}</div>
-  </div>
-  ${phone
-    ? `<span class="rem-phone-num">${maskPhone(phone.phone_number)}</span>
-       <span class="badge ${phone.verified ? 'badge-green' : 'badge-yellow'}">${phone.verified ? '✓ Verified' : 'Active'}</span>`
-    : `<span class="rem-phone-missing">Not set</span>
-       <span class="badge badge-red">Missing</span>`}
-</div>`;
-      }).join('')}
-    </div>
-  </div>
-</div>
+  let html = '<section class="v2-rem-grid" aria-label="Schedule configuration">';
 
-<div class="card">
-  <div class="card-header">
-    <div class="card-header-accent"></div>
-    Per-Vehicle Overrides
-    <span class="badge badge-gray" style="margin-left:6px">Overrides global defaults for specific trucks</span>
-  </div>
-  <div class="card-body">
-    ${overrides.length === 0
-      ? '<div style="color:var(--text3);font-size:12px">No overrides — all vehicles using global defaults.</div>'
-      : overrides.map(o => {
-          const v = VEHICLES.find(x => x.id === o.vehicle_id);
-          const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service' };
-          return `
-<div class="rem-override-row">
-  <div style="flex:1">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span style="font-weight:700">Truck #${esc(v?.truckNumber ?? '?')}</span>
-      <span class="badge badge-red">${typeLabel[o.reminder_type]??o.reminder_type}</span>
-      <span class="badge badge-gray">Custom</span>
-    </div>
-    <div style="font-size:12px;color:var(--text2)">
-      Interval: <strong>${o.interval_days}d</strong> · Warn: <strong>${o.warning_days_before}d</strong> · Escalate: <strong>${o.escalation_hours}h</strong>
-    </div>
-  </div>
-  <button class="btn btn-ghost btn-sm" onclick="remDeleteOverride('${o.id}')">
-    <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:15px;color:var(--danger)">delete</span>
-  </button>
-</div>`;
-        }).join('')}
-  </div>
-</div>`;
+  // ── Global defaults ────────────────────────────────────────────────────────
+  html += '<article class="v2-table-card">' +
+    '<div class="v2-panel-head v2-accent-amber"><span class="v2-panel-ic">' + _sv(IC.tune) + '</span>' +
+    '<h2>Global defaults</h2><span class="v2-panel-tag">Applies to all vehicles</span></div>' +
+    '<div class="v2-table-wrap"><table class="v2-sched-table"><thead><tr>' +
+    '<th>Service type</th><th>Interval</th><th>Warn before</th><th>Escalate after</th><th>On</th>' +
+    '</tr></thead><tbody>';
+  types.forEach(type => {
+    const s = REM_SCHEDULES.find(r => r.vehicle_id === null && r.reminder_type === type);
+    const num = (field, val, min, max, unit, aria) =>
+      '<td><span class="v2-num"><input type="number" value="' + val + '" min="' + min + '" max="' + max + '"' +
+      ' aria-label="' + aria + '" onchange="remSaveSchedule(null,\'' + type + '\',\'' + field + '\',+this.value)"/>' +
+      '<span class="v2-num-unit">' + unit + '</span></span></td>';
+    const on = s && s.enabled !== false;
+    html += '<tr>' +
+      '<td><span class="v2-sched-type"><span class="v2-sched-ic ' + tone[type] + '">' + _sv(typeIcon[type]) + '</span>' +
+      '<span><span class="v2-sched-label">' + labels[type] + '</span>' +
+      '<span class="v2-sched-sub">' + subtitles[type] + '</span></span></span></td>' +
+      num('interval_days',        (s && s.interval_days) != null ? s.interval_days : 30,        1, 365, 'd', labels[type] + ' interval in days') +
+      num('warning_days_before',  (s && s.warning_days_before) != null ? s.warning_days_before : 7, 1, 30,  'd', labels[type] + ' warn before, in days') +
+      num('escalation_hours',     (s && s.escalation_hours) != null ? s.escalation_hours : 48,  1, 168, 'h', labels[type] + ' escalate after, in hours') +
+      '<td><label class="v2-toggle"><input type="checkbox"' + (on ? ' checked' : '') +
+        ' aria-label="' + labels[type] + ' reminders enabled"' +
+        ' onchange="remSaveSchedule(null,\'' + type + '\',\'enabled\',this.checked)"/>' +
+        '<span class="v2-toggle-track"><span class="v2-toggle-thumb"></span></span></label></td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div>' +
+    '<div class="v2-panel-foot">' +
+      '<span class="v2-panel-foot-hint">Changes save as you edit; this re-saves all three.</span>' +
+      '<button class="v2-btn-primary" type="button" onclick="remSaveAllSchedules()">' + _sv(IC.save,'2') + 'Save defaults</button>' +
+    '</div></article>';
+
+  // ── Driver phone numbers ───────────────────────────────────────────────────
+  html += '<article class="v2-table-card">' +
+    '<div class="v2-panel-head v2-accent-cyan"><span class="v2-panel-ic">' + _sv(IC.phone) + '</span>' +
+    '<h2>Driver phone numbers</h2>' +
+    '<span class="v2-panel-tag">' + withPhone + ' of ' + DRIVERS.length + ' on file</span></div>' +
+    '<div class="v2-phone-list">';
+  DRIVERS.forEach(d => {
+    const phone = DRIVER_PHONES.find(p => p.driver_id === d.id);
+    const v = VEHICLES.find(x => x.assignedDriverId === d.id);
+    html += '<div class="v2-phone-item">' +
+      '<span class="v2-phone-who"><span class="v2-phone-who-name">' + esc(d.name) + '</span>' +
+      '<span class="v2-phone-who-truck">' + (v ? 'Truck #' + esc(v.truckNumber) : 'Unassigned') + '</span></span>' +
+      (phone
+        ? '<span class="v2-phone-masked">' + esc(maskPhone(phone.phone_number)) + '</span>' +
+          '<span class="v2-phone-badge ' + (phone.verified ? 'is-ok' : 'is-warn') + '">' + (phone.verified ? 'Verified' : 'Active') + '</span>'
+        : '<span class="v2-phone-unset">Not set</span>' +
+          '<span class="v2-phone-badge is-crit">Missing</span>') +
+    '</div>';
+  });
+  html += '</div></article></section>';
+
+  // ── Per-vehicle overrides ──────────────────────────────────────────────────
+  html += '<section class="v2-table-card" aria-label="Per-vehicle overrides">' +
+    '<div class="v2-panel-head v2-accent-red"><span class="v2-panel-ic">' + _sv(IC.tune) + '</span>' +
+    '<h2>Per-vehicle overrides</h2>' +
+    '<span class="v2-panel-tag">' + (overrides.length || 'No') + ' truck' + (overrides.length === 1 ? '' : 's') + ' on custom intervals</span></div>';
+  if (overrides.length === 0) {
+    html += '<div class="v2-override-empty">No overrides &mdash; every vehicle is using the global defaults above.</div>';
+  } else {
+    html += '<div class="v2-override-list">';
+    overrides.forEach(o => {
+      const v = VEHICLES.find(x => x.id === o.vehicle_id);
+      html += '<div class="v2-override">' +
+        '<span class="v2-override-main">' +
+          '<span class="v2-override-head">' +
+            '<span class="v2-override-truck">Truck #' + esc(v && v.truckNumber != null ? v.truckNumber : '?') + '</span>' +
+            '<span class="v2-override-chip">' + (labels[o.reminder_type] || o.reminder_type) + '</span>' +
+          '</span>' +
+          '<span class="v2-override-params">Interval <b>' + o.interval_days + 'd</b>' +
+            '<span class="v2-override-sep">&middot;</span>Warn <b>' + o.warning_days_before + 'd</b>' +
+            '<span class="v2-override-sep">&middot;</span>Escalate <b>' + o.escalation_hours + 'h</b></span>' +
+        '</span>' +
+        '<button class="v2-icon-btn" type="button" onclick="remDeleteOverride(\'' + o.id + '\')"' +
+        ' aria-label="Remove override for Truck #' + esc(v && v.truckNumber != null ? v.truckNumber : '?') + '">' + _sv(IC.trash) + '</button>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</section>';
+  return html;
 }
 
 // ── Actions ───────────────────────────────────────────────────
