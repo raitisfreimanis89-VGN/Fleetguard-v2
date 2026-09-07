@@ -106,80 +106,110 @@ function remRenderOverview() {
     const phoneStr = phone ? maskPhone(phone.phone_number) : '— no phone';
 
     // intervals come from getVehicleStatus so a truck on a custom schedule shows its own numbers
-    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'construction',  type:'brake_service'  });
-    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.serviceDays, interval:s.serviceInterval, icon:'build_circle',   type:'dot_inspection' });
-    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'construction',  type:'brake_service'  });
-    if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:s.serviceInterval, icon:'build_circle',   type:'pm_service'     });
+    if (s.brakeOverdue)   critAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'brake', type:'brake_service'  });
+    if (s.serviceOverdue) critAlerts.push({ v, driver, phoneStr, label:'Periodic Inspection', days: s.serviceDays, interval:s.serviceInterval, icon:'yard',  type:'dot_inspection' });
+    if (s.brakeDueSoon)   warnAlerts.push({ v, driver, phoneStr, label:'Brake Inspection',  days: s.brakeDays,   interval:s.brakeInterval,   icon:'brake', type:'brake_service'  });
+    if (s.serviceDueSoon) warnAlerts.push({ v, driver, phoneStr, label:'PM Service',     days: s.serviceDays, interval:s.serviceInterval, icon:'yard',  type:'pm_service'     });
   });
 
   const recentNotifs = SMS_NOTIFS.slice(0, 6);
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const IC = {
+    alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+    clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/>',
+    sms:  '<path d="M4 4h16v12H7l-3 3Z"/><path d="M8 9h8M8 12h5"/>',
+    brake:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/>',
+    yard: '<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+    hist: '<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+  };
+  const metric = (tone, icon, val, label, sub) =>
+    '<article class="v2-metric ' + tone + '"><div class="v2-metric-head">' +
+    '<span class="v2-metric-ic">' + _sv(icon) + '</span>' +
+    '<span class="v2-metric-label">' + label + '</span></div>' +
+    '<span class="v2-metric-val">' + val + '</span>' +
+    (sub ? '<span class="v2-metric-sub">' + sub + '</span>' : '') + '</article>';
 
-  return `
-<div class="rem-stats">
-  ${remStatCard('error',    'var(--danger)',  'var(--danger-bg)',  critAlerts.length,     'Overdue Now')}
-  ${remStatCard('warning',  'var(--warning)', 'var(--warning-bg)', warnAlerts.length,     'Due This Week')}
-  ${remStatCard('mark_chat_read','var(--success)','var(--success-bg)', replies,           'Driver Replies')}
-  ${remStatCard('sms',      'var(--primary-text)','var(--primary-dim)', sent30d,          'SMS Sent (30d)')}
-</div>
-<div class="rem-grid">
-  <div>
-    ${critAlerts.length > 0 ? `
-      <div class="rem-section-label">
-        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;color:var(--danger)">error</span>
-        Overdue — Action Required
-      </div>
-      ${critAlerts.map(a => remAlertRow(a, 'crit')).join('')}
-    ` : ''}
-    ${warnAlerts.length > 0 ? `
-      <div class="rem-section-label" style="margin-top:${critAlerts.length?'18px':'0'}">
-        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;color:var(--warning)">warning</span>
-        Due Soon
-      </div>
-      ${warnAlerts.map(a => remAlertRow(a, 'warn')).join('')}
-    ` : ''}
-    ${critAlerts.length === 0 && warnAlerts.length === 0
-      ? '<div class="empty" style="padding:32px 0">✅ All vehicles are on schedule — no reminders due</div>'
-      : ''}
-  </div>
-  <div style="display:flex;flex-direction:column;gap:16px">
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-accent"></div>
-        Recent SMS Activity
-        <span style="margin-left:auto;font-size:11px;color:var(--text3);display:flex;align-items:center;gap:5px">
-          <span class="rem-live-dot"></span> Live
-        </span>
-      </div>
-      <div class="card-body" style="padding:6px 18px">
-        ${recentNotifs.length === 0
-          ? '<div class="empty">No SMS sent yet</div>'
-          : recentNotifs.map(n => remSmsRow(n)).join('')}
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <div class="card-header-accent"></div>
-        Manual Trigger
-      </div>
-      <div class="card-body">
-        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">
-          Force the daily reminder scan right now. Normally fires automatically when the Google Voice service starts each morning.
-        </p>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="remTriggerScan(this)">
-            <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:15px">send</span>
-            Run Scan Now
-          </button>
-          <button class="btn btn-ghost btn-sm" onclick="remSwitchTab('history')">
-            <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:15px">history</span>
-            View Log
-          </button>
-        </div>
-        <div id="rem-trigger-result" style="display:none" class="rem-trigger-result"></div>
-      </div>
-    </div>
-  </div>
-</div>`;
+  // The whole row is the click target, exactly as before, and the eight
+  // arguments to remOpenSendModal are unchanged — this is the SMS send path.
+  const alertRow = (a, tone) => {
+    const isOver = a.days > a.interval;
+    const daysOver = a.days - a.interval;
+    const daysLeft = a.interval - a.days;
+    const lastNotif = SMS_NOTIFS.find(n => n.vehicle_id === a.v.id && n.reminder_type === a.type);
+    const note = lastNotif
+      ? (lastNotif.status === 'acknowledged' ? '<span class="v2-cell-caught">Driver confirmed</span>'
+        : lastNotif.status === 'sent'        ? '<span class="v2-rem-await">SMS sent &mdash; awaiting reply</span>'
+        : '<span class="v2-cell-dim">No SMS sent yet</span>')
+      : '<span class="v2-cell-dim">No SMS sent yet</span>';
+    return '<div class="v2-stream-row ' + tone + '" style="cursor:pointer" title="Send a reminder for this truck"' +
+      ' onclick="remOpenSendModal(\'' + esc(a.v.truckNumber) + '\',\'' + esc(a.v.id) + '\',\'' + esc(a.driver.id) +
+      '\',\'' + esc(a.type) + '\',\'' + esc(a.label) + '\',' + isOver + ',' + daysOver + ',' + daysLeft + ')">' +
+      '<span class="v2-stream-ic">' + _sv(IC[a.icon]) + '</span>' +
+      '<span class="v2-stream-main">' +
+        '<span class="v2-stream-label">Truck #' + esc(a.v.truckNumber) + ' &middot; ' + esc(a.label) + '</span>' +
+        '<span class="v2-stream-type">' + esc(a.driver.name) + ' &middot; ' + esc(a.phoneStr) + ' &middot; ' + note + '</span>' +
+      '</span>' +
+      '<span class="v2-countdown' + (isOver ? ' is-urgent' : ' is-soon') + '">' +
+        (isOver ? '+' + daysOver + 'd' : daysLeft + 'd left') + '</span>' +
+    '</div>';
+  };
+
+  let html = '<div class="v2-metrics">' +
+    metric('v2-accent-red',   IC.alert, critAlerts.length, 'Overdue now',    'Action required today') +
+    metric('v2-accent-amber', IC.clock, warnAlerts.length, 'Due this week',  'Inside the warning window') +
+    metric('v2-accent-green', IC.chat,  replies,           'Driver replies', 'Inbound over all time') +
+    metric('v2-accent-cyan',  IC.sms,   sent30d,           'SMS sent (30d)', 'Outbound reminders') +
+  '</div>';
+
+  html += '<div class="v2-rem-grid"><div class="v2-rep-col">';
+  if (critAlerts.length) {
+    html += '<section class="v2-table-card" aria-label="Overdue">' +
+      '<div class="v2-panel-head v2-accent-red"><span class="v2-panel-ic">' + _sv(IC.alert) + '</span>' +
+      '<h2>Overdue &mdash; action required</h2><span class="v2-panel-tag">' + critAlerts.length + '</span></div>' +
+      '<div class="v2-stream">' + critAlerts.map(a => alertRow(a, 'v2-accent-red')).join('') + '</div></section>';
+  }
+  if (warnAlerts.length) {
+    html += '<section class="v2-table-card" aria-label="Due soon">' +
+      '<div class="v2-panel-head v2-accent-amber"><span class="v2-panel-ic">' + _sv(IC.clock) + '</span>' +
+      '<h2>Due soon</h2><span class="v2-panel-tag">' + warnAlerts.length + '</span></div>' +
+      '<div class="v2-stream">' + warnAlerts.map(a => alertRow(a, 'v2-accent-amber')).join('') + '</div></section>';
+  }
+  if (!critAlerts.length && !warnAlerts.length) {
+    html += '<section class="v2-table-card"><div style="padding:var(--v2-s10);text-align:center;color:var(--v2-ink-3)">' +
+      'All vehicles are on schedule &mdash; no reminders due.</div></section>';
+  }
+  html += '</div><div class="v2-rep-col">';
+
+  // Recent SMS activity
+  html += '<section class="v2-table-card" aria-label="Recent SMS activity">' +
+    '<div class="v2-panel-head v2-accent-cyan"><span class="v2-panel-ic">' + _sv(IC.sms) + '</span>' +
+    '<h2>Recent SMS activity</h2><span class="v2-panel-tag">Live</span></div>';
+  if (!recentNotifs.length) {
+    html += '<div style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No SMS sent yet</div>';
+  } else {
+    html += '<div class="v2-phone-list">' + recentNotifs.map(n => remSmsRow(n)).join('') + '</div>';
+  }
+  html += '</section>';
+
+  // Manual trigger
+  html += '<section class="v2-table-card" aria-label="Manual trigger">' +
+    '<div class="v2-panel-head v2-accent-primary"><span class="v2-panel-ic">' + _sv(IC.send) + '</span>' +
+    '<h2>Manual trigger</h2></div>' +
+    '<div style="padding:var(--v2-s5)">' +
+      '<p class="v2-rem-hint">Force the daily reminder scan right now. It normally fires automatically when the Google Voice service starts each morning.</p>' +
+      '<div style="display:flex;gap:var(--v2-s3);flex-wrap:wrap">' +
+        '<button class="v2-btn-primary" type="button" onclick="remTriggerScan(this)">' + _sv(IC.send,'2') + 'Run scan now</button>' +
+        '<button class="v2-btn-ghost" type="button" onclick="remSwitchTab(\'history\')">' + _sv(IC.hist,'1.8') + 'View log</button>' +
+      '</div>' +
+      // remTriggerScan writes its result here and flips display, so the id and
+      // the starting display:none are both load-bearing.
+      '<div id="rem-trigger-result" style="display:none" class="rem-trigger-result"></div>' +
+    '</div></section>';
+
+  html += '</div></div>';
+  return html;
 }
 
 function remStatCard(icon, color, bg, num, label) {
@@ -225,80 +255,65 @@ function remSmsRow(n) {
   const v      = VEHICLES.find(x => x.id === n.vehicle_id);
   const driver = DRIVERS.find(d => d.id === n.driver_id);
   const initials = driver ? driver.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase() : '??';
-  const statusMap = { pending:'badge-gray', sent:'badge-blue', failed:'badge-red', acknowledged:'badge-yellow', completed:'badge-green' };
-  const labelMap  = { pending:'Pending', sent:'Sent', failed:'Failed', acknowledged:'Confirmed', completed:'Done ✓' };
-  const typeLabel = { dot_inspection:'Periodic', brake_service:'Brakes', pm_service:'PM' };
+  const toneMap  = { pending:'is-none', sent:'is-warn', failed:'is-crit', acknowledged:'is-warn', completed:'is-ok' };
+  const labelMap = { pending:'Pending', sent:'Sent', failed:'Failed', acknowledged:'Confirmed', completed:'Done' };
   const ago = remTimeAgo(n.created_at);
-  return `
-<div class="rem-sms-row">
-  <div class="rem-sms-avatar">${esc(initials)}</div>
-  <div class="rem-sms-body">
-    <div class="rem-sms-name">${esc(driver?.name ?? '—')} <span style="font-size:10px;color:var(--text3);font-weight:400">#${esc(v?.truckNumber ?? '?')}</span></div>
-    <div class="rem-sms-msg">${esc(n.message_body)}</div>
-  </div>
-  <div class="rem-sms-time">${ago}</div>
-  <span class="badge ${statusMap[n.status]??'badge-gray'}">${labelMap[n.status]??n.status}</span>
-</div>`;
+  return '<div class="v2-phone-item">' +
+    '<span class="v2-drv-avatar">' + esc(initials) + '</span>' +
+    '<span class="v2-phone-who" style="flex:1;min-width:0">' +
+      '<span class="v2-phone-who-name">' + esc(driver ? driver.name : '—') +
+        ' <span class="v2-cell-dim">#' + esc(v && v.truckNumber != null ? v.truckNumber : '?') + '</span></span>' +
+      '<span class="v2-rem-msg">' + esc(n.message_body) + '</span>' +
+    '</span>' +
+    '<span class="v2-cell-dim" style="white-space:nowrap">' + ago + '</span>' +
+    '<span class="v2-phone-badge ' + (toneMap[n.status] || 'is-none') + '">' + (labelMap[n.status] || n.status) + '</span>' +
+  '</div>';
 }
 
 // ── HISTORY ───────────────────────────────────────────────────
 function remRenderHistory(filter = 'all') {
   const rows = SMS_NOTIFS.filter(n => filter === 'all' || n.status === filter);
   const typeLabel = { dot_inspection:'Periodic Inspection', brake_service:'Brake Inspection', pm_service:'PM Service' };
-  const statusBadge = (s) => {
-    const m = { pending:'badge-gray',sent:'badge-blue',failed:'badge-red',acknowledged:'badge-yellow',completed:'badge-green' };
-    const l = { pending:'Pending',sent:'Sent',failed:'Failed',acknowledged:'Confirmed',completed:'Done ✓' };
-    return `<span class="badge ${m[s]??'badge-gray'}">${l[s]??s}</span>`;
+  const toneMap  = { pending:'is-none', sent:'is-warn', failed:'is-crit', acknowledged:'is-warn', completed:'is-ok' };
+  const labelMap = { pending:'Pending', sent:'Sent', failed:'Failed', acknowledged:'Confirmed', completed:'Done' };
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const IC = {
+    hist:'<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+    down:'<path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/>',
+    chev:'<path d="m6 9 6 6 6-6"/>',
   };
+  const opts = [['all','All statuses'],['sent','Sent'],['acknowledged','Confirmed (OK)'],['completed','Done'],['failed','Failed'],['pending','Pending']]
+    .map(o => '<option value="' + o[0] + '"' + (filter === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('');
 
-  return `
-<div class="card">
-  <div class="card-header">
-    <div class="card-header-accent"></div>
-    SMS Notification Log
-    <div class="rem-history-filter">
-      <select onchange="remFilterHistory(this.value)">
-        <option value="all">All statuses</option>
-        <option value="sent">Sent</option>
-        <option value="acknowledged">Confirmed (OK)</option>
-        <option value="completed">Done</option>
-        <option value="failed">Failed</option>
-        <option value="pending">Pending</option>
-      </select>
-      <button class="btn btn-ghost btn-sm" onclick="remExportCSV()">
-        <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;font-size:14px">download</span> CSV
-      </button>
-    </div>
-  </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>Date / Time</th><th>Truck</th><th>Driver</th>
-        <th>Type</th><th>Phone</th><th>Status</th><th>Replied</th>
-      </tr></thead>
-      <tbody>
-        ${rows.length === 0
-          ? `<tr><td colspan="7" class="empty">No records match</td></tr>`
-          : rows.map(n => {
-              const v      = VEHICLES.find(x => x.id === n.vehicle_id);
-              const driver = DRIVERS.find(d => d.id === n.driver_id);
-              const replied = SMS_REPLIES.some(r => r.notification_id === n.id);
-              return `<tr>
-                <td style="color:var(--text3);font-size:12px;white-space:nowrap">${fmtDate(n.created_at)}</td>
-                <td><strong>${esc(v?.truckNumber ?? '—')}</strong></td>
-                <td>${esc(driver?.name ?? '—')}</td>
-                <td><span class="badge badge-gray">${typeLabel[n.reminder_type]??n.reminder_type}</span></td>
-                <td style="font-family:monospace;font-size:12px;color:var(--text3)">${maskPhone(n.phone_number)}</td>
-                <td>${statusBadge(n.status)}</td>
-                <td>${replied
-                  ? '<span style="color:var(--success);font-size:12px;display:flex;align-items:center;gap:3px"><span style="font-family:\'Material Symbols Outlined\';font-size:14px;font-weight:300;line-height:1">check</span> Yes</span>'
-                  : '<span style="color:var(--text3);font-size:12px">—</span>'}</td>
-              </tr>`;
-            }).join('')}
-      </tbody>
-    </table>
-  </div>
-</div>`;
+  let html = '<section class="v2-table-card" aria-label="SMS notification log">' +
+    '<div class="v2-panel-head v2-accent-cyan"><span class="v2-panel-ic">' + _sv(IC.hist) + '</span>' +
+    '<h2>SMS notification log</h2>' +
+    '<span class="v2-rep-actions">' +
+      '<span class="v2-rep-select"><select onchange="remFilterHistory(this.value)" aria-label="Filter by status">' + opts + '</select>' + _sv(IC.chev,'1.8') + '</span>' +
+      '<button class="v2-rep-btn" type="button" onclick="remExportCSV()">' + _sv(IC.down,'1.8') + 'CSV</button>' +
+    '</span></div>' +
+    '<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>' +
+    '<th>Date / time</th><th>Truck</th><th>Driver</th><th>Type</th><th>Phone</th><th>Status</th><th>Replied</th>' +
+    '</tr></thead><tbody>';
+  if (!rows.length) {
+    html += '<tr><td colspan="7" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No records match</td></tr>';
+  }
+  rows.forEach(n => {
+    const v      = VEHICLES.find(x => x.id === n.vehicle_id);
+    const driver = DRIVERS.find(d => d.id === n.driver_id);
+    const replied = SMS_REPLIES.some(r => r.notification_id === n.id);
+    html += '<tr>' +
+      '<td class="v2-cell-num v2-cell-dim">' + fmtDate(n.created_at) + '</td>' +
+      '<td class="v2-cell-strong">' + esc(v && v.truckNumber != null ? v.truckNumber : '—') + '</td>' +
+      '<td>' + esc(driver ? driver.name : '—') + '</td>' +
+      '<td><span class="v2-override-chip">' + (typeLabel[n.reminder_type] || n.reminder_type) + '</span></td>' +
+      '<td class="v2-phone-masked">' + esc(maskPhone(n.phone_number)) + '</td>' +
+      '<td><span class="v2-phone-badge ' + (toneMap[n.status] || 'is-none') + '">' + (labelMap[n.status] || n.status) + '</span></td>' +
+      '<td>' + (replied ? '<span class="v2-cell-caught">Yes</span>' : '<span class="v2-cell-dim">&mdash;</span>') + '</td>' +
+    '</tr>';
+  });
+  html += '</tbody></table></div></section>';
+  return html;
 }
 
 function remFilterHistory(val) {
@@ -309,73 +324,72 @@ function remFilterHistory(val) {
 // ── REPLIES ───────────────────────────────────────────────────
 function remRenderReplies() {
   const activeEscalations = ESCALATIONS.filter(e => e.escalated_to !== 'pending');
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const IC = {
+    chat:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z"/><path d="m8 10 2.5 2.5L15 8"/>',
+    esc: '<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/>',
+  };
+  const TYPE = { dot_inspection:'Periodic', brake_service:'Brakes', pm_service:'PM' };
 
-  return `
-<div class="rem-grid">
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-accent"></div>
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;color:var(--success)">mark_chat_read</span>
-      Inbound Replies
-      ${SMS_REPLIES.length > 0 ? `<span class="badge badge-green" style="margin-left:4px">${SMS_REPLIES.length}</span>` : ''}
-    </div>
-    <div class="card-body">
-      ${SMS_REPLIES.length === 0
-        ? '<div class="empty">No driver replies yet</div>'
-        : SMS_REPLIES.slice(0, 15).map(r => {
-            const driver = DRIVERS.find(d => d.id === r.driver_id);
-            const notif  = SMS_NOTIFS.find(n => n.id === r.notification_id);
-            const acked  = notif?.status === 'acknowledged';
-            const isWarn = !acked;
-            return `
-<div class="rem-reply ${isWarn ? 'warn-reply' : ''}">
-  <div class="rem-sms-avatar" style="${acked ? 'background:linear-gradient(135deg,var(--success),#2e7d32)' : 'background:linear-gradient(135deg,var(--warning),#f59e0b)'}">${
-    (driver?.name ?? '??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()
-  }</div>
-  <div style="flex:1;min-width:0">
-    <div class="rem-reply-from">${esc(driver?.name ?? r.from_number)}</div>
-    <div class="rem-reply-text">"${esc(r.body)}"</div>
-    <div style="font-size:10px;color:var(--text3);margin-top:2px">
-      ${notif ? `${({dot_inspection:'Periodic',brake_service:'Brakes',pm_service:'PM'})[notif.reminder_type]??''} reminder` : ''}
-    </div>
-  </div>
-  <div style="text-align:right;flex-shrink:0">
-    ${acked
-      ? '<div class="rem-reply-ack"><span class="nav-icon" style="font-family:\'Material Symbols Outlined\';font-size:14px;font-weight:300;line-height:1">check_circle</span> ACK</div>'
-      : '<div style="font-size:11px;font-weight:700;color:var(--warning)">Not acked</div>'}
-    <div class="rem-reply-time">${remTimeAgo(r.received_at)}</div>
-  </div>
-</div>`;
-          }).join('')}
-    </div>
-  </div>
+  let html = '<div class="v2-rem-grid">';
 
-  <div class="card">
-    <div class="card-header">
-      <div class="card-header-accent"></div>
-      <span class="nav-icon" style="font-family:'Material Symbols Outlined';font-weight:300;line-height:1;color:var(--danger)">escalator_warning</span>
-      Escalation Log
-    </div>
-    <div class="card-body">
-      ${activeEscalations.length === 0
-        ? '<div class="empty">No escalations</div>'
-        : activeEscalations.map(e => {
-            const notif  = SMS_NOTIFS.find(n => n.id === e.notification_id);
-            const v      = VEHICLES.find(x => x.id === notif?.vehicle_id);
-            const driver = DRIVERS.find(d => d.id === notif?.driver_id);
-            return `
-<div class="rem-escalation">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
-    <div class="rem-escalation-title">Truck #${esc(v?.truckNumber ?? '?')} — ${esc(driver?.name ?? '?')}</div>
-    <span class="badge badge-red">Escalated</span>
-  </div>
-  <div class="rem-escalation-detail">${notif ? `${notif.reminder_type.replace(/_/g,' ')} — no reply` : ''}</div>
-  <div class="rem-escalation-meta">To: <strong style="color:var(--text2)">${esc(e.escalated_to)}</strong> · ${fmtDate(e.sent_at)}</div>
-</div>`;
-          }).join('')}
-    </div>
-  </div>
-</div>`;
+  html += '<section class="v2-table-card" aria-label="Inbound replies">' +
+    '<div class="v2-panel-head v2-accent-green"><span class="v2-panel-ic">' + _sv(IC.chat) + '</span>' +
+    '<h2>Inbound replies</h2>' +
+    (SMS_REPLIES.length ? '<span class="v2-panel-tag">' + SMS_REPLIES.length + '</span>' : '') + '</div>';
+  if (!SMS_REPLIES.length) {
+    html += '<div style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No driver replies yet</div>';
+  } else {
+    html += '<div class="v2-phone-list">';
+    SMS_REPLIES.slice(0, 15).forEach(r => {
+      const driver = DRIVERS.find(d => d.id === r.driver_id);
+      const notif  = SMS_NOTIFS.find(n => n.id === r.notification_id);
+      const acked  = notif && notif.status === 'acknowledged';
+      const initials = (driver ? driver.name : '??').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      html += '<div class="v2-phone-item">' +
+        '<span class="v2-drv-avatar">' + esc(initials) + '</span>' +
+        '<span class="v2-phone-who" style="flex:1;min-width:0">' +
+          '<span class="v2-phone-who-name">' + esc(driver ? driver.name : r.from_number) + '</span>' +
+          '<span class="v2-rem-msg">&ldquo;' + esc(r.body) + '&rdquo;</span>' +
+          (notif ? '<span class="v2-phone-who-truck">' + (TYPE[notif.reminder_type] || '') + ' reminder</span>' : '') +
+        '</span>' +
+        '<span class="v2-cell-dim" style="white-space:nowrap">' + remTimeAgo(r.received_at) + '</span>' +
+        '<span class="v2-phone-badge ' + (acked ? 'is-ok' : 'is-warn') + '">' + (acked ? 'ACK' : 'Not acked') + '</span>' +
+      '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</section>';
+
+  html += '<section class="v2-table-card" aria-label="Escalation log">' +
+    '<div class="v2-panel-head v2-accent-red"><span class="v2-panel-ic">' + _sv(IC.esc) + '</span>' +
+    '<h2>Escalation log</h2>' +
+    (activeEscalations.length ? '<span class="v2-panel-tag">' + activeEscalations.length + '</span>' : '') + '</div>';
+  if (!activeEscalations.length) {
+    html += '<div class="v2-override-empty">No escalations.</div>';
+  } else {
+    html += '<div class="v2-override-list">';
+    activeEscalations.forEach(e => {
+      const notif  = SMS_NOTIFS.find(n => n.id === e.notification_id);
+      const v      = VEHICLES.find(x => x.id === (notif && notif.vehicle_id));
+      const driver = DRIVERS.find(d => d.id === (notif && notif.driver_id));
+      html += '<div class="v2-override">' +
+        '<span class="v2-override-main">' +
+          '<span class="v2-override-head">' +
+            '<span class="v2-override-truck">Truck #' + esc(v && v.truckNumber != null ? v.truckNumber : '?') + '</span>' +
+            '<span class="v2-override-chip">' + esc(driver ? driver.name : '?') + '</span>' +
+          '</span>' +
+          '<span class="v2-override-params">' +
+            (notif ? esc(notif.reminder_type.replace(/_/g,' ')) + ' &mdash; no reply' : '') +
+            '<span class="v2-override-sep">&middot;</span>To <b>' + esc(e.escalated_to) + '</b>' +
+            '<span class="v2-override-sep">&middot;</span>' + fmtDate(e.sent_at) +
+          '</span>' +
+        '</span></div>';
+    });
+    html += '</div>';
+  }
+  html += '</section></div>';
+  return html;
 }
 
 // ── SCHEDULE CONFIG ───────────────────────────────────────────

@@ -182,7 +182,7 @@ dispatcher-versus-admin split still need a human with a session.
 | Calendar | `renderCalendar` | ported |
 | Reports | `renderReports` | ported |
 | Dispatch Board | `renderDispatcherBoard` | ported |
-| Reminders | `renderReminders` (`js/reminders.js`) | shell + Schedule tab ported; Overview / History / Replies have no v2 design |
+| Reminders | `renderReminders` (`js/reminders.js`) | ported, all four tabs |
 | Vehicle detail | `renderVehicleDetail` | **no v2 design** |
 | Driver portal | `renderPortal` | **no v2 design** |
 | Users | `renderUsers` / `renderUsersAsync` | **no v2 design** |
@@ -222,13 +222,7 @@ resolve.
   the port; tracked separately.
 - **Pre-existing contrast**: `.nav-item.active` and `.nav-icon` sit at 3.56:1
   in `css/styles.css`.
-- **Three contrast failures on the Reminders Overview tab**, which has no v2
-  design and was not ported: `.rem-days.crit` 2.77:1, `.rem-sms-avatar` 2.31:1,
-  and the shared `.btn-primary.btn-sm` at 3.56:1. Measured with the skin off as
-  well: it caused none of them and fixed five others on that tab. One honest
-  caveat — `.rem-days.crit` moved from 3.41:1 to 2.77:1 under the skin. It
-  failed either way, but it did get worse, and it should be fixed when that tab
-  is designed.
+
 - **Three Unsplash hotlinks** in `v2-cards.css` (toll, traffic, states) — remote
   dependencies in a page that otherwise ships its own assets.
 
