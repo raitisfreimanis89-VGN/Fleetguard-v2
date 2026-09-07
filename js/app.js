@@ -906,177 +906,235 @@ async function renderUsersAsync(){
 // DISPATCHER BOARD
 // ═══════════════════════════════════════════════════════
 function renderDispatcherBoard(){
-  // Collect unique dispatcher names from vehicle data
+  // v2 components against live data. Styles: v2-dispatch.css + v2-filter.css
+  // (+ v2-shell.css for .v2-page-head / .v2-sr-only).
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.8')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    arrow:'<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+    back:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+    search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    plus:'<path d="M12 5v14M5 12h14"/>',
+  };
+  const _ini=n=>String(n||'').trim().split(/\s+/).map(w=>w[0]||'').join('').slice(0,2).toUpperCase()||'?';
+
   const names=[...new Set(VEHICLES.map(v=>v.assignedDispatcher).filter(n=>n&&n.trim()!=''))].sort();
   const unassigned=VEHICLES.filter(v=>!v.assignedDispatcher||v.assignedDispatcher.trim()==='');
+  const _vacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
 
-  // ── FILTERED VIEW: one dispatcher selected ──────────────
+  // One status strip, used by both views. The tone words come straight from
+  // getVehicleStatus(); nothing here recomputes compliance.
+  // Titles spell out what the letter and the number mean — production showed a
+  // bare emoji and "34d", which reads like a countdown when it is days ELAPSED.
+  const _strip=s=>{
+    const cell=(k,tone,val,title)=>'<span class="v2-sp '+tone+'" title="'+esc(title)+'"><span class="v2-sp-k">'+k+'</span><span class="v2-sp-v">'+val+'</span></span>';
+    const d=n=>n!==null&&n!==undefined?n+'d':'&mdash;';
+    const bTone=s.brakeOverdue?'is-crit':s.brakeDueSoon?'is-warn':'is-ok';
+    const tTone=s.tyreOverdue?'is-warn':'is-ok';
+    const sTone=s.serviceOverdue?'is-crit':s.serviceDueSoon?'is-warn':'is-ok';
+    return '<span class="v2-strip">'
+      +cell('B',bTone,d(s.brakeDays),'Brakes — '+(s.brakeDays!==null?s.brakeDays+' days since last test':'no test on file')+(s.brakeOverdue?': OVERDUE':s.brakeDueSoon?': due soon':': in date'))
+      +cell('T',tTone,d(s.tyreDays),'Tyres — '+(s.tyreDays!==null?s.tyreDays+' days since last check':'no check on file')+(s.tyreOverdue?': OVERDUE':': in date'))
+      +cell('S',sTone,d(s.serviceDays),'Service — '+(s.serviceDays!==null?s.serviceDays+' days since last yard visit':'no visit on file')+(s.serviceOverdue?': OVERDUE':s.serviceDueSoon?': due soon':': in date'))
+      +cell('P',s.preTripToday?'is-ok':'is-warn',s.preTripToday?'&check;':'&mdash;',s.preTripToday?'Pre-trip inspection filed today':'No pre-trip inspection today')
+      +'</span>';
+  };
+
+  // ── FILTERED VIEW: one dispatcher's fleet ─────────────────────────────────
   if(currentDispatcherFilter!==null){
     const dispName=currentDispatcherFilter;
     const fleet=VEHICLES.filter(v=>v.assignedDispatcher===dispName);
-    const initials=dispName.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    let html=`<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border)">
-      <button class="btn btn-ghost btn-sm" onclick="currentDispatcherFilter=null;render()" style="display:flex;align-items:center;gap:5px">
-        <span style="font-family:'Material Symbols Outlined';font-size:16px;font-weight:300;line-height:1">arrow_back</span> All Dispatchers
-      </button>
-      <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0">${initials}</div>
-        <div>
-          <div style="font-size:16px;font-weight:700">${esc(dispName)}'s Fleet</div>
-          <div style="font-size:12px;color:var(--text2)">${fleet.length} truck${fleet.length!==1?'s':''} assigned</div>
-        </div>
-      </div>
-    </div>`;
+    let html='<div class="v2-region">';
+    html+='<div class="v2-page-head" style="display:flex;align-items:center;gap:var(--v2-s5);margin-bottom:var(--v2-s6)">'
+      +'<button class="v2-btn-ghost" type="button" onclick="currentDispatcherFilter=null;render()">'
+      +_sv(_IC.back,'2')+'All dispatchers</button>'
+      +'<span style="display:flex;align-items:center;gap:var(--v2-s3)">'
+        +'<span class="v2-disp-avatar">'+esc(_ini(dispName))+'</span>'
+        +'<span class="v2-disp-id"><span class="v2-disp-name">'+esc(dispName)+'</span>'
+        +'<span class="v2-disp-meta">'+fleet.length+' truck'+(fleet.length!==1?'s':'')+' assigned</span></span>'
+      +'</span></div>';
     if(fleet.length===0){
-      html+=`<div class="empty" style="padding:40px">No trucks assigned to ${esc(dispName)}</div>`;
-      return html;
+      html+='<div class="v2-empty" style="padding:var(--v2-s10);text-align:center;color:var(--v2-ink-3)">No trucks assigned to '+esc(dispName)+'</div>';
+      return html+'</div>';
     }
-    const _fvVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
-    html+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">`;
+    html+='<div class="v2-board">';
     fleet.forEach(v=>{
       const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
-      const isVac=_fvVacSet.has(v.assignedDriverId);
+      const isVac=_vacSet.has(v.assignedDriverId);
       if(isVac){
-        html+=`<div class="card" style="cursor:pointer;opacity:.55" onclick="navigate('vehicle','${v.id}')">
-          <div class="card-body" style="padding:16px">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-              <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text2)">Truck #${esc(v.truckNumber)}</div>
-                <div style="font-size:12px;color:var(--text3)">Trailer #${esc(v.trailerNumber)}</div>
-              </div>
-              <span style="background:rgba(245,158,11,.18);color:var(--warning);font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px">🏖️ Vacation</span>
-            </div>
-            ${driver?`<div style="font-size:12px;color:var(--text3);margin-bottom:6px">👤 ${esc(driver.name)}</div>`:''}
-            <div style="font-size:11px;color:var(--text3)">Frozen — no alerts while on vacation</div>
-          </div>
-        </div>`;
+        html+='<article class="v2-disp-card" style="opacity:.6;cursor:pointer" onclick="navigate(\'vehicle\',\''+v.id+'\')">'
+          +'<header class="v2-disp-head"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+          +'<span class="v2-disp-id"><span class="v2-disp-name">Truck #'+esc(v.truckNumber)+'</span>'
+          +'<span class="v2-disp-meta">Trailer #'+esc(v.trailerNumber||'—')+(driver?' &middot; '+esc(driver.name):'')+'</span></span>'
+          +'<span class="v2-vac-tag">Vacation</span></header>'
+          +'<div class="v2-disp-stats"><span class="v2-disp-meta">Frozen &mdash; no alerts while on vacation</span></div>'
+          +'</article>';
         return;
       }
-      const s=getVehicleStatus(v.id);
-      const sb=s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">OK</span>`;
-      const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
-      const tyreClass=s.tyreOverdue?'badge-yellow':'badge-green';
-      const svcClass=s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green';
-      html+=`<div class="card" style="cursor:pointer" onclick="navigate('vehicle','${v.id}')">
-        <div class="card-body" style="padding:16px">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-            <div>
-              <div style="font-size:15px;font-weight:700">Truck #${esc(v.truckNumber)}</div>
-              <div style="font-size:12px;color:var(--text2)">Trailer #${esc(v.trailerNumber)}</div>
-            </div>
-            ${sb}
-          </div>
-          ${driver?`<div style="font-size:12px;color:var(--text2);margin-bottom:3px">👤 ${esc(driver.name)}</div>`:''}
-          <div style="font-size:12px;color:var(--text2);margin-bottom:10px">📡 ${esc(dispName)}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:5px">
-            <span class="status-pill ${brakeClass}">🔧 Brakes ${s.brakeDays!==null?s.brakeDays+'d':'None'}</span>
-            <span class="status-pill ${tyreClass}">⭕ Tyres ${s.tyreDays!==null?s.tyreDays+'d':'None'}</span>
-            <span class="status-pill ${svcClass}">🔵 Service ${s.serviceDays!==null?s.serviceDays+'d':'None'}</span>
-            <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}">📋 PTI ${s.preTripToday?'✓ today':(s.lastPreTrip?fmtDate(s.lastPreTrip.submittedAt):'none')}</span>
-            ${annualPill(s)}
-            ${s.openDefect?`<span class="status-pill ${s.defectCritical?'badge-red':'badge-yellow'}">🛠 ${s.defectCritical?'DEFECT':'Minor'} unrepaired</span>`:''}
-          </div>
-        </div>
-      </div>`;
+      const st=getVehicleStatus(v.id);
+      const tone=st.critical?'is-crit':st.warning?'is-warn':'is-ok';
+      const label=st.critical?'Critical':st.warning?'Warning':'OK';
+      html+='<article class="v2-disp-card '+tone+'" style="cursor:pointer" onclick="navigate(\'vehicle\',\''+v.id+'\')">'
+        +'<header class="v2-disp-head"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+        +'<span class="v2-disp-id"><span class="v2-disp-name">Truck #'+esc(v.truckNumber)+'</span>'
+        +'<span class="v2-disp-meta">Trailer #'+esc(v.trailerNumber||'—')+(driver?' &middot; '+esc(driver.name):'')+'</span></span>'
+        +'<span class="v2-disp-chip '+tone+'">'+label+'</span></header>'
+        +'<div class="v2-disp-stats">'+_strip(st)
+          +'<div class="v2-disp-chips" style="margin-top:var(--v2-s3)">'
+          +annualPill(st)
+          +(st.openDefect?'<span class="v2-disp-chip '+(st.defectCritical?'is-crit':'is-warn')+'">'+(st.defectCritical?'Defect':'Minor')+' unrepaired</span>':'')
+          +'</div></div></article>';
     });
-    if(isAdmin()) html+=`<div class="card" style="cursor:pointer;min-height:160px;border:2px dashed var(--border);background:transparent;display:flex;align-items:center;justify-content:center;transition:border-color .15s,box-shadow .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)'" onmouseout="this.style.borderColor='';this.style.boxShadow=''" onclick="openAddVehicleModal('${dispName.replace(/'/g,"\\'")}')"><div style="text-align:center;color:var(--text3);pointer-events:none"><div style="font-size:48px;font-weight:200;line-height:1">+</div><div style="font-size:12px;font-weight:600;margin-top:8px">Add New</div></div></div>`;
-    html+=`</div>`;
+    // Same handler and the same single-quote escape as before.
+    if(isAdmin()) html+='<article class="v2-disp-card" style="cursor:pointer;min-height:150px;border:2px dashed var(--v2-line-strong);background:transparent;display:grid;place-items:center" onclick="openAddVehicleModal(\''+dispName.replace(/'/g,"\\'")+'\')">'
+      +'<span style="text-align:center;color:var(--v2-ink-3);pointer-events:none">'+_sv(_IC.plus,'1.5')
+      +'<span style="display:block;font-size:var(--v2-fs-xs);font-weight:600;margin-top:var(--v2-s2)">Add New</span></span></article>';
+    html+='</div></div>';
     return html;
   }
 
-  // ── BOARD VIEW: all dispatchers ─────────────────────────
-  const _dbVacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
-  let html='';
+  // ── BOARD VIEW: every dispatcher ──────────────────────────────────────────
+  let html='<div class="v2-region">';
+  html+='<div class="v2-page-head"><h1>Dispatch Board</h1>'
+    +'<p>Who is running which truck, and whether any of them should be rolling.</p></div>';
   if(!isAdmin()) html+=dispatcherNotice();
+
   if(names.length===0&&unassigned.length===0){
-    return`<div class="empty" style="padding:60px;text-align:center">No vehicles with dispatcher assignments yet.<br><span style="font-size:12px;color:var(--text3)">Assign dispatchers to vehicles on the Vehicles page.</span></div>`;
+    return html+'<div class="v2-empty" style="padding:var(--v2-s10);text-align:center;color:var(--v2-ink-3)">'
+      +'No vehicles with dispatcher assignments yet.<br><span style="font-size:var(--v2-fs-xs)">'
+      +'Assign dispatchers to vehicles on the Vehicles page.</span></div></div>';
   }
-  html+=`<div class="db-board">`;
-  names.forEach(name=>{
+
+  // Fleet-wide tallies, computed once and reused by the tabs and the legend.
+  // Two different tallies, and they are not interchangeable. tOk/tWarn/tCrit
+  // count TRUCKS, and feed the legend. dOk/dWarn/dCrit count DISPATCHERS, and
+  // label the tabs — because a tab filters dispatcher cards, so its number has
+  // to be the number of cards you will be left looking at. A dispatcher with a
+  // critical truck and a warning truck is in both buckets, which is why these
+  // sum to more than the card count.
+  let tOk=0,tWarn=0,tCrit=0,tVac=0;
+  let dOk=0,dWarn=0,dCrit=0;
+  const cards=names.map(name=>{
     const trucks=VEHICLES.filter(v=>v.assignedDispatcher===name);
-    const activeTrucks=trucks.filter(v=>!_dbVacSet.has(v.assignedDriverId));
-    const vacTrucks=trucks.filter(v=>_dbVacSet.has(v.assignedDriverId));
-    const statuses=activeTrucks.map(v=>getVehicleStatus(v.id));
-    const critCount=statuses.filter(s=>s.critical).length;
-    const warnCount=statuses.filter(s=>s.warning&&!s.critical).length;
-    const okCount=activeTrucks.length-critCount-warnCount;
-    const healthPct=activeTrucks.length?Math.round((okCount/activeTrucks.length)*100):100;
-    const barColor=critCount>0?'var(--danger)':warnCount>0?'var(--warning)':'var(--success)';
-    const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    const chipHtml=
-      (okCount>0   ?`<span class="db-fleet-chip ok">✅ ${okCount} Good</span>`:'')
-     +(warnCount>0 ?`<span class="db-fleet-chip warn">⚠ ${warnCount} Warn</span>`:'')
-     +(critCount>0 ?`<span class="db-fleet-chip crit">🔴 ${critCount} Critical</span>`:'')
-     +(vacTrucks.length>0?`<span class="db-fleet-chip" style="background:rgba(245,158,11,.12);color:var(--warning)">🏖️ ${vacTrucks.length} Vacation</span>`:'')
-     +`<div class="db-health-bar-wrap"><div class="db-health-bar-fill" style="width:${healthPct}%;background:${barColor}"></div></div>`;
-    const activeRows=activeTrucks.map((v,i)=>{
-      const s=statuses[i];
-      const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
-      const brakeClass=s.brakeOverdue?'badge-red':s.brakeDueSoon?'badge-yellow':'badge-green';
-      const tyreClass=s.tyreOverdue?'badge-yellow':'badge-green';
-      const svcClass=s.serviceOverdue?'badge-red':s.serviceDueSoon?'badge-yellow':'badge-green';
-      const rowPulse=s.critical?'fg-row-crit':s.warning?'fg-row-warn':'';
-      return`<div class="db-truck-row ${rowPulse}">
-        <div class="db-truck-icon">local_shipping</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;line-height:1.2">#${esc(v.truckNumber)}</div>
-          ${driver?`<div style="font-size:11px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${esc(driver.name)}</div>`:''}
-        </div>
-        <div style="display:flex;gap:4px;flex-shrink:0">
-          <span class="status-pill ${brakeClass}" style="font-size:9px">🔧 ${s.brakeDays!==null?s.brakeDays+'d':'—'}</span>
-          <span class="status-pill ${tyreClass}" style="font-size:9px">⭕ ${s.tyreDays!==null?s.tyreDays+'d':'—'}</span>
-          <span class="status-pill ${svcClass}" style="font-size:9px">🔵 ${s.serviceDays!==null?s.serviceDays+'d':'—'}</span>
-          <span class="status-pill ${s.preTripToday?'badge-green':'badge-gray'}" style="font-size:9px">📋 ${s.preTripToday?'✓':'—'}</span>
-        </div>
-      </div>`;
-    });
-    const vacRows=vacTrucks.map(v=>{
-      const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
-      return`<div class="db-truck-row" style="opacity:.5">
-        <div class="db-truck-icon">local_shipping</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:700;line-height:1.2;color:var(--text3)">#${esc(v.truckNumber)}</div>
-          ${driver?`<div style="font-size:11px;color:var(--text3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">👤 ${esc(driver.name)}</div>`:''}
-        </div>
-        <span style="font-size:9px;background:rgba(245,158,11,.15);color:var(--warning);padding:2px 7px;border-radius:20px;font-weight:700;flex-shrink:0">🏖️ Vacation</span>
-      </div>`;
-    });
-    const rows=[...activeRows,...vacRows].join('');
-    html+=`<div class="card" style="cursor:pointer;overflow:hidden;transition:border-color .15s,box-shadow .15s,transform .15s" onmouseover="this.style.borderColor='var(--primary)';this.style.boxShadow='0 0 0 1px var(--primary)';this.style.transform='translateY(-2px)'" onmouseout="this.style.borderColor='';this.style.boxShadow='';this.style.transform=''" onclick="currentDispatcherFilter='${name.replace(/'/g,"\\'")}';render()">
-      <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-          <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,var(--primary),#ff8a65);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;flex-shrink:0;box-shadow:0 0 12px var(--primary-glow)">${initials}</div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:15px;font-weight:800">${esc(name)}</div>
-            <div style="font-size:11px;color:var(--text2);margin-top:2px">${trucks.length} truck${trucks.length!==1?'s':''} &nbsp;·&nbsp; <span style="color:var(--primary)">View fleet →</span></div>
-          </div>
-        </div>
-        <div class="db-fleet-stats">${chipHtml}</div>
-      </div>
-      <div>${rows}</div>
-    </div>`;
-  });
+    const active=trucks.filter(v=>!_vacSet.has(v.assignedDriverId));
+    const vac=trucks.filter(v=>_vacSet.has(v.assignedDriverId));
+    const sts=active.map(v=>getVehicleStatus(v.id));
+    const crit=sts.filter(s=>s.critical).length;
+    const warn=sts.filter(s=>s.warning&&!s.critical).length;
+    const ok=active.length-crit-warn;
+    tOk+=ok; tWarn+=warn; tCrit+=crit; tVac+=vac.length;
+    if(crit>0)dCrit++; if(warn>0)dWarn++; if(crit===0&&warn===0&&ok>0)dOk++;
+    const pct=active.length?Math.round((ok/active.length)*100):100;
+    const tone=crit>0?'is-crit':warn>0?'is-warn':'is-ok';
+    // Every driver name on this card goes into the search haystack, so typing a
+    // driver finds the dispatcher running them — what the placeholder promises.
+    const hay=[name].concat(trucks.map(v=>{
+      const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+      return (d?d.name:'')+' '+(v.truckNumber||'');
+    })).join(' ').toLowerCase();
+
+    const rows=active.map((v,i)=>{
+      const st=sts[i];
+      const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+      const rt=st.critical?' is-crit':st.warning?' is-warn':'';
+      return '<div class="v2-truck-row'+rt+'"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+        +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span>'
+        +(d?'<span class="v2-truck-sub">'+esc(d.name)+'</span>':'')+'</span>'
+        +_strip(st)+'</div>';
+    }).join('')
+    +vac.map(v=>{
+      const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+      return '<div class="v2-truck-row" style="opacity:.5"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+        +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span>'
+        +(d?'<span class="v2-truck-sub">'+esc(d.name)+'</span>':'')+'</span>'
+        +'<span class="v2-vac-tag">Vacation</span></div>';
+    }).join('');
+
+    return '<article class="v2-disp-card '+tone+'" data-hay="'+esc(hay)+'" data-crit="'+crit+'" data-warn="'+warn+'" data-ok="'+ok+'"'
+      +' style="cursor:pointer" onclick="currentDispatcherFilter=\''+name.replace(/'/g,"\\'")+'\';render()">'
+      +'<header class="v2-disp-head"><span class="v2-disp-avatar">'+esc(_ini(name))+'</span>'
+      +'<span class="v2-disp-id"><span class="v2-disp-name">'+esc(name)+'</span>'
+      +'<span class="v2-disp-meta">'+trucks.length+' truck'+(trucks.length!==1?'s':'')+'</span></span>'
+      +'<span class="v2-disp-link">View fleet'+_sv(_IC.arrow,'2')+'</span></header>'
+      +'<div class="v2-disp-stats"><div class="v2-disp-chips">'
+        +(ok>0?'<span class="v2-disp-chip is-ok">'+ok+' Good</span>':'')
+        +(warn>0?'<span class="v2-disp-chip is-warn">'+warn+' Warn</span>':'')
+        +(crit>0?'<span class="v2-disp-chip is-crit">'+crit+' Critical</span>':'')
+        +(vac.length>0?'<span class="v2-disp-chip">'+vac.length+' Vacation</span>':'')
+      +'</div><div class="v2-health"><div class="v2-health-track" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(name)+' fleet health">'
+      +'<div class="v2-health-fill" style="width:'+pct+'%"></div></div><span class="v2-health-pct">'+pct+'%</span></div></div>'
+      +'<div class="v2-fleet-list">'+rows+'</div></article>';
+  }).join('');
+
+  // The All tab counts every CARD on the board, which includes the Unassigned
+  // tile when there is one — it is a card you can see and filter away, even
+  // though it is not a dispatcher.
+  const rated=tOk+tWarn+tCrit;
+  html+='<div class="v2-filterbar">'
+    +'<div class="v2-disp-search">'+_sv(_IC.search)
+      +'<label class="v2-sr-only" for="db-q">Filter by dispatcher, driver or truck</label>'
+      +'<input id="db-q" type="text" placeholder="Dispatcher, driver or truck" autocomplete="off" spellcheck="false" oninput="dbApplyFilter()"/>'
+    +'</div>'
+    +'<div class="v2-tabs" role="group" aria-label="Filter by status">'
+      +'<button class="v2-tab is-active" type="button" data-dbstatus="all" onclick="dbSetStatus(this)">All <span class="v2-tab-n">'+(names.length+(unassigned.length>0?1:0))+'</span></button>'
+      +'<button class="v2-tab" type="button" data-dbstatus="ok" onclick="dbSetStatus(this)">Good <span class="v2-tab-n">'+dOk+'</span></button>'
+      +'<button class="v2-tab" type="button" data-dbstatus="warn" onclick="dbSetStatus(this)">Warning <span class="v2-tab-n">'+dWarn+'</span></button>'
+      +'<button class="v2-tab" type="button" data-dbstatus="crit" onclick="dbSetStatus(this)">Critical <span class="v2-tab-n">'+dCrit+'</span></button>'
+    +'</div></div>';
+
+  html+='<div class="v2-legend"><span class="v2-legend-lead">Days since last</span>'
+    +'<span class="v2-legend-item"><span class="v2-legend-key">B</span>Brake test</span>'
+    +'<span class="v2-legend-item"><span class="v2-legend-key">T</span>Tyre check</span>'
+    +'<span class="v2-legend-item"><span class="v2-legend-key">S</span>Yard service</span>'
+    +'<span class="v2-legend-item"><span class="v2-legend-key">P</span>Pre-trip today</span>'
+    +'<span class="v2-legend-tail">'+rated+' rated &middot; '+tVac+' frozen on vacation &middot; '+unassigned.length+' unassigned &middot; '+VEHICLES.length+' total</span></div>';
+
+  html+='<div class="v2-board" id="db-board">'+cards;
+
   if(unassigned.length>0){
-    const rows=unassigned.map(v=>`<div class="db-truck-row">
-      <div class="db-truck-icon">local_shipping</div>
-      <div style="font-size:13px;font-weight:700">Truck #${v.truckNumber}</div>
-    </div>`).join('');
-    html+=`<div class="card" style="opacity:.65;overflow:hidden">
-      <div style="padding:16px 18px 14px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div style="width:44px;height:44px;border-radius:50%;background:var(--surface-highest,#32353c);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">?</div>
-          <div>
-            <div style="font-size:15px;font-weight:800;color:var(--text2)">Unassigned</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">${unassigned.length} truck${unassigned.length!==1?'s':''}</div>
-          </div>
-        </div>
-      </div>
-      <div>${rows}</div>
-    </div>`;
+    const rows=unassigned.map(v=>'<div class="v2-truck-row"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+      +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span></span></div>').join('');
+    html+='<article class="v2-disp-card" data-hay="unassigned" data-crit="0" data-warn="0" data-ok="0" style="opacity:.7">'
+      +'<header class="v2-disp-head"><span class="v2-disp-avatar" style="background:var(--v2-surface-3)">?</span>'
+      +'<span class="v2-disp-id"><span class="v2-disp-name">Unassigned</span>'
+      +'<span class="v2-disp-meta">'+unassigned.length+' truck'+(unassigned.length!==1?'s':'')+'</span></span></header>'
+      +'<div class="v2-fleet-list">'+rows+'</div></article>';
   }
-  html+=`</div>`;
+  html+='</div>';
+  html+='<div class="v2-empty" id="db-empty" hidden style="padding:var(--v2-s10);text-align:center;color:var(--v2-ink-3)">No dispatcher matches that filter.</div>';
+  html+='</div>';
   return html;
 }
+
+// ── Dispatch board filter ───────────────────────────────────────────────────
+// Client-side only: it hides cards that are already rendered and touches no
+// data. The v2 mock-up ships this bar with no JavaScript behind it; leaving it
+// inert in the live app would be a control that renders and does nothing.
+// Hiding uses el.hidden, which needs the .v2-region [hidden] rule in
+// v2-bridge.css — the UA's bare attribute selector loses to any class that
+// sets display.
+function dbApplyFilter(){
+  const q=document.getElementById('db-q');
+  const term=q?q.value.trim().toLowerCase():'';
+  const active=document.querySelector('.v2-tab.is-active[data-dbstatus]');
+  const want=active?active.dataset.dbstatus:'all';
+  let shown=0;
+  document.querySelectorAll('#db-board .v2-disp-card').forEach(card=>{
+    const crit=+(card.dataset.crit||0), warn=+(card.dataset.warn||0), ok=+(card.dataset.ok||0);
+    const okText=!term||(card.dataset.hay||'').indexOf(term)>=0;
+    const okStatus=want==='all'||(want==='crit'&&crit>0)||(want==='warn'&&warn>0)||(want==='ok'&&crit===0&&warn===0&&ok>0);
+    const show=okText&&okStatus;
+    card.hidden=!show;
+    if(show) shown++;
+  });
+  const empty=document.getElementById('db-empty');
+  if(empty) empty.hidden=shown>0;
+}
+function dbSetStatus(btn){
+  document.querySelectorAll('.v2-tab[data-dbstatus]').forEach(b=>b.classList.toggle('is-active',b===btn));
+  dbApplyFilter();
+}
+
 
 // ═══════════════════════════════════════════════════════
 // DASHBOARD

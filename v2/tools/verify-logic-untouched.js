@@ -54,12 +54,12 @@ const GROUPS = {
                                    'addBrakeTest', 'addServiceRecord', 'addDOTInspection', 'addMaintenance'],
   'Auth / data load / routing':   ['signIn', 'signOut', 'loadAll', 'init', 'navigate', 'render'],
   'Render functions not yet ported': ['renderCalendar', 'renderReports',
-                                      'renderDispatcherBoard', 'renderVehicleDetail', 'renderUsers'],
+                                      'renderVehicleDetail', 'renderUsers'],
 };
 
 /* Ported deliberately — expected to differ, and listed so the count is honest.
    Move a name here as its port lands, and out of the group above. */
-const PORTED = ['renderDashboard', 'renderVehicles', 'renderInspections', 'renderDrivers'];
+const PORTED = ['renderDashboard', 'renderVehicles', 'renderInspections', 'renderDrivers', 'renderDispatcherBoard'];
 
 /* Changed on purpose for a FEATURE, not a port — each with the reason, because
    these are the functions this tool exists to protect and waving one through

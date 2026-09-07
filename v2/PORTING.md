@@ -62,7 +62,7 @@ node v2/tools/check-isolation.js
 ## 2. The two integration modes
 
 **`.v2-region` — a page ported inside production's existing shell.** What the
-four shipped ports do. The render function returns v2 markup wrapped in
+five shipped ports do. The render function returns v2 markup wrapped in
 `.v2-region`, which `v2-bridge.css` gives the v2 ground and the anchor reset,
 because production's sidebar and topbar are still the ones on screen. This is
 the incremental mode: one page at a time, no chrome change, nothing else on the
@@ -181,7 +181,7 @@ dispatcher-versus-admin split still need a human with a session.
 | Drivers | `renderDrivers` | ported |
 | Calendar | `renderCalendar` | v2 design exists — not ported |
 | Reports | `renderReports` | v2 design exists — not ported |
-| Dispatch Board | `renderDispatcherBoard` | v2 design exists — not ported |
+| Dispatch Board | `renderDispatcherBoard` | ported |
 | Reminders | `renderReminders` (`js/reminders.js`) | v2 design exists — not ported |
 | Vehicle detail | `renderVehicleDetail` | **no v2 design** |
 | Driver portal | `renderPortal` | **no v2 design** |

@@ -124,3 +124,11 @@
   transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
 }
 .v2-btn-ghost:hover { background: var(--v2-surface-2); border-color: var(--v2-line-glass-hi); color: var(--v2-ink); }
+
+/* ── Hiding inside a ported region ────────────────────────────────────────
+   v2-shell.css scopes its [hidden] rule to .v2-app, which no page in the live
+   app emits, so a ported page that filters rows with el.hidden gets no rule at
+   all. The UA's own [hidden] is a bare attribute selector and loses to any
+   class that sets display — which most v2 components do. Mirrored here for the
+   region a ported render occupies, so filtering works the same either way. */
+.v2-region [hidden] { display: none !important; }
