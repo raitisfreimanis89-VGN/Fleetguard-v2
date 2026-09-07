@@ -1890,6 +1890,12 @@ async function doDeleteDriver(id,name){if(!isAdmin())return;const ok=await confi
 // ═══════════════════════════════════════════════════════
 // CALENDAR
 // ═══════════════════════════════════════════════════════
+// Which clock the calendar is showing. Presentation state only — it filters
+// events already computed, and never changes what is due.
+let calFilter='all';
+function calSetFilter(t){ calFilter=t; render(); }
+function calToday(){ calendarMonth=new Date(); calendarMonth.setDate(1); render(); }
+
 function renderCalendar(){
   const year=calendarMonth.getFullYear(),month=calendarMonth.getMonth();
   const firstDay=new Date(year,month,1).getDay(),daysInMonth=new Date(year,month+1,0).getDate();
@@ -1900,70 +1906,138 @@ function renderCalendar(){
   //   brake   last brake test + vehSched(brake_service) 30 days by default
   //   annual  the DOT certificate expiry, entered by hand
   // Intervals come from vehSched so per-vehicle overrides and the new-truck
-  // ladder are honoured; they are no longer hardcoded here.
+  // ladder are honoured; they are not hardcoded here.
   //
-  // The old `maint` event is gone. It drew maintenance_records
-  // .next_inspection_date, which addMaintenance() bakes as service_date + 60
-  // at insert time and never recalculates. That field was removed from
-  // getVehicleStatus() on 2026-08-18 for "duplicating the yard/periodic
-  // cadence and contradicting the 90-day Service pill" — see the note there —
-  // but this function kept rendering it. Because svcRefDate falls back to the
-  // maintenance service date when a vehicle has no service_records row, the
-  // two events resolved to the SAME day for those vehicles: one service drawn
-  // twice in two colours. The column itself is untouched and still shown in
-  // the Service history and on the vehicle detail page.
-  //
-  // Date maths is UTC throughout. The previous code parsed an ISO date as UTC
-  // midnight and then stepped it with local setDate(), which shifts the result
-  // by a day when the interval crosses a daylight-saving boundary.
+  // Date maths is UTC throughout. Parsing an ISO date as UTC midnight and then
+  // stepping it with local setDate() shifts the result by a day when the
+  // interval crosses a daylight-saving boundary.
   const _calAdd=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().split('T')[0];};
   VEHICLES.forEach(v=>{
     if(_calVacSet.has(v.assignedDriverId)) return;
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-    const svcs=SERVICE_RECORDS.filter(s=>s.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
+    const svcs=SERVICE_RECORDS.filter(x=>x.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const tn=esc(v.truckNumber);
     if(brakes[0]){
       const iv=vehSched(v.id,'brake_service').interval;
-      events.push({date:_calAdd(brakes[0].testDate,iv),label:`Truck #${tn} brake inspection due (${iv}-day)`,short:`#${tn} Brake`,type:'brake'});
+      events.push({date:_calAdd(brakes[0].testDate,iv),label:'Truck #'+tn+' brake inspection due ('+iv+'-day)',short:'#'+tn+' Brake',type:'brake',truck:tn,kind:'Brake inspection due',iv:iv});
     }
-    const svcRefDate=svcs[0]?.serviceDate||maint[0]?.serviceDate||null;
+    const svcRefDate=(svcs[0]&&svcs[0].serviceDate)||(maint[0]&&maint[0].serviceDate)||null;
     if(svcRefDate){
       const iv=vehSched(v.id,'dot_inspection').interval;
-      events.push({date:_calAdd(svcRefDate,iv),label:`Truck #${tn} yard / periodic inspection due (${iv}-day)`,short:`#${tn} Yard`,type:'yard'});
+      events.push({date:_calAdd(svcRefDate,iv),label:'Truck #'+tn+' yard / periodic inspection due ('+iv+'-day)',short:'#'+tn+' Yard',type:'yard',truck:tn,kind:'Yard / periodic inspection',iv:iv});
     }
     // Certificate expiry is a stored date, not an interval — nothing to add to.
     if(ANNUAL_AVAILABLE&&v.annualExpiry){
-      events.push({date:v.annualExpiry,label:`Truck #${tn} annual DOT certificate expires`,short:`#${tn} Annual`,type:'annual'});
+      events.push({date:v.annualExpiry,label:'Truck #'+tn+' annual DOT certificate expires',short:'#'+tn+' Annual',type:'annual',truck:tn,kind:'Annual DOT certificate expires',iv:null});
     }
   });
+
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    prev:'<path d="m15 18-6-6 6-6"/>', next:'<path d="m9 18 6-6-6-6"/>',
+    brake:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/>',
+    yard:'<path d="M3 21h18"/><path d="M5 21V8l7-5 7 5v13"/><path d="M10 21v-6h4v6"/>',
+    annual:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/>',
+  };
+  const TONE={yard:'v2-accent-blue',brake:'v2-accent-red',annual:'v2-accent-cyan'};
+  const ICON={yard:_IC.yard,brake:_IC.brake,annual:_IC.annual};
+
+  const counts={all:events.length,yard:0,brake:0,annual:0};
+  events.forEach(e=>{counts[e.type]++;});
+  const shown=calFilter==='all'?events:events.filter(e=>e.type===calFilter);
+
+  let html='<div class="v2-region">';
+  html+='<div class="v2-page-head"><h1>Calendar</h1>'
+    +'<p>Every compliance clock in the fleet, laid out by the day it comes due.</p></div>';
+
+  // ── Controls ──────────────────────────────────────────────────────────────
   const monthName=calendarMonth.toLocaleDateString('en-US',{month:'long',year:'numeric'});
-  let html=`<div class="card" style="margin-bottom:20px"><div class="card-body">
-    <div class="cal-header"><button class="btn btn-ghost btn-sm" onclick="calPrev()">← Prev</button><div class="cal-month-title">${monthName}</div><button class="btn btn-ghost btn-sm" onclick="calNext()">Next →</button></div>
-    <div class="cal-grid">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>`<div class="cal-day-header">${d}</div>`).join('')}${Array(firstDay).fill('<div></div>').join('')}`;
+  const pill=(key,label,tone)=>'<button class="v2-cal-pill '+tone+(calFilter===key?' is-active':'')+'" type="button" onclick="calSetFilter(\''+key+'\')">'
+    +(key==='all'?'':'<span class="v2-cal-dot"></span>')+label+' <span class="v2-cal-n">'+counts[key]+'</span></button>';
+  html+='<div class="v2-cal-bar">'
+    +'<div class="v2-cal-nav">'
+      // calPrev / calNext are the production handlers, unchanged
+      +'<button class="v2-cal-arrow" type="button" onclick="calPrev()" aria-label="Previous month">'+_sv(_IC.prev,'2')+'</button>'
+      +'<span class="v2-cal-month">'+esc(monthName)+'</span>'
+      +'<button class="v2-cal-arrow" type="button" onclick="calNext()" aria-label="Next month">'+_sv(_IC.next,'2')+'</button>'
+      +'<button class="v2-cal-today-btn" type="button" onclick="calToday()">Today</button>'
+    +'</div>'
+    +'<div class="v2-cal-filters" role="group" aria-label="Filter events by type">'
+      +pill('all','All events','v2-accent-amber')
+      +pill('yard','Yard','v2-accent-blue')
+      +pill('brake','Brakes','v2-accent-red')
+      +pill('annual','Annual DOT','v2-accent-cyan')
+    +'</div></div>';
+
+  // ── Month grid ────────────────────────────────────────────────────────────
+  html+='<div class="v2-cal-card"><div class="v2-cal-grid">';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>{html+='<div class="v2-cal-dow">'+d+'</div>';});
+  for(let i=0;i<firstDay;i++) html+='<div class="v2-cal-day is-blank" aria-hidden="true"></div>';
+  // A day with a dozen brake events would push the grid row to an unusable
+  // height, so cap the chips and count the rest.
+  const CAP=3;
   for(let d=1;d<=daysInMonth;d++){
-    const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const dayEvents=events.filter(e=>e.date===dateStr),isToday=dateStr===todayStr;
-    // `short` carries the clock name as well as the truck, so the three types
-    // are told apart by text and not by colour alone.
-    html+=`<div class="cal-day ${isToday?'today':''} ${dayEvents.length?'has-events':''}"><div class="cal-day-num">${d}</div>${dayEvents.map(e=>`<div class="cal-event cal-event-${e.type}" title="${e.label}">${e.short}</div>`).join('')}</div>`;
+    const dateStr=year+'-'+String(month+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const dayEvents=shown.filter(e=>e.date===dateStr);
+    const isToday=dateStr===todayStr;
+    html+='<div class="v2-cal-day'+(isToday?' is-today':'')+(dayEvents.length?' has-events':'')+'">'
+      +'<span class="v2-cal-num">'+d+'</span>';
+    if(dayEvents.length){
+      html+='<span class="v2-cal-events">';
+      dayEvents.slice(0,CAP).forEach(e=>{
+        html+='<span class="v2-cap '+TONE[e.type]+'" title="'+esc(e.label)+'">'
+          +'<span class="v2-cap-dot"></span><span class="v2-cap-text">'+esc(e.short)+'</span></span>';
+      });
+      if(dayEvents.length>CAP){
+        const rest=dayEvents.slice(CAP).map(e=>e.label).join('\n');
+        html+='<span class="v2-cap-more" title="'+esc(rest)+'">+'+(dayEvents.length-CAP)+' more</span>';
+      }
+      html+='</span>';
+    }
+    html+='</div>';
   }
-  html+=`</div></div></div><div class="card"><div class="card-header">📋 Upcoming Events</div><div class="card-body">`;
-  // Next few of EACH clock, merged back into date order — not simply the next
-  // N dates. A 30-day brake cycle across a 40-odd truck fleet produces roughly
-  // one brake event per truck per month, so a purely chronological list runs
-  // about 90% brakes and the yard visit and certificate expiry sit dozens of
-  // rows below the fold. Per-clock quotas keep every deadline type visible.
+  html+='</div></div>';
+
+  // ── Upcoming stream ───────────────────────────────────────────────────────
+  // Next few of EACH clock, merged back into date order — not simply the next N
+  // dates. A 30-day brake cycle across a 40-odd truck fleet produces roughly one
+  // brake event per truck per month, so a purely chronological list runs about
+  // 90% brakes and the yard visit and certificate expiry sit dozens of rows
+  // below the fold. Per-clock quotas keep every deadline type visible.
   const CAL_PER_TYPE=5;
-  const _calFuture=events.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
-  const upcoming=['yard','brake','annual']
-    .flatMap(t=>_calFuture.filter(e=>e.type===t).slice(0,CAL_PER_TYPE))
+  const _calFuture=shown.filter(e=>e.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+  const types=calFilter==='all'?['yard','brake','annual']:[calFilter];
+  const upcoming=types
+    .reduce((acc,t)=>acc.concat(_calFuture.filter(e=>e.type===t).slice(0,CAL_PER_TYPE)),[])
     .sort((a,b)=>a.date.localeCompare(b.date));
-  if(upcoming.length===0) html+=`<div class="empty">No upcoming events</div>`;
-  // --text2, not --text3: text3 measures 2.75:1 on the card and fails AA.
-  else if(_calFuture.length>upcoming.length) html+=`<div class="text-sm" style="color:var(--text2);margin-bottom:8px">Showing the next ${CAL_PER_TYPE} of each type &middot; ${_calFuture.length} upcoming in total</div>`;
-  upcoming.forEach(e=>{const d=daysBetween(todayStr,e.date);html+=`<div class="history-item"><span>${e.label}</span><div style="display:flex;gap:8px;align-items:center"><span class="text-sm">${fmtDate(e.date)}</span><span class="badge ${d<=7?'badge-red':d<=14?'badge-yellow':'badge-blue'}">${d===0?'Today':d+'d'}</span></div></div>`;});
-  html+=`</div></div>`;
+
+  html+='<section class="v2-table-card" aria-label="Upcoming events">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.annual)+'</span>'
+    +'<h2>Upcoming</h2>'
+    +'<span class="v2-console-note">'
+      +(upcoming.length?'Next '+CAL_PER_TYPE+' of each type &middot; '+_calFuture.length+' upcoming in total':'Nothing upcoming')
+    +'</span></div>';
+  if(upcoming.length===0){
+    html+='<div style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No upcoming events</div>';
+  } else {
+    html+='<div class="v2-stream">';
+    upcoming.forEach(e=>{
+      const days=daysBetween(todayStr,e.date);
+      const urgency=days<=7?' is-urgent':days<=14?' is-soon':'';
+      html+='<div class="v2-stream-row '+TONE[e.type]+'">'
+        +'<span class="v2-stream-ic">'+_sv(ICON[e.type])+'</span>'
+        +'<span class="v2-stream-main"><span class="v2-stream-label">Truck #'+esc(e.truck)+'</span>'
+        +'<span class="v2-stream-type">'+esc(e.kind)+(e.iv?' &middot; '+e.iv+'-day':'')+'</span></span>'
+        +'<span class="v2-stream-date">'+fmtDate(e.date)+'</span>'
+        +'<span class="v2-countdown'+urgency+'">'+(days===0?'Today':days+'d')+'</span>'
+      +'</div>';
+    });
+    html+='</div>';
+  }
+  html+='</section>';
+
+  html+='</div>';
   return html;
 }
 function calPrev(){calendarMonth.setMonth(calendarMonth.getMonth()-1);render();}
