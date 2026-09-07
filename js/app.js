@@ -2015,10 +2015,13 @@ function driverSafetyScore(st){
 }
 const scoreColour=s=>s>=80?'var(--success)':s>=55?'var(--warning)':'var(--danger)';
 
-function _driverSafetyCard(){
+function _driverSafetyCard(scopeIds){
   // Only drivers who could actually have done a PTI: one needs an assigned truck,
   // and a driver currently on vacation would otherwise read as non-compliant.
-  const eligible=DRIVERS.filter(d=>!d.on_vacation&&VEHICLES.some(v=>v.assignedDriverId===d.id));
+  // scopeIds, when passed, narrows that to the drivers on those vehicles, so a
+  // report scoped to one truck does not show the whole fleet's compliance.
+  const _pool=scopeIds?VEHICLES.filter(v=>scopeIds.has(v.id)):VEHICLES;
+  const eligible=DRIVERS.filter(d=>!d.on_vacation&&_pool.some(v=>v.assignedDriverId===d.id));
   const rows=eligible.map(d=>{
     const st=driverPtiStats(d.id);
     return {d,st,sc:driverSafetyScore(st)};
@@ -2079,6 +2082,43 @@ function _driverSafetyCard(){
   return html;
 }
 
+// ── Reports controls ────────────────────────────────────────────────────────
+// Scope for the Reports page only. Both are presentation state: they change
+// which rows are summarised, never what is stored. The 'rep' prefix is free —
+// js/reminders.js uses 'rem'.
+let repRangeDays = 30;
+let repVehicleId = '';          // '' = every vehicle
+
+function repSetRange(sel){ repRangeDays = parseInt(sel.value,10)||30; render(); }
+function repSetVehicle(sel){ repVehicleId = sel.value||''; render(); }
+function repPrint(){ window.print(); }
+
+// Exports the per-vehicle summary as it is currently scoped. Built in the
+// browser from data already loaded — no request, nothing leaves the page except
+// into the user's own downloads.
+function repExportCSV(){
+  const rows=(repVehicleId?VEHICLES.filter(v=>v.id===repVehicleId):VEHICLES);
+  const head=['Truck','Trailer','Driver','Dispatcher','Last brake','Last tyre','Last service','Status'];
+  const q=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';
+  const body=rows.map(v=>{
+    const st=getVehicleStatus(v.id);
+    const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+    return [v.truckNumber,v.trailerNumber||'',d?d.name:'',v.assignedDispatcher||'',
+      st.lastBrake?st.lastBrake.testDate:'',
+      st.lastTyre?st.lastTyre.photoDate:'',
+      st.lastService?st.lastService.serviceDate:(st.maint?st.maint.serviceDate:''),
+      st.critical?'Critical':st.warning?'Warning':'OK'].map(q).join(',');
+  });
+  const csv=head.map(q).join(',')+'\r\n'+body.join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='fleetguard-vehicles-'+today()+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  showToast('Exported '+rows.length+' vehicle'+(rows.length===1?'':'s'),'success');
+}
+
 function renderReports(){
   // v2 components against live data. Styles: v2-reports.css + v2-inspections.css
   // (table shell) + v2-shell.css (.v2-page-head).
@@ -2089,7 +2129,10 @@ function renderReports(){
     shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
     brake:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>',
     truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
-    dot:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    vest:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    print:'<path d="M6 9V2h12v7"/><rect x="6" y="14" width="12" height="8"/><path d="M6 18H4a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-2"/>',
+    down:'<path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/>',
+    chev:'<path d="m6 9 6 6 6-6"/>',
   };
   const pctOf=(n,d)=>d?Math.round(n/d*1000)/10:0;
   const bdRow=(tone,label,n,total)=>'<div class="v2-bd-row v2-accent-'+tone+'">'
@@ -2097,108 +2140,129 @@ function renderReports(){
     +'<span class="v2-bd-meter"><span class="v2-bd-fill" style="width:'+pctOf(n,total)+'%"></span></span>'
     +'<span class="v2-bd-n">'+n+'</span><span class="v2-bd-pct">'+pctOf(n,total)+'%</span></div>';
 
-  const statuses=VEHICLES.map(v=>({v,s:getVehicleStatus(v.id)}));
-  const roadworthy=statuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length,pending=VEHICLES.length-roadworthy;
-  const brakePass=BRAKE_TESTS.filter(b=>b.result==='pass').length,brakeFail=BRAKE_TESTS.filter(b=>b.result==='fail').length;
+  // ── Scope ─────────────────────────────────────────────────────────────────
+  // One truck or the whole fleet. Everything below is derived from these, so a
+  // scoped report is genuinely scoped rather than a filtered table under
+  // fleet-wide headline numbers.
+  const scopeVeh = repVehicleId ? VEHICLES.filter(v=>v.id===repVehicleId) : VEHICLES;
+  const scopeIds = new Set(scopeVeh.map(v=>v.id));
+  const inScope = arr => repVehicleId ? arr.filter(r=>scopeIds.has(r.vehicleId)) : arr;
+  const scopeIns = inScope(INSPECTIONS), scopeBrake = inScope(BRAKE_TESTS), scopeDot = inScope(DOT_INSPECTIONS);
+  const scopeMaint = inScope(MAINTENANCE);
+  const scopedVehicle = repVehicleId ? VEHICLES.find(v=>v.id===repVehicleId) : null;
+
+  const statuses=scopeVeh.map(v=>({v,s:getVehicleStatus(v.id)}));
+  const roadworthy=statuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length,pending=scopeVeh.length-roadworthy;
+  const brakePass=scopeBrake.filter(b=>b.result==='pass').length,brakeFail=scopeBrake.filter(b=>b.result==='fail').length;
+
+  // ── Window ────────────────────────────────────────────────────────────────
+  const winStart=new Date(Date.now()-repRangeDays*86400000).toISOString().split('T')[0];
+  const inWindow=scopeIns.filter(i=>String(i.submittedAt||'').split('T')[0]>=winStart);
+  const bizDays=businessDaysInWindow(repRangeDays).length;
+  const ptiDrivers=new Set(inWindow.map(i=>i.driverId).filter(Boolean)).size;
 
   // ── Metrics ───────────────────────────────────────────────────────────────
-  const healthPct=VEHICLES.length?Math.round(roadworthy/VEHICLES.length*100):0;
-  const winStart=new Date(Date.now()-PTI_WINDOW_DAYS*86400000).toISOString().split('T')[0];
-  const inWindow=INSPECTIONS.filter(i=>String(i.submittedAt||'').split('T')[0]>=winStart);
-  // businessDaysInWindow returns the ARRAY of dates, not a count — the same
-  // shape driverPtiStats consumes. Printing it directly rendered the whole
-  // comma-joined list into the tile.
-  const bizDays=businessDaysInWindow(PTI_WINDOW_DAYS).length;
-  const ptiDrivers=new Set(inWindow.map(i=>i.driverId).filter(Boolean)).size;
-  // Defect resolution only means anything once migration 011 is applied; until
-  // then repairStatus is undefined on every row and the tile is not rendered.
-  const defects=INSPECTIONS.filter(i=>i.overallResult==='defect'||i.overallResult==='minor');
+  const healthPct=scopeVeh.length?Math.round(roadworthy/scopeVeh.length*100):0;
+  const defects=inWindow.filter(i=>i.overallResult==='defect'||i.overallResult==='minor');
   const resolved=REPAIRS_AVAILABLE?defects.filter(i=>!isOpenDefect(i)).length:0;
   const stillOpen=defects.length-resolved;
   const resPct=defects.length?Math.round(resolved/defects.length*100):0;
+  // Driver compliance, same population the compliance table scores.
+  const compDrivers=DRIVERS.filter(d=>!d.on_vacation&&scopeVeh.some(v=>v.assignedDriverId===d.id));
+  const compStats=compDrivers.map(d=>driverPtiStats(d.id));
+  const compPct=compStats.length?Math.round(compStats.reduce((t,x)=>t+(x.pct||0),0)/compStats.length):null;
+  const caughtTotal=compStats.reduce((t,x)=>t+x.defectsFound,0);
+  const quickDrivers=compStats.filter(x=>x.medianSec!=null&&x.medianSec<THOROUGH_ZERO_SEC).length;
 
   let html='<div class="v2-region">';
   html+='<div class="v2-page-head"><h1>Reports &amp; Analytics</h1>'
-    +'<p>What the fleet has actually done, and where the gaps are.</p></div>';
+    +'<p>Compliance, inspection and maintenance performance across the fleet.</p></div>';
 
+  // ── Controls ──────────────────────────────────────────────────────────────
+  const rangeOpts=[[7,'Last 7 days'],[30,'Last 30 days'],[90,'Last 90 days'],[365,'Last 12 months']]
+    .map(o=>'<option value="'+o[0]+'"'+(repRangeDays===o[0]?' selected':'')+'>'+o[1]+'</option>').join('');
+  const vehOpts='<option value=""'+(repVehicleId?'':' selected')+'>All vehicles ('+VEHICLES.length+')</option>'
+    +VEHICLES.slice().sort((a,b)=>String(a.truckNumber).localeCompare(String(b.truckNumber),undefined,{numeric:true}))
+      .map(v=>'<option value="'+v.id+'"'+(repVehicleId===v.id?' selected':'')+'>Truck #'+esc(v.truckNumber)+'</option>').join('');
+  html+='<div class="v2-rep-bar">'
+    +'<div class="v2-rep-group"><label class="v2-rep-label" for="rep-range">Date range</label>'
+      +'<span class="v2-rep-select"><select id="rep-range" onchange="repSetRange(this)">'+rangeOpts+'</select>'+_sv(_IC.chev,'1.8')+'</span></div>'
+    +'<div class="v2-rep-group"><label class="v2-rep-label" for="rep-veh">Vehicle</label>'
+      +'<span class="v2-rep-select"><select id="rep-veh" onchange="repSetVehicle(this)">'+vehOpts+'</select>'+_sv(_IC.chev,'1.8')+'</span></div>'
+    +'<div class="v2-rep-actions">'
+      +'<button class="v2-rep-btn" type="button" onclick="repPrint()">'+_sv(_IC.print)+'Print summary</button>'
+      +'<button class="v2-rep-btn is-primary" type="button" onclick="repExportCSV()">'+_sv(_IC.down)+'Export CSV</button>'
+    +'</div></div>';
+
+  if(scopedVehicle){
+    html+='<p class="v2-rep-note" style="margin-bottom:var(--v2-s6)">Scoped to <b>Truck #'+esc(scopedVehicle.truckNumber)+'</b>. '
+      +'Every figure below counts this vehicle only.</p>';
+  }
+
+  // ── Metrics ───────────────────────────────────────────────────────────────
   html+='<div class="v2-metrics">'
     +'<article class="v2-metric v2-accent-green"><div class="v2-metric-head">'
       +'<span class="v2-metric-ic">'+_sv(_IC.heart)+'</span><span class="v2-metric-label">Fleet health score</span></div>'
       +'<span class="v2-metric-val">'+healthPct+'<span class="v2-metric-unit">%</span></span>'
       // The Dashboard counts only active vehicles and so reads higher. Saying so
-      // here is cheaper than letting someone find the two numbers and distrust both.
-      +'<span class="v2-metric-sub">'+roadworthy+' of '+VEHICLES.length+' roadworthy &middot; '+pending+' pending. Counts every vehicle; the Dashboard counts active ones only.</span>'
+      // here is cheaper than letting someone find both numbers and distrust each.
+      +'<span class="v2-metric-sub">'+roadworthy+' of '+scopeVeh.length+' roadworthy &middot; '+pending+' pending.'
+      +(repVehicleId?'':' Counts every vehicle; the Dashboard counts active ones only.')+'</span>'
       +'<div class="v2-metric-meter"><div style="width:'+healthPct+'%"></div></div></article>'
     +'<article class="v2-metric v2-accent-cyan"><div class="v2-metric-head">'
       +'<span class="v2-metric-ic">'+_sv(_IC.clip)+'</span><span class="v2-metric-label">Inspections completed</span></div>'
       +'<span class="v2-metric-val">'+inWindow.length+'</span>'
-      +'<span class="v2-metric-sub">Last '+PTI_WINDOW_DAYS+' days &middot; '+bizDays+' business days &middot; '+ptiDrivers+' driver'+(ptiDrivers===1?'':'s')+'</span></article>'
+      +'<span class="v2-metric-sub">Last '+repRangeDays+' days &middot; '+bizDays+' business days &middot; '+ptiDrivers+' driver'+(ptiDrivers===1?'':'s')+'</span></article>'
     +(REPAIRS_AVAILABLE?'<article class="v2-metric v2-accent-blue"><div class="v2-metric-head">'
       +'<span class="v2-metric-ic">'+_sv(_IC.shield)+'</span><span class="v2-metric-label">Defect resolution rate</span></div>'
       +'<span class="v2-metric-val">'+resPct+'<span class="v2-metric-unit">%</span></span>'
       +'<span class="v2-metric-sub">'+resolved+' of '+defects.length+' resolved &middot; '+stillOpen+' still open</span>'
       +'<div class="v2-metric-meter"><div style="width:'+resPct+'%"></div></div></article>':'')
     +'<article class="v2-metric v2-accent-amber"><div class="v2-metric-head">'
-      +'<span class="v2-metric-ic">'+_sv(_IC.dot)+'</span><span class="v2-metric-label">DOT inspections</span></div>'
-      +'<span class="v2-metric-val">'+DOT_INSPECTIONS.length+'</span>'
-      +'<span class="v2-metric-sub">'+MAINTENANCE.length+' service records &middot; '+BRAKE_TESTS.length+' brake tests on file</span></article>'
+      +'<span class="v2-metric-ic">'+_sv(_IC.vest)+'</span><span class="v2-metric-label">Driver compliance</span></div>'
+      +'<span class="v2-metric-val">'+(compPct===null?'&mdash;':compPct+'<span class="v2-metric-unit">%</span>')+'</span>'
+      // Fixed at PTI_WINDOW_DAYS on purpose: driverPtiStats scores against that
+      // constant, and letting the date range move it would put a number here
+      // that the compliance table below could not reproduce.
+      +'<span class="v2-metric-sub">'+compDrivers.length+' driver'+(compDrivers.length===1?'':'s')+' with a truck &middot; fixed '+PTI_WINDOW_DAYS+'-day window</span>'
+      +(compPct===null?'':'<div class="v2-metric-meter"><div style="width:'+compPct+'%"></div></div>')+'</article>'
     +'</div>';
 
-  // ── Two breakdowns side by side ───────────────────────────────────────────
-  const insPass=INSPECTIONS.filter(i=>i.overallResult!=='defect'&&i.overallResult!=='minor').length;
-  const insMinor=INSPECTIONS.filter(i=>i.overallResult==='minor').length;
-  const insDefect=INSPECTIONS.filter(i=>i.overallResult==='defect').length;
-  html+='<div class="v2-rep-grid">'
-    +'<section class="v2-table-card" aria-label="Inspection log breakdown">'
-      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.clip)+'</span>'
-      +'<h2>Inspection log breakdown</h2><span class="v2-console-note">'+INSPECTIONS.length+' on file</span></div>'
-      +'<div class="v2-bd">'
-        +bdRow('green','Roadworthy',insPass,INSPECTIONS.length)
-        +bdRow('amber','Minor',insMinor,INSPECTIONS.length)
-        +bdRow('red','Defect',insDefect,INSPECTIONS.length)
-      +'</div></section>'
-    +'<section class="v2-table-card" aria-label="Fleet roadworthiness">'
-      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.truck)+'</span>'
-      +'<h2>Fleet roadworthiness</h2><span class="v2-console-note">'+VEHICLES.length+' vehicles</span></div>'
-      +'<div class="v2-bd">'
-        +bdRow('green','Roadworthy',roadworthy,VEHICLES.length)
-        +bdRow('red','Pending',pending,VEHICLES.length)
-      +'</div></section>'
-    +'<section class="v2-table-card" aria-label="Brake test results">'
-      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.brake)+'</span>'
-      +'<h2>Brake test results</h2><span class="v2-console-note">'+BRAKE_TESTS.length+' tests</span></div>'
-      +'<div class="v2-bd">'
-        +bdRow('green','Pass',brakePass,BRAKE_TESTS.length)
-        +bdRow('red','Fail',brakeFail,BRAKE_TESTS.length)
-      +'</div></section>'
-    +'</div>';
+  // ── Breakdown + DOT, two up ───────────────────────────────────────────────
+  const insPass=inWindow.filter(i=>i.overallResult!=='defect'&&i.overallResult!=='minor').length;
+  const insMinor=inWindow.filter(i=>i.overallResult==='minor').length;
+  const insDefect=inWindow.filter(i=>i.overallResult==='defect').length;
 
-  // ── DOT clean rate, monthly ───────────────────────────────────────────────
   const _rNow=new Date();
   const _MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const _MOF=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const _dotMS=(y,m)=>{const pfx=y+'-'+String(m+1).padStart(2,'0');const inM=DOT_INSPECTIONS.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
+  const _dotMS=(y,m)=>{const pfx=y+'-'+String(m+1).padStart(2,'0');const inM=scopeDot.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
   const _cDot=_dotMS(_rNow.getFullYear(),_rNow.getMonth());
   const _tone=p=>p===null?'is-t-none':p>70?'is-t-ok':p>50?'is-t-warn':'is-t-bad';
   const _dotHist=[];for(let _i=1;_i<=12;_i++){let _y=_rNow.getFullYear(),_m=_rNow.getMonth()-_i;while(_m<0){_m+=12;_y--;}_dotHist.push(Object.assign({year:_y,month:_m},_dotMS(_y,_m)));}
 
-  html+='<section class="v2-table-card v2-rep-section" aria-label="DOT clean rate">'
-    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.dot)+'</span>'
-    +'<h2>DOT clean rate &middot; monthly</h2>'
-    +'<span class="v2-console-note">'+_MOF[_rNow.getMonth()]+' '+_rNow.getFullYear()+' &middot; current month</span>'
-    +'<span class="v2-rep-actions"><span class="v2-rtag">'+DOT_INSPECTIONS.length+' total</span></span></div>'
-    +'<div class="v2-bd">'
-      +'<div class="v2-bd-row v2-accent-'+(_cDot.pct===null?'blue':_cDot.pct>70?'green':_cDot.pct>50?'amber':'red')+'">'
-        +'<span class="v2-bd-key"><span class="v2-bd-dot"></span>Clean rate</span>'
-        +'<span class="v2-bd-meter"><span class="v2-bd-fill" style="width:'+(_cDot.pct||0)+'%"></span></span>'
-        +'<span class="v2-bd-n">'+_cDot.clean+'/'+_cDot.total+'</span>'
-        +'<span class="v2-bd-pct">'+(_cDot.pct!==null?_cDot.pct+'%':'&mdash;')+'</span></div>'
-      +(_cDot.total===0?'<span class="v2-bd-sub">No inspections recorded this month yet.</span>'
-        :'<span class="v2-bd-sub">'+_cDot.clean+' clean pass'+(_cDot.clean===1?'':'es')+' &middot; '+_cDot.issues+' violation'+(_cDot.issues===1?'':'s')+' / OOS</span>')
-    +'</div>'
-    +'<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
-    +'<th>Month</th><th>Total</th><th>Clean</th><th>Violation</th><th>% clean</th>'
-    +'</tr></thead><tbody>';
+  html+='<div class="v2-rep-grid">'
+    +'<section class="v2-table-card" aria-label="Inspection log breakdown">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.clip)+'</span>'
+      +'<h2>Inspection log breakdown</h2><span class="v2-console-note">'+inWindow.length+' in window</span></div>'
+      +'<div class="v2-bd">'
+        +bdRow('green','Roadworthy',insPass,inWindow.length)
+        +bdRow('amber','Minor',insMinor,inWindow.length)
+        +bdRow('red','Defect',insDefect,inWindow.length)
+      +'</div>'
+      +'<div class="v2-rep-note"><b>'+caughtTotal+' defect'+(caughtTotal===1?'':'s')+' caught</b> by drivers in the window '
+      +'&mdash; reported as a positive, never a penalty. Scoring a driver down for finding faults would only pay them to stay quiet.<br>'
+      +'<b>'+quickDrivers+' driver'+(quickDrivers===1?'':'s')+'</b> have a median walk-around under '+THOROUGH_ZERO_SEC+'s, '
+      +'the threshold the inspection log flags as suspiciously quick.</div>'
+    +'</section>'
+    +'<section class="v2-table-card" aria-label="DOT clean rate">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.clip)+'</span>'
+      +'<h2>DOT clean rate &middot; monthly</h2>'
+      +'<span class="v2-console-note">'+_MOF[_rNow.getMonth()]+' '+_rNow.getFullYear()+'</span>'
+      +'<span class="v2-rep-actions"><span class="v2-rtag">'+scopeDot.length+' total</span></span></div>'
+      +'<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
+      +'<th>Month</th><th>Total</th><th>Clean</th><th>Violation</th><th>% clean</th>'
+      +'</tr></thead><tbody>';
   if(!_dotHist.some(r=>r.total>0)&&_cDot.total===0){
     html+='<tr><td colspan="5" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No DOT inspection data yet</td></tr>';
   }
@@ -2212,22 +2276,35 @@ function renderReports(){
         ?'<span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill '+t+'" style="width:'+r.pct+'%"></span></span><span class="v2-meter-pct '+t+'">'+r.pct+'%</span></span>'
         :'<span class="v2-cell-dim">&mdash;</span>')+'</td></tr>';
   });
-  html+='</tbody></table></div></section>';
+  html+='</tbody></table></div></section></div>';
+
+  // ── Roadworthiness + brakes, two up ───────────────────────────────────────
+  html+='<div class="v2-rep-grid">'
+    +'<section class="v2-table-card" aria-label="Fleet roadworthiness">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.truck)+'</span>'
+      +'<h2>Fleet roadworthiness</h2><span class="v2-console-note">'+scopeVeh.length+' vehicle'+(scopeVeh.length===1?'':'s')+'</span></div>'
+      +'<div class="v2-bd">'+bdRow('green','Roadworthy',roadworthy,scopeVeh.length)+bdRow('red','Pending',pending,scopeVeh.length)+'</div></section>'
+    +'<section class="v2-table-card" aria-label="Brake test results">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.brake)+'</span>'
+      +'<h2>Brake test results</h2><span class="v2-console-note">'+scopeBrake.length+' test'+(scopeBrake.length===1?'':'s')+'</span></div>'
+      +'<div class="v2-bd">'+bdRow('green','Pass',brakePass,scopeBrake.length)+bdRow('red','Fail',brakeFail,scopeBrake.length)+'</div></section>'
+    +'</div>';
 
   // ── Driver compliance ─────────────────────────────────────────────────────
-  html+=_driverSafetyCard();
+  html+=_driverSafetyCard(repVehicleId?scopeIds:null);
 
   // ── Per-vehicle summary ───────────────────────────────────────────────────
   html+='<section class="v2-table-card v2-rep-section" aria-label="Vehicle maintenance overview">'
     +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.truck)+'</span>'
-    +'<h2>Vehicle maintenance overview</h2><span class="v2-console-note">'+VEHICLES.length+' vehicles</span></div>'
+    +'<h2>Vehicle maintenance overview</h2>'
+    +'<span class="v2-console-note">'+scopeVeh.length+' vehicle'+(scopeVeh.length===1?'':'s')+' &middot; '+scopeMaint.length+' service records</span></div>'
     +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
     +'<th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th>'
     +'</tr></thead><tbody>';
-  if(VEHICLES.length===0){
+  if(scopeVeh.length===0){
     html+='<tr><td colspan="5" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No vehicles</td></tr>';
   }
-  VEHICLES.forEach(v=>{
+  scopeVeh.forEach(v=>{
     const st=getVehicleStatus(v.id);
     const tone=st.critical?'is-defect':st.warning?'is-minor':'is-pass';
     const label=st.critical?'Critical':st.warning?'Warning':'OK';
