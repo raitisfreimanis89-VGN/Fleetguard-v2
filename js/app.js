@@ -1649,13 +1649,37 @@ function renderDrivers(){
   // "did the table respond at all"; isAdmin() answers "may this person see it".
   const showPhones = isAdmin() && PHONES_AVAILABLE;
 
+  // Roster counts, all from data already loaded. Assigned + unassigned = total;
+  // on vacation deliberately overlaps both, because it is a state a driver is
+  // in rather than a fourth bucket they belong to.
+  const _assignedIds=new Set(VEHICLES.map(v=>v.assignedDriverId).filter(Boolean));
+  const _assigned=DRIVERS.filter(d=>_assignedIds.has(d.id)).length;
+  const _unassigned=DRIVERS.length-_assigned;
+  const _onVac=DRIVERS.filter(d=>d.on_vacation).length;
+
   let html='<div class="v2-region">';
 
+  // The live app puts the page name in #page-title in the topbar, so this
+  // heading is the subtitle's carrier more than the title's. Kept because the
+  // one-line description is the only place the page says what it is for.
+  html+='<div class="v2-page-head"><h1>Drivers</h1>'
+    +'<p>Who drives what, who can be reached, and who is away.</p></div>';
+
+  html+='<section class="v2-console-row" aria-label="Driver summary and add">'
+    +'<article class="v2-console v2-accent-cyan"><div class="v2-console-head">'
+    +'<span class="v2-console-ic">'+_sv(_IC.users)+'</span><h2>Driver roster</h2></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+      +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+DRIVERS.length+'</span><span class="v2-pulse-label">Total drivers</span></div>'
+      +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+_assigned+'</span><span class="v2-pulse-label">Assigned</span></div>'
+      +'<div class="v2-pulse-stat '+(_unassigned?'v2-accent-blue':'v2-accent-green')+'"><span class="v2-pulse-num">'+_unassigned+'</span><span class="v2-pulse-label">Unassigned</span></div>'
+      +'<div class="v2-pulse-stat '+(_onVac?'v2-accent-amber':'v2-accent-green')+'"><span class="v2-pulse-num">'+_onVac+'</span><span class="v2-pulse-label">On vacation</span></div>'
+    +'</div></div></article>';
+
   if(isAdmin()){
-    html+='<section class="v2-form-card v2-accent-primary" aria-label="Add driver">'
-      +'<div class="v2-form-head"><span class="v2-form-ic">'+_sv(_IC.user)+'</span>'
-      +'<h2>Add driver</h2></div>'
-      +'<div class="v2-form-body"><div class="v2-form-grid">'
+    html+='<article class="v2-console v2-accent-primary" aria-label="Add driver">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.user)+'</span>'
+      +'<h2>Add driver</h2><span class="v2-console-note">Admin only</span></div>'
+      +'<div class="v2-console-body"><div class="v2-form-grid">'
         +'<div class="v2-field"><label for="d-name">Full name <span class="v2-field-req">*</span></label>'
         // id, the Enter binding and doAddDriver() are all load-bearing
         +'<input class="v2-input" id="d-name" type="text" placeholder="Full name" onkeydown="if(event.key===\'Enter\')doAddDriver()"/></div>'
@@ -1669,10 +1693,12 @@ function renderDrivers(){
       +(showPhones?'<p class="v2-add-hint">Optional. Stored in E.164 (<code>+12625550142</code>) in the admin-only <code>driver_phones</code> table, never on the driver record. 10 digits are assumed US.</p>':'')
       +'<div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddDriver()">'
       +_sv(_IC.plus,'2.2')+'Add driver</button></div>'
-      +'</div></section>';
-  } else {
-    html+=dispatcherNotice();
+      +'</div></article>';
   }
+  html+='</section>';
+  // Dispatchers get the roster card above but no add form, so the notice sits
+  // after the row rather than inside it.
+  if(!isAdmin()) html+=dispatcherNotice();
 
   html+='<section class="v2-table-card" aria-label="Driver directory">'
     +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.users)+'</span>'

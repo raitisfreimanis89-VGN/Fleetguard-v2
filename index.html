@@ -17,15 +17,26 @@
   <!-- v2 design layer, loaded AFTER styles.css so the --v2-* tokens are
        available to the component sheets below.
 
-       v2-shell.css is deliberately NOT here. It is the staging pages' global
-       reset — it restyles body, a and [hidden] — and would repaint the live
-       app from #10131a to #00050d and break the .light theme. Everything the
-       ported pages need from it lives in v2-bridge.css instead, scoped.
+       v2-staging-reset.css is the one sheet that must never be linked here. It
+       carries the global rules (*, body) the standalone v2/*.html pages need
+       because they own their document, and in this app they would repaint
+       everything from #10131a to #00050d and break the .light theme.
 
-       Every selector in these three is .v2- prefixed and every custom property
-       is --v2-, so nothing collides with the production stylesheet above.
+       v2-shell.css used to be excluded for that reason too, since it carried
+       those globals itself. It no longer does — they moved to the staging
+       reset and the shell's own equivalents are scoped under .v2-app — so it
+       is linked here for .v2-page-head and the rest of the shell layer. The
+       sidebar and topbar rules in it stay inert until some page emits .v2-app
+       markup, which none does yet: measured at 0 of 2128 computed properties
+       changed on the ported Drivers page with real data.
+
+       Every selector in these is .v2- prefixed or .v2-app scoped, and every
+       custom property is --v2-, so nothing collides with the production
+       stylesheet above. v2-skin.css is the exception that proves it: it
+       deliberately remaps production's own tokens, scoped :root:not(.light).
        Pages are ported one at a time; add a component sheet as its page lands. -->
   <link rel="stylesheet" href="v2/css/v2-tokens.css"/>
+  <link rel="stylesheet" href="v2/css/v2-shell.css"/>
   <link rel="stylesheet" href="v2/css/v2-skin.css"/>
   <link rel="stylesheet" href="v2/css/v2-bridge.css"/>
   <link rel="stylesheet" href="v2/css/v2-dash.css"/>
