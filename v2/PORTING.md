@@ -117,13 +117,13 @@ still breaks.
   time someone clicks Edit, and the layout will break only in that state.
   `.v2-drv` and `.v2-actions` are both `display:flex`, which is why the Drivers
   port could use them directly.
-- **A v2 mockup may show data the live page does not have.** The v2 Drivers
-  design has a Cell column and `d-truck` / `d-phone` inputs. `loadAll()` never
-  fetches `driver_phones` — it is admin-only by RLS and belongs to the Reminders
-  page and the edge functions — and `doAddDriver()` reads only `d-name`. Porting
-  those controls would have produced a column that renders empty and two inputs
-  that silently discard what you type. They were left out. Adding them is a
-  feature with a data change behind it, not a port.
+- **A v2 mockup may show data the live page does not have — check before you
+  build it.** The v2 Drivers design has a Cell column that the live page had no
+  data for: `loadAll()` never fetched `driver_phones`. It was left out of the
+  first port for that reason, then added deliberately as a feature (see section
+  7), which required a new query rather than new markup. The general rule holds:
+  a control the data cannot feed is worse than no control, because it renders
+  and silently does nothing.
 
 ## 4. Verifying a port changed nothing but pixels
 
@@ -213,3 +213,42 @@ resolve.
   in `css/styles.css`.
 - **Three Unsplash hotlinks** in `v2-cards.css` (toll, traffic, states) — remote
   dependencies in a page that otherwise ships its own assets.
+
+## 7. Driver cell numbers
+
+Added after the Drivers port, as a feature rather than a port — it needed a new
+query, not new markup. Three things about it are worth keeping written down.
+
+**Writes go to the table, never through `broadcast-sms`.** That function has an
+`update_phone` action which looks like the obvious API, and it is not usable
+from the browser: it authenticates on a shared `GV_SERVICE_SECRET`, so calling
+it from front-end JavaScript would mean shipping that secret to every user,
+along with the ability to add and delete drivers, blast SMS to the whole fleet
+and read every number on file. RLS is the correct door. `phones_insert_admin`
+and `phones_update_admin` both require `is_admin()`, so a dispatcher who forges
+the call is refused by the database rather than by this code.
+
+**`PHONES_AVAILABLE` is not an authorisation check.** The select policy is
+`FOR SELECT TO authenticated USING (is_admin())`, which returns a dispatcher
+**zero rows and no error** — so `PHONES_AVAILABLE` is true for them too, just
+with an empty map. Gating the column on it alone rendered the Cell column for
+dispatchers with "No number" on every row and an Add button their write RLS
+would refuse. The gate is `showPhones = isAdmin() && PHONES_AVAILABLE`:
+availability answers *did the table respond*, `isAdmin()` answers *may this
+person see it*.
+
+**Normalisation mirrors the edge function line for line** — 10 digits assumed
+US, 11 leading 1 prefixed, anything else must already start with `+`. A number
+typed in the UI and a number typed into the SMS tooling therefore land
+identically. The database has the last word regardless:
+`CHECK (phone_number ~ '^\+[1-9]\d{7,14}$')` from migration 002 refuses a bad
+value even if the client is bypassed.
+
+One footnote for whoever reads migration 002 and worries: it carries
+`REVOKE SELECT (phone_number) ... FROM authenticated`, and the comment beside it
+implies direct selects will fail. They do not. A column-level `REVOKE` cannot
+subtract from a table-level `GRANT` in PostgreSQL, so the table-level grant
+Supabase issues still permits the read — which is why `js/reminders.js` has read
+this column successfully since migration 002, and why `PHONES_AVAILABLE` comes
+back true. RLS is what actually restricts it, and RLS is sufficient. The
+`get_driver_phone()` RPC in that migration is therefore unused.

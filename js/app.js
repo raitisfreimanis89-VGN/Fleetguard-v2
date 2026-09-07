@@ -106,6 +106,19 @@ let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DO
 let REPAIRS_AVAILABLE=false;
 // Same idea for vehicles.annual_inspection_expiry (migration 012).
 let ANNUAL_AVAILABLE=false;
+// Driver cell numbers (migration 002). Two things worth knowing here:
+//
+//   1. driver_phones is admin-only by RLS ("phones_select_admin" USING is_admin()),
+//      so a dispatcher's SELECT returns zero rows, PHONES_AVAILABLE stays false
+//      and the Cell column is never rendered for them. The gate is the
+//      database's, not this file's — which is the whole reason numbers are kept
+//      off the drivers table.
+//   2. js/reminders.js already declares a top-level `DRIVER_PHONES`. Both files
+//      are plain scripts sharing one global scope, so a second `let DRIVER_PHONES`
+//      here would be a SyntaxError that stops the entire application from
+//      parsing. Hence the different name.
+let PHONES_BY_DRIVER={};
+let PHONES_AVAILABLE=false;
 // Certificate expiry warning windows.
 const ANNUAL_WARN_DAYS=30;   // amber from here
 const ANNUAL_CRIT_DAYS=7;    // red from here, and red once expired
@@ -147,7 +160,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch,ph] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -173,6 +186,13 @@ async function loadAll() {
     // Fleet defaults. Guarded like the rest: if this fails, GLOBAL_SCHED stays
     // empty and vehSched falls through to the constants, i.e. today's behaviour.
     sb.from('reminder_schedules').select('reminder_type,interval_days,warning_days_before,enabled').is('vehicle_id',null),
+    // Driver cell numbers. Guarded and separate for the same reason as the
+    // repair and annual columns above: this is the one table in the set that
+    // a dispatcher is not allowed to read at all, and folding it into the
+    // drivers select would fail the WHOLE drivers fetch for them and empty the
+    // fleet everywhere. Split, a refused read costs only the Cell column.
+    // Same shape js/reminders.js has read since migration 002.
+    sb.from('driver_phones').select('driver_id,phone_number,verified'),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -215,6 +235,85 @@ async function loadAll() {
   // SCHEDULES simply means every truck uses the fleet defaults.
   if (!sch.error && sch.data) SCHEDULES = sch.data;
   if (!gsch.error && gsch.data) GLOBAL_SCHED = gsch.data;
+  // A dispatcher gets an empty set here rather than an error, so treat "no rows
+  // and no error" as available-but-empty and let RLS decide what is visible.
+  // Reset the map on failure instead of leaving a stale one behind: a phone the
+  // current session is no longer entitled to read must not stay on screen.
+  PHONES_AVAILABLE = !ph.error && !!ph.data;
+  PHONES_BY_DRIVER = {};
+  if (PHONES_AVAILABLE) ph.data.forEach(r=>{ PHONES_BY_DRIVER[r.driver_id]={number:r.phone_number,verified:!!r.verified}; });
+}
+
+// ── Driver cell numbers ─────────────────────────────────────────────────────
+// Normalisation deliberately mirrors the update_phone action in
+// supabase/functions/broadcast-sms/index.ts line for line, so a number typed
+// here and a number typed into the SMS tooling land in the database identically.
+// The database has the last word either way: driver_phones.phone_number carries
+// CHECK (phone_number ~ '^\+[1-9]\d{7,14}$') from migration 002, so a bad value
+// is refused server-side even if this function were bypassed.
+function normalizePhoneE164(raw){
+  const s=String(raw==null?'':raw).trim();
+  const digits=s.replace(/\D/g,'');
+  if(digits.length===10) return '+1'+digits;
+  if(digits.length===11&&digits[0]==='1') return '+'+digits;
+  return s.startsWith('+')?s:'';
+}
+function isE164(p){ return /^\+[1-9]\d{7,14}$/.test(p); }
+// Display format for a US number; anything else is shown as stored.
+function fmtPhone(p){
+  const m=/^\+1(\d{3})(\d{3})(\d{4})$/.exec(String(p||''));
+  return m?`(${m[1]}) ${m[2]}-${m[3]}`:String(p||'');
+}
+
+// Writes go straight to the table, not through broadcast-sms. That function
+// authenticates with a shared GV_SERVICE_SECRET, and putting that secret in
+// front-end JavaScript would hand every user of this app the ability to blast
+// SMS to the whole fleet and read every number on file. RLS is the correct
+// door: "phones_insert_admin" / "phones_update_admin" both require is_admin(),
+// so a dispatcher who forges this call is refused by the database.
+async function doSaveDriverPhone(id){
+  if(!isAdmin())return;
+  const el=document.getElementById('dphone-'+id); if(!el||!sb)return;
+  const raw=el.value.trim();
+  const driver=DRIVERS.find(d=>d.id===id);
+  // Empty field clears the number — the way to remove one without a second control.
+  if(raw===''){
+    if(!PHONES_BY_DRIVER[id]){ cancelEditPhone(id); return; }
+    const ok=await confirm2(`Remove cell number for "${driver?driver.name:'this driver'}"?`,'They will stop receiving PTI links and SMS reminders.');
+    if(!ok)return;
+    const {error}=await sb.from('driver_phones').delete().eq('driver_id',id);
+    if(error){showToast('Could not remove number: '+error.message,'danger');return;}
+    delete PHONES_BY_DRIVER[id];
+    showToast('Cell number removed','warning'); render(); return;
+  }
+  const phone=normalizePhoneE164(raw);
+  if(!isE164(phone)){showToast('Enter a valid number, e.g. (262) 555-0142','danger');return;}
+  const now=new Date().toISOString();
+  // driver_id is the PRIMARY KEY, so one upsert covers both add and edit.
+  // verified resets to false: a changed number has not been confirmed by the
+  // driver yet, which is exactly what the SMS side assumes.
+  const {error}=await sb.from('driver_phones')
+    .upsert({driver_id:id,phone_number:phone,verified:false,updated_at:now},{onConflict:'driver_id'});
+  if(error){showToast('Could not save number: '+error.message,'danger');return;}
+  PHONES_BY_DRIVER[id]={number:phone,verified:false};
+  showToast('Cell number saved','success'); render();
+}
+// The restored value is 'inline-flex', not 'flex': .v2-phone and .v2-phone-none
+// are both inline-flex in v2-drivers.css, and forcing them to block-level flex
+// would silently relayout the cell the first time anyone cancelled an edit.
+// Same class of bug as startEditDriver hardcoding 'flex' — see v2/PORTING.md.
+function startEditPhone(id){
+  const v=document.getElementById('phone-view-'+id),e=document.getElementById('phone-edit-'+id);
+  if(!v||!e)return;
+  v.style.display='none'; e.style.display='inline-flex';
+  const i=document.getElementById('dphone-'+id); if(i){i.focus();i.select();}
+}
+function cancelEditPhone(id){
+  const v=document.getElementById('phone-view-'+id),e=document.getElementById('phone-edit-'+id);
+  if(!v||!e)return;
+  v.style.display='inline-flex'; e.style.display='none';
+  const i=document.getElementById('dphone-'+id);
+  if(i) i.value=PHONES_BY_DRIVER[id]?PHONES_BY_DRIVER[id].number:'';
 }
 
 async function addDriver(name) {
@@ -1535,9 +1634,20 @@ function renderDrivers(){
     user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     users:'<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     plus:'<path d="M12 5v14M5 12h14"/>',
+    // Marks the Cell column header: the data behind it is admin-only by RLS.
+    lock:'<rect x="4" y="10.5" width="16" height="11" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>',
   };
   // Initials for the avatar, derived from the name already on screen.
   const _ini=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase()||'?';
+
+  // Both conditions are needed, and it is worth being precise about why.
+  // driver_phones RLS is `FOR SELECT TO authenticated USING (is_admin())`, which
+  // returns a dispatcher ZERO ROWS AND NO ERROR — so PHONES_AVAILABLE is true
+  // for them too, just with an empty map. Gating on that alone would render the
+  // Cell column for dispatchers, reading "No number" on every row, with an Add
+  // button their write RLS would then refuse. PHONES_AVAILABLE only answers
+  // "did the table respond at all"; isAdmin() answers "may this person see it".
+  const showPhones = isAdmin() && PHONES_AVAILABLE;
 
   let html='<div class="v2-region">';
 
@@ -1549,7 +1659,14 @@ function renderDrivers(){
         +'<div class="v2-field"><label for="d-name">Full name <span class="v2-field-req">*</span></label>'
         // id, the Enter binding and doAddDriver() are all load-bearing
         +'<input class="v2-input" id="d-name" type="text" placeholder="Full name" onkeydown="if(event.key===\'Enter\')doAddDriver()"/></div>'
+        // Cell number only appears when this session can actually read the
+        // table, so the field is never offered to someone whose write RLS
+        // would refuse it anyway.
+        +(showPhones?'<div class="v2-field"><label for="d-phone">Cell number</label>'
+          +'<input class="v2-input" id="d-phone" type="tel" inputmode="tel" autocomplete="off"'
+          +' placeholder="(262) 555-0142" onkeydown="if(event.key===\'Enter\')doAddDriver()"/></div>':'')
       +'</div>'
+      +(showPhones?'<p class="v2-add-hint">Optional. Stored in E.164 (<code>+12625550142</code>) in the admin-only <code>driver_phones</code> table, never on the driver record. 10 digits are assumed US.</p>':'')
       +'<div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddDriver()">'
       +_sv(_IC.plus,'2.2')+'Add driver</button></div>'
       +'</div></section>';
@@ -1561,12 +1678,18 @@ function renderDrivers(){
     +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.users)+'</span>'
     +'<h2>All drivers</h2><span class="v2-console-note">'+DRIVERS.length+' total</span></div>'
     +'<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
-    +'<th>Driver</th><th>Assigned truck</th><th>Dispatcher</th><th>Status</th>'
+    +'<th>Driver</th>'
+    // Absent entirely for dispatchers rather than present-and-empty — see the
+    // showPhones note above for why RLS alone is not enough to decide this.
+    // so the column is absent for them rather than present-and-empty.
+    +(showPhones?'<th><span class="v2-th-locked">'+_sv(_IC.lock,'2')+'Cell</span></th>':'')
+    +'<th>Assigned truck</th><th>Dispatcher</th><th>Status</th>'
     +(isAdmin()?'<th>Actions</th>':'')
     +'</tr></thead><tbody>';
 
+  const _cols=1+(showPhones?1:0)+3+(isAdmin()?1:0);
   if(DRIVERS.length===0){
-    html+='<tr><td colspan="'+(isAdmin()?5:4)+'" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No drivers added yet</td></tr>';
+    html+='<tr><td colspan="'+_cols+'" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No drivers added yet</td></tr>';
   }
 
   DRIVERS.forEach(d=>{
@@ -1589,8 +1712,28 @@ function renderDrivers(){
           +'<button class="v2-btn-primary" type="button" onclick="doUpdateDriver(\''+d.id+'\')">Save</button>'
           +'<button class="v2-btn-ghost" type="button" onclick="cancelEditDriver(\''+d.id+'\')">Cancel</button>'
         +'</div>'
-      +'</td>'
-      +'<td>'+(trucks?'<span class="v2-truck-list">'+trucks+'</span>':'<span class="v2-cell-none">&mdash;</span>')+'</td>'
+      +'</td>';
+    if(showPhones){
+      const ph=PHONES_BY_DRIVER[d.id];
+      html+='<td>'
+        // .v2-phone / .v2-phone-none are inline-flex; cancelEditPhone restores
+        // exactly that, never plain flex.
+        +'<span id="phone-view-'+d.id+'" class="'+(ph?'v2-phone':'v2-phone-none')+'">'
+          +(ph?'<span class="v2-phone-num">'+esc(fmtPhone(ph.number))+'</span>':'<span>No number</span>')
+          +'<button class="v2-phone-edit" type="button" onclick="startEditPhone(\''+d.id+'\')"'
+          +' title="'+(ph?'Edit':'Add')+' cell number" aria-label="'+(ph?'Edit':'Add')+' cell number for '+esc(d.name)+'">'
+          +_sv(_IC.edit)+'</button>'
+        +'</span>'
+        +'<span id="phone-edit-'+d.id+'" style="display:none;gap:var(--v2-s2);align-items:center">'
+          +'<input class="v2-input" id="dphone-'+d.id+'" type="tel" inputmode="tel" autocomplete="off"'
+          +' value="'+esc(ph?ph.number:'')+'" placeholder="(262) 555-0142" style="width:150px"'
+          +' onkeydown="if(event.key===\'Enter\')doSaveDriverPhone(\''+d.id+'\');if(event.key===\'Escape\')cancelEditPhone(\''+d.id+'\')"/>'
+          +'<button class="v2-btn-primary" type="button" onclick="doSaveDriverPhone(\''+d.id+'\')">Save</button>'
+          +'<button class="v2-btn-ghost" type="button" onclick="cancelEditPhone(\''+d.id+'\')">Cancel</button>'
+        +'</span>'
+      +'</td>';
+    }
+    html+='<td>'+(trucks?'<span class="v2-truck-list">'+trucks+'</span>':'<span class="v2-cell-none">&mdash;</span>')+'</td>'
       +'<td>'+(dispatchers?'<span class="v2-disp-list">'+dispatchers+'</span>':'<span class="v2-cell-none">&mdash;</span>')+'</td>'
       +'<td><span class="v2-drv-status '+st[0]+'">'+st[1]+'</span></td>';
     if(isAdmin()){
@@ -1612,7 +1755,34 @@ function renderDrivers(){
   return html;
 }
 
-async function doAddDriver(){if(!isAdmin())return;const name=document.getElementById('d-name').value.trim();if(!name){showToast('Enter a driver name','danger');return;}await addDriver(name);document.getElementById('d-name').value='';showToast('Driver added!','success');render();}
+async function doAddDriver(){
+  if(!isAdmin())return;
+  const name=document.getElementById('d-name').value.trim();
+  if(!name){showToast('Enter a driver name','danger');return;}
+  // Cell number is optional, and validated BEFORE the driver row is created so
+  // a typo cannot leave a driver behind with no number and no warning.
+  const phoneEl=document.getElementById('d-phone');
+  const rawPhone=phoneEl?phoneEl.value.trim():'';
+  let phone='';
+  if(rawPhone){
+    phone=normalizePhoneE164(rawPhone);
+    if(!isE164(phone)){showToast('Enter a valid cell number, e.g. (262) 555-0142','danger');return;}
+  }
+  const rec=await addDriver(name);
+  if(phone&&rec&&rec.id&&sb){
+    const now=new Date().toISOString();
+    const {error}=await sb.from('driver_phones')
+      .upsert({driver_id:rec.id,phone_number:phone,verified:false,added_at:now,updated_at:now},{onConflict:'driver_id'});
+    // The driver already exists at this point, so a failed number is reported
+    // as its own problem rather than rolling anything back.
+    if(error) showToast('Driver added, but the cell number failed: '+error.message,'warning');
+    else PHONES_BY_DRIVER[rec.id]={number:phone,verified:false};
+  }
+  document.getElementById('d-name').value='';
+  if(phoneEl) phoneEl.value='';
+  showToast('Driver added!','success');
+  render();
+}
 function startEditDriver(id){document.getElementById('driver-view-'+id).style.display='none';document.getElementById('driver-edit-'+id).style.display='flex';document.getElementById('driver-btns-'+id).style.display='none';document.getElementById('dedit-'+id).focus();}
 function cancelEditDriver(id){document.getElementById('driver-view-'+id).style.display='flex';document.getElementById('driver-edit-'+id).style.display='none';document.getElementById('driver-btns-'+id).style.display='flex';}
 async function doUpdateDriver(id){if(!isAdmin())return;const name=document.getElementById('dedit-'+id).value.trim();if(!name){showToast('Name cannot be empty','danger');return;}await updateDriver(id,name);showToast('Driver updated!','success');render();}

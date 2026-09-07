@@ -61,21 +61,37 @@ const GROUPS = {
    Move a name here as its port lands, and out of the group above. */
 const PORTED = ['renderDashboard', 'renderVehicles', 'renderInspections', 'renderDrivers'];
 
+/* Changed on purpose for a FEATURE, not a port — each with the reason, because
+   these are the functions this tool exists to protect and waving one through
+   silently would defeat the point. Adding a name here is a deliberate act:
+   state what changed and why, or do not add it. */
+const FEATURE_CHANGES = {
+  loadAll: 'driver cell numbers — one guarded driver_phones select added to the '
+         + 'Promise.all, plus PHONES_AVAILABLE / PHONES_BY_DRIVER. Every existing '
+         + 'query and every existing guard is byte-identical; the table is '
+         + 'admin-only by RLS so a dispatcher gets an empty set, not an error.',
+  doAddDriver: 'driver cell numbers — optional d-phone field, validated before '
+             + 'the driver row is created, upserted after it.',
+};
+
 console.log('  baseline: ' + BASE + ':' + FILE + '\n');
 let total = 0, identical = 0;
 const changed = [];
 
 for (const [group, fns] of Object.entries(GROUPS)) {
-  const ok = [], diff = [], missing = [];
+  const ok = [], diff = [], missing = [], declared = [];
   for (const fn of fns) {
     const a = grab(baseline, fn), b = grab(current, fn);
     if (a === null || b === null) { missing.push(fn); continue; }
     total++;
-    if (a === b) { ok.push(fn); identical++; } else { diff.push(fn); changed.push(fn); }
+    if (a === b) { ok.push(fn); identical++; }
+    else if (FEATURE_CHANGES[fn]) { declared.push(fn); }
+    else { diff.push(fn); changed.push(fn); }
   }
   console.log('  ' + group);
   console.log('    ' + ok.length + '/' + (fns.length - missing.length) +
     (diff.length ? ' — CHANGED: ' + diff.join(', ') : ' identical') +
+    (declared.length ? '   [declared feature change: ' + declared.join(', ') + ']' : '') +
     (missing.length ? '   [not found: ' + missing.join(', ') + ']' : ''));
 }
 
@@ -86,6 +102,35 @@ const stillPorted = PORTED.filter(fn => {
 console.log('\n  ported on purpose (markup only): ' + (stillPorted.join(', ') || 'none yet'));
 console.log('  ' + identical + ' of ' + total + ' functions byte-identical to ' + BASE);
 console.log('  unexpected changes: ' + (changed.length ? changed.join(', ') : 'NONE'));
+
+/* Print the declared feature changes in full. They are the ones a reader most
+   needs to see: this tool's whole job is guarding these functions, so anything
+   waved through has to justify itself on screen, not just in a constant. */
+const declaredHit = Object.keys(FEATURE_CHANGES).filter(fn => {
+  const a = grab(baseline, fn), b = grab(current, fn);
+  return a !== null && b !== null && a !== b;
+});
+if (declaredHit.length) {
+  console.log('\n  declared feature changes (NOT ports — each reviewed and justified):');
+  for (const fn of declaredHit) {
+    console.log('    ' + fn);
+    let line = '     ';
+    for (const word of FEATURE_CHANGES[fn].split(' ')) {
+      if ((line + ' ' + word).length > 76) { console.log(line); line = '     '; }
+      line += ' ' + word;
+    }
+    if (line.trim()) console.log(line);
+  }
+}
+
+/* A name left here after its change is reverted would silence a future real
+   regression, so say so rather than passing quietly. */
+const stale = Object.keys(FEATURE_CHANGES).filter(fn => !declaredHit.includes(fn));
+if (stale.length) {
+  console.log('\n  NOTE: FEATURE_CHANGES still lists ' + stale.join(', ') +
+              ', but they match the baseline. Stale entry — remove it, or it will');
+  console.log('  hide a real change to that function later.');
+}
 
 if (changed.length) {
   console.log('\n  A port must not alter these. Move the change back out, or if it is');
