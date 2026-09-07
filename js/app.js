@@ -2027,120 +2027,220 @@ function _driverSafetyCard(){
   const fleetPct=rows.length?Math.round(rows.reduce((t,r)=>t+(r.st.pct||0),0)/rows.length):null;
   const caught=rows.reduce((t,r)=>t+r.st.defectsFound,0);
 
-  let html=`<div class="card" style="grid-column:1/-1"><div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="width:30px;height:30px;border-radius:8px;background:rgba(59,130,246,.15);display:flex;align-items:center;justify-content:center;font-size:15px">🦺</div>
-      <div><div style="font-size:13px;font-weight:700">Driver Pre-Trip Compliance</div>
-      <div style="font-size:11px;color:var(--text3);font-weight:400;margin-top:1px">Last ${PTI_WINDOW_DAYS} days · business days only · weakest first</div></div>
-    </div>
-    <div style="display:flex;gap:6px;align-items:center">
-      ${fleetPct!==null?`<span class="badge ${fleetPct>=80?'badge-green':fleetPct>=55?'badge-yellow':'badge-red'}">Fleet ${fleetPct}%</span>`:''}
-      ${caught?`<span class="badge badge-blue">${caught} defect${caught>1?'s':''} caught</span>`:''}
-    </div></div>`;
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const vest='<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>';
+
+  let html='<section class="v2-table-card v2-rep-section" aria-label="Driver pre-trip compliance">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(vest)+'</span>'
+    +'<h2>Driver pre-trip compliance</h2>'
+    +'<span class="v2-console-note">Last '+PTI_WINDOW_DAYS+' days &middot; business days only &middot; weakest first</span>'
+    +'<span class="v2-rep-actions">'
+      +(fleetPct!==null?'<span class="v2-rtag '+(fleetPct>=80?'is-ok':fleetPct>=55?'is-warn':'is-crit')+'">Fleet '+fleetPct+'%</span>':'')
+      +(caught?'<span class="v2-rtag">'+caught+' defect'+(caught>1?'s':'')+' caught</span>':'')
+    +'</span></div>';
 
   if(!rows.length){
-    html+=`<div class="card-body"><div class="empty">No drivers with an assigned truck.</div></div></div>`;
-    return html;
+    return html+'<div style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No drivers with an assigned truck.</div></section>';
   }
 
-  html+=`<div class="card-body" style="padding:0"><div class="table-wrap"><table>
-    <thead><tr><th style="padding-left:18px">Driver</th><th>PTIs done</th><th>Compliance</th><th>Median walk-around</th><th>Defects caught</th><th>Last PTI</th><th>Score</th></tr></thead><tbody>`;
-  rows.forEach((r,i)=>{
-    const {d,st,sc}=r;
-    const pc=st.pct??0;
-    const pcCol=pc>=80?'var(--success)':pc>=55?'var(--warning)':'var(--danger)';
-    const dur=st.medianSec==null?'—':inspDur(st.medianSec);
-    const durCol=st.medianSec==null?'var(--text3)':st.medianSec<THOROUGH_ZERO_SEC?'var(--danger)':st.medianSec<THOROUGH_FULL_SEC?'var(--warning)':'var(--success)';
-    const stripe=i%2===1?'background:var(--row-stripe)':'';
-    html+=`<tr style="${stripe}">
-      <td style="padding:11px 14px 11px 18px"><span class="fw-600">${esc(d.name)}</span></td>
-      <td class="text-sm">${st.done} / ${st.expected}</td>
-      <td><div style="display:flex;align-items:center;gap:8px"><div style="width:60px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${Math.min(pc,100)}%;background:${pcCol};border-radius:3px"></div></div><span style="font-size:12px;font-weight:700;color:${pcCol}">${pc}%</span></div></td>
-      <td class="text-sm" style="color:${durCol};font-weight:600">${dur}</td>
-      <td class="text-sm">${st.defectsFound?`<span style="color:var(--success);font-weight:600" title="Catching defects is good — it never lowers the score">✓ ${st.defectsFound}</span>`:`<span style="color:var(--text3)">—</span>`}</td>
-      <td class="text-sm">${st.lastPti?fmtDate(st.lastPti):'<span style="color:var(--danger)">never</span>'}</td>
-      <td><span style="display:inline-block;min-width:40px;text-align:center;background:${scoreColour(sc.score)};color:#0d1117;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:800" title="Compliance ${sc.compliance}/${SCORE_COMPLIANCE_MAX} + thoroughness ${sc.thorough}/${SCORE_THOROUGH_MAX}">${sc.score}</span></td>
-    </tr>`;
+  html+='<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
+    +'<th>Driver</th><th>PTIs done</th><th>Compliance</th><th>Median walk-around</th>'
+    +'<th>Defects caught</th><th>Last PTI</th><th>Score</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const d=r.d, st=r.st, sc=r.sc;
+    const pc=st.pct==null?0:st.pct;
+    // v2-reports.css names these is-t-*, not is-*: .v2-meter-fill.is-ok simply
+    // does not exist and the bar renders transparent. Caught by measuring the
+    // computed background rather than by reading the markup.
+    const pcTone=pc>=80?'is-t-ok':pc>=55?'is-t-warn':'is-t-bad';
+    const dur=st.medianSec==null?'&mdash;':inspDur(st.medianSec);
+    // Same three bands as before: below THOROUGH_ZERO_SEC is a red flag, below
+    // THOROUGH_FULL_SEC is partial credit, at or above it is full.
+    const durTone=st.medianSec==null?'is-t-none':st.medianSec<THOROUGH_ZERO_SEC?'is-t-bad':st.medianSec<THOROUGH_FULL_SEC?'is-t-warn':'is-t-ok';
+    html+='<tr>'
+      +'<td class="v2-cell-strong">'+esc(d.name)+'</td>'
+      +'<td class="v2-cell-num">'+st.done+' / '+st.expected+'</td>'
+      +'<td><span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill '+pcTone+'" style="width:'+Math.min(pc,100)+'%"></span></span>'
+        +'<span class="v2-meter-pct '+pcTone+'">'+pc+'%</span></span></td>'
+      +'<td class="v2-cell-dur '+durTone+'">'+dur+'</td>'
+      +'<td>'+(st.defectsFound
+        ? '<span class="v2-cell-caught" title="Catching defects is good — it never lowers the score">&check; '+st.defectsFound+'</span>'
+        : '<span class="v2-cell-dim">&mdash;</span>')+'</td>'
+      +'<td class="v2-cell-num">'+(st.lastPti?fmtDate(st.lastPti):'<span class="v2-cell-never">never</span>')+'</td>'
+      +'<td><span class="v2-score" style="background:'+scoreColour(sc.score)+'" title="Compliance '+sc.compliance+'/'+SCORE_COMPLIANCE_MAX+' + thoroughness '+sc.thorough+'/'+SCORE_THOROUGH_MAX+'">'+sc.score+'</span></td>'
+    +'</tr>';
   });
-  html+=`</tbody></table></div>
-    <div style="padding:12px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);line-height:1.7">
-      <b>Score</b> = compliance (${SCORE_COMPLIANCE_MAX}) + walk-around thoroughness (${SCORE_THOROUGH_MAX}). Full thoroughness at ${Math.round(THOROUGH_FULL_SEC/60)} min, zero at ${THOROUGH_ZERO_SEC}s.<br>
-      <b>Reporting a defect never lowers a score</b> — a driver who finds faults is doing the job, and penalising it would only teach them to stay quiet.<br>
-      Compliance counts business days, since driving days aren't recorded; a driver off sick or on leave during the window will read low.
-    </div></div></div>`;
+  html+='</tbody></table></div>'
+    +'<p class="v2-rep-note"><b>Score</b> = compliance ('+SCORE_COMPLIANCE_MAX+') + walk-around thoroughness ('+SCORE_THOROUGH_MAX+'). '
+    +'Full thoroughness at '+Math.round(THOROUGH_FULL_SEC/60)+' min, zero at '+THOROUGH_ZERO_SEC+'s.<br>'
+    +'<b>Reporting a defect never lowers a score</b> &mdash; a driver who finds faults is doing the job, and penalising it would only teach them to stay quiet.<br>'
+    +'Compliance counts business days, since driving days are not recorded; a driver off sick or on leave during the window will read low.</p>'
+    +'</section>';
   return html;
 }
 
 function renderReports(){
+  // v2 components against live data. Styles: v2-reports.css + v2-inspections.css
+  // (table shell) + v2-shell.css (.v2-page-head).
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    heart:'<path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 22l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8Z"/>',
+    clip:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    brake:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><path d="M12 3v6M12 15v6M3 12h6M15 12h6"/>',
+    truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    dot:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+  };
+  const pctOf=(n,d)=>d?Math.round(n/d*1000)/10:0;
+  const bdRow=(tone,label,n,total)=>'<div class="v2-bd-row v2-accent-'+tone+'">'
+    +'<span class="v2-bd-key"><span class="v2-bd-dot"></span>'+label+'</span>'
+    +'<span class="v2-bd-meter"><span class="v2-bd-fill" style="width:'+pctOf(n,total)+'%"></span></span>'
+    +'<span class="v2-bd-n">'+n+'</span><span class="v2-bd-pct">'+pctOf(n,total)+'%</span></div>';
+
   const statuses=VEHICLES.map(v=>({v,s:getVehicleStatus(v.id)}));
   const roadworthy=statuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length,pending=VEHICLES.length-roadworthy;
   const brakePass=BRAKE_TESTS.filter(b=>b.result==='pass').length,brakeFail=BRAKE_TESTS.filter(b=>b.result==='fail').length;
-  const dotPass=DOT_INSPECTIONS.filter(d=>d.result==='pass').length,dotViol=DOT_INSPECTIONS.filter(d=>d.result==='violation').length,dotOOS=DOT_INSPECTIONS.filter(d=>d.result==='oos').length;
-  const maxBar=Math.max(brakePass,brakeFail,1);
-  // ── DOT monthly stats ──────────────────────────────────
+
+  // ── Metrics ───────────────────────────────────────────────────────────────
+  const healthPct=VEHICLES.length?Math.round(roadworthy/VEHICLES.length*100):0;
+  const winStart=new Date(Date.now()-PTI_WINDOW_DAYS*86400000).toISOString().split('T')[0];
+  const inWindow=INSPECTIONS.filter(i=>String(i.submittedAt||'').split('T')[0]>=winStart);
+  // businessDaysInWindow returns the ARRAY of dates, not a count — the same
+  // shape driverPtiStats consumes. Printing it directly rendered the whole
+  // comma-joined list into the tile.
+  const bizDays=businessDaysInWindow(PTI_WINDOW_DAYS).length;
+  const ptiDrivers=new Set(inWindow.map(i=>i.driverId).filter(Boolean)).size;
+  // Defect resolution only means anything once migration 011 is applied; until
+  // then repairStatus is undefined on every row and the tile is not rendered.
+  const defects=INSPECTIONS.filter(i=>i.overallResult==='defect'||i.overallResult==='minor');
+  const resolved=REPAIRS_AVAILABLE?defects.filter(i=>!isOpenDefect(i)).length:0;
+  const stillOpen=defects.length-resolved;
+  const resPct=defects.length?Math.round(resolved/defects.length*100):0;
+
+  let html='<div class="v2-region">';
+  html+='<div class="v2-page-head"><h1>Reports &amp; Analytics</h1>'
+    +'<p>What the fleet has actually done, and where the gaps are.</p></div>';
+
+  html+='<div class="v2-metrics">'
+    +'<article class="v2-metric v2-accent-green"><div class="v2-metric-head">'
+      +'<span class="v2-metric-ic">'+_sv(_IC.heart)+'</span><span class="v2-metric-label">Fleet health score</span></div>'
+      +'<span class="v2-metric-val">'+healthPct+'<span class="v2-metric-unit">%</span></span>'
+      // The Dashboard counts only active vehicles and so reads higher. Saying so
+      // here is cheaper than letting someone find the two numbers and distrust both.
+      +'<span class="v2-metric-sub">'+roadworthy+' of '+VEHICLES.length+' roadworthy &middot; '+pending+' pending. Counts every vehicle; the Dashboard counts active ones only.</span>'
+      +'<div class="v2-metric-meter"><div style="width:'+healthPct+'%"></div></div></article>'
+    +'<article class="v2-metric v2-accent-cyan"><div class="v2-metric-head">'
+      +'<span class="v2-metric-ic">'+_sv(_IC.clip)+'</span><span class="v2-metric-label">Inspections completed</span></div>'
+      +'<span class="v2-metric-val">'+inWindow.length+'</span>'
+      +'<span class="v2-metric-sub">Last '+PTI_WINDOW_DAYS+' days &middot; '+bizDays+' business days &middot; '+ptiDrivers+' driver'+(ptiDrivers===1?'':'s')+'</span></article>'
+    +(REPAIRS_AVAILABLE?'<article class="v2-metric v2-accent-blue"><div class="v2-metric-head">'
+      +'<span class="v2-metric-ic">'+_sv(_IC.shield)+'</span><span class="v2-metric-label">Defect resolution rate</span></div>'
+      +'<span class="v2-metric-val">'+resPct+'<span class="v2-metric-unit">%</span></span>'
+      +'<span class="v2-metric-sub">'+resolved+' of '+defects.length+' resolved &middot; '+stillOpen+' still open</span>'
+      +'<div class="v2-metric-meter"><div style="width:'+resPct+'%"></div></div></article>':'')
+    +'<article class="v2-metric v2-accent-amber"><div class="v2-metric-head">'
+      +'<span class="v2-metric-ic">'+_sv(_IC.dot)+'</span><span class="v2-metric-label">DOT inspections</span></div>'
+      +'<span class="v2-metric-val">'+DOT_INSPECTIONS.length+'</span>'
+      +'<span class="v2-metric-sub">'+MAINTENANCE.length+' service records &middot; '+BRAKE_TESTS.length+' brake tests on file</span></article>'
+    +'</div>';
+
+  // ── Two breakdowns side by side ───────────────────────────────────────────
+  const insPass=INSPECTIONS.filter(i=>i.overallResult!=='defect'&&i.overallResult!=='minor').length;
+  const insMinor=INSPECTIONS.filter(i=>i.overallResult==='minor').length;
+  const insDefect=INSPECTIONS.filter(i=>i.overallResult==='defect').length;
+  html+='<div class="v2-rep-grid">'
+    +'<section class="v2-table-card" aria-label="Inspection log breakdown">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.clip)+'</span>'
+      +'<h2>Inspection log breakdown</h2><span class="v2-console-note">'+INSPECTIONS.length+' on file</span></div>'
+      +'<div class="v2-bd">'
+        +bdRow('green','Roadworthy',insPass,INSPECTIONS.length)
+        +bdRow('amber','Minor',insMinor,INSPECTIONS.length)
+        +bdRow('red','Defect',insDefect,INSPECTIONS.length)
+      +'</div></section>'
+    +'<section class="v2-table-card" aria-label="Fleet roadworthiness">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.truck)+'</span>'
+      +'<h2>Fleet roadworthiness</h2><span class="v2-console-note">'+VEHICLES.length+' vehicles</span></div>'
+      +'<div class="v2-bd">'
+        +bdRow('green','Roadworthy',roadworthy,VEHICLES.length)
+        +bdRow('red','Pending',pending,VEHICLES.length)
+      +'</div></section>'
+    +'<section class="v2-table-card" aria-label="Brake test results">'
+      +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.brake)+'</span>'
+      +'<h2>Brake test results</h2><span class="v2-console-note">'+BRAKE_TESTS.length+' tests</span></div>'
+      +'<div class="v2-bd">'
+        +bdRow('green','Pass',brakePass,BRAKE_TESTS.length)
+        +bdRow('red','Fail',brakeFail,BRAKE_TESTS.length)
+      +'</div></section>'
+    +'</div>';
+
+  // ── DOT clean rate, monthly ───────────────────────────────────────────────
   const _rNow=new Date();
   const _MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const _MOF=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const _dotMS=(y,m)=>{const pfx=`${y}-${String(m+1).padStart(2,'0')}`;const inM=DOT_INSPECTIONS.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
+  const _dotMS=(y,m)=>{const pfx=y+'-'+String(m+1).padStart(2,'0');const inM=DOT_INSPECTIONS.filter(d=>d.inspectionDate&&d.inspectionDate.startsWith(pfx));const tot=inM.length,cln=inM.filter(d=>d.result==='pass').length;return{total:tot,clean:cln,issues:tot-cln,pct:tot>0?Math.round(cln/tot*100):null};};
   const _cDot=_dotMS(_rNow.getFullYear(),_rNow.getMonth());
-  const _cCol=_cDot.pct===null?'var(--text3)':_cDot.pct>70?'var(--success)':_cDot.pct>50?'var(--warning)':'var(--danger)';
-  const _dotHist=[];for(let _i=1;_i<=12;_i++){let _y=_rNow.getFullYear(),_m=_rNow.getMonth()-_i;while(_m<0){_m+=12;_y--;}_dotHist.push({year:_y,month:_m,..._dotMS(_y,_m)});}
-  const _pCol=p=>p>70?'var(--success)':p>50?'var(--warning)':'var(--danger)';
-  const _pBg=p=>p>70?'var(--success-bg)':p>50?'var(--warning-bg)':'var(--danger-bg)';
-  const _dotRowsHtml=_dotHist.map((r,i)=>{
-    const pc=r.pct,pcc=pc!==null?_pCol(pc):'var(--text3)',pcb=pc!==null?_pBg(pc):'transparent';
-    const stripe=i%2===1?'background:var(--row-stripe)':'';
-    const issuesTd=r.issues>0?`<span style="font-size:13px;font-weight:700;color:var(--danger)">${r.issues}</span>`:`<span style="color:var(--text3);font-size:13px">—</span>`;
-    const pctTd=pc!==null?`<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px"><div style="width:56px;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;flex-shrink:0"><div style="height:100%;width:${pc}%;background:${pcc};border-radius:3px"></div></div><span style="display:inline-block;min-width:44px;text-align:center;background:${pcb};color:${pcc};padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700">${pc}%</span></div>`:`<span style="color:var(--text3)">—</span>`;
-    return `<tr style="${stripe}"><td style="padding:10px 16px;font-size:13px;font-weight:600">${_MO[r.month]} ${r.year}</td><td style="padding:10px 16px;text-align:center;font-size:13px;color:var(--text2)">${r.total}</td><td style="padding:10px 16px;text-align:center"><span style="font-size:13px;font-weight:700;color:var(--success)">${r.clean}</span></td><td style="padding:10px 16px;text-align:center">${issuesTd}</td><td style="padding:10px 16px;text-align:right">${pctTd}</td></tr>`;
-  }).join('');
-  const _dotCardHtml=`<div class="card" style="grid-column:1/-1">
-    <div class="card-header" style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><div style="width:30px;height:30px;border-radius:8px;background:rgba(147,51,234,.15);display:flex;align-items:center;justify-content:center;font-size:15px">📋</div><div><div style="font-size:13px;font-weight:700">DOT Inspection Results</div><div style="font-size:11px;color:var(--text3);font-weight:400;margin-top:1px">Clean vs Issues · Monthly breakdown</div></div></div><span style="background:rgba(147,51,234,.12);color:#a855f7;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700">${DOT_INSPECTIONS.length} total</span></div>
-    <div style="padding:20px;border-bottom:1px solid var(--border)">
-      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3);margin-bottom:16px">📅 ${_MOF[_rNow.getMonth()]} ${_rNow.getFullYear()} — Current Month</div>
-      <div style="display:flex;align-items:center;gap:28px">
-        <div style="text-align:center;flex-shrink:0;min-width:90px">
-          <div style="font-size:52px;font-weight:800;line-height:1;color:${_cCol};letter-spacing:-2px">${_cDot.pct!==null?_cDot.pct+'%':'—'}</div>
-          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);margin-top:5px">Clean Rate</div>
-        </div>
-        <div style="flex:1">
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-            <div style="background:var(--success-bg);border:1px solid rgba(120,220,119,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--success);line-height:1">${_cDot.clean}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">✅ Clean (Pass)</div></div>
-            <div style="background:var(--danger-bg);border:1px solid rgba(255,68,68,.15);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;color:var(--danger);line-height:1">${_cDot.issues}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">⚠ Violation (Viol+OOS)</div></div>
-            <div style="background:var(--surface3);border:1px solid var(--border);border-radius:11px;padding:12px 14px"><div style="font-size:26px;font-weight:800;line-height:1">${_cDot.total}</div><div style="font-size:11px;color:var(--text2);margin-top:4px">📋 Total</div></div>
-          </div>
-          <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden">${_cDot.total>0?`<div style="height:100%;width:${_cDot.pct}%;background:${_cCol};border-radius:4px"></div>`:''}</div>
-          <div style="display:flex;justify-content:space-between;margin-top:5px"><div style="font-size:10px;color:var(--text3)">${_cDot.clean} clean passes</div><div style="font-size:10px;color:var(--text3)">${_cDot.issues} violations / OOS</div></div>
-        </div>
-      </div>
-      ${_cDot.total===0?'<div style="font-size:12px;color:var(--text3);margin-top:12px;text-align:center">No inspections recorded this month yet</div>':''}
-    </div>
-    <div>
-      <div style="padding:14px 20px 8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--text3)">📊 Last 12 Months</div>
-      <div class="table-wrap"><table><thead><tr><th>Month</th><th style="text-align:center">Total</th><th style="text-align:center">✅ Clean</th><th style="text-align:center">⚠ Violation</th><th style="text-align:right">% Clean</th></tr></thead><tbody>${_dotRowsHtml||`<tr><td colspan="5" class="empty">No DOT inspection data yet</td></tr>`}</tbody></table></div>
-    </div>
-  </div>`;
-  let html=`<div class="stats-grid" style="margin-bottom:24px">
-    <div class="stat-card"><div class="stat-icon" style="background:#dbeafe">🚛</div><div><div class="stat-num">${VEHICLES.length}</div><div class="stat-label">Vehicles</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#dcfce7">🔧</div><div><div class="stat-num">${MAINTENANCE.length}</div><div class="stat-label">Service records</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#fef3c7">🛑</div><div><div class="stat-num">${BRAKE_TESTS.length}</div><div class="stat-label">Brake tests</div></div></div>
-    <div class="stat-card"><div class="stat-icon" style="background:#f3e8ff">📋</div><div><div class="stat-num">${DOT_INSPECTIONS.length}</div><div class="stat-label">DOT inspections</div></div></div>
-  </div><div class="two-col">
-  <div class="card"><div class="card-header">Fleet Roadworthiness</div><div class="card-body"><div style="display:flex;gap:16px;align-items:flex-end"><div style="flex:1"><div class="chart-bar-wrap">
-    <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--success)">${roadworthy}</div><div class="chart-bar" style="background:var(--success);height:${VEHICLES.length?(roadworthy/VEHICLES.length)*100:0}%"></div><div class="chart-bar-label">Roadworthy</div></div>
-    <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--danger)">${pending}</div><div class="chart-bar" style="background:var(--danger);height:${VEHICLES.length?(pending/VEHICLES.length)*100:0}%"></div><div class="chart-bar-label">Pending</div></div>
-  </div></div><div style="font-size:13px;color:var(--text2);min-width:120px"><div><span style="color:var(--success);font-weight:700">${VEHICLES.length?Math.round(roadworthy/VEHICLES.length*100):0}%</span> roadworthy</div><div style="margin-top:4px">${VEHICLES.length} total vehicles</div></div></div></div></div>
-  <div class="card"><div class="card-header">Brake Test Results</div><div class="card-body"><div class="chart-bar-wrap">
-    <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--success)">${brakePass}</div><div class="chart-bar" style="background:var(--success);height:${Math.round(brakePass/maxBar*100)}%"></div><div class="chart-bar-label">Pass</div></div>
-    <div class="chart-bar-col"><div class="chart-bar-val" style="color:var(--danger)">${brakeFail}</div><div class="chart-bar" style="background:var(--danger);height:${Math.round(brakeFail/maxBar*100)}%"></div><div class="chart-bar-label">Fail</div></div>
-  </div><div class="text-sm" style="margin-top:8px">Pass rate: <strong>${BRAKE_TESTS.length?Math.round(brakePass/BRAKE_TESTS.length*100):0}%</strong></div></div></div>
-  ${_dotCardHtml}
-  ${_driverSafetyCard()}
-  <div class="card" style="grid-column:1/-1"><div class="card-header">Per-Vehicle Summary</div><div class="card-body" style="padding:0"><div class="table-wrap"><table>
-    <thead><tr><th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th></tr></thead>
-    <tbody>${VEHICLES.length===0?`<tr><td colspan="5" class="empty">No vehicles</td></tr>`:VEHICLES.map(v=>{const s=getVehicleStatus(v.id);return`<tr style="cursor:pointer" onclick="navigate('vehicle','${v.id}')"><td><strong>Truck #${esc(v.truckNumber)}</strong></td><td>${s.lastBrake?fmtDate(s.lastBrake.testDate):'—'}</td><td>${s.lastTyre?fmtDate(s.lastTyre.photoDate):'—'}</td><td>${s.lastService?fmtDate(s.lastService.serviceDate):s.maint?fmtDate(s.maint.serviceDate):'—'}</td><td><span class="badge ${s.critical?'badge-red':s.warning?'badge-yellow':'badge-green'}">${s.critical?'Critical':s.warning?'Warning':'OK'}</span></td></tr>`;}).join('')}</tbody>
-  </table></div></div></div>
-  </div>`;
+  const _tone=p=>p===null?'is-t-none':p>70?'is-t-ok':p>50?'is-t-warn':'is-t-bad';
+  const _dotHist=[];for(let _i=1;_i<=12;_i++){let _y=_rNow.getFullYear(),_m=_rNow.getMonth()-_i;while(_m<0){_m+=12;_y--;}_dotHist.push(Object.assign({year:_y,month:_m},_dotMS(_y,_m)));}
+
+  html+='<section class="v2-table-card v2-rep-section" aria-label="DOT clean rate">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.dot)+'</span>'
+    +'<h2>DOT clean rate &middot; monthly</h2>'
+    +'<span class="v2-console-note">'+_MOF[_rNow.getMonth()]+' '+_rNow.getFullYear()+' &middot; current month</span>'
+    +'<span class="v2-rep-actions"><span class="v2-rtag">'+DOT_INSPECTIONS.length+' total</span></span></div>'
+    +'<div class="v2-bd">'
+      +'<div class="v2-bd-row v2-accent-'+(_cDot.pct===null?'blue':_cDot.pct>70?'green':_cDot.pct>50?'amber':'red')+'">'
+        +'<span class="v2-bd-key"><span class="v2-bd-dot"></span>Clean rate</span>'
+        +'<span class="v2-bd-meter"><span class="v2-bd-fill" style="width:'+(_cDot.pct||0)+'%"></span></span>'
+        +'<span class="v2-bd-n">'+_cDot.clean+'/'+_cDot.total+'</span>'
+        +'<span class="v2-bd-pct">'+(_cDot.pct!==null?_cDot.pct+'%':'&mdash;')+'</span></div>'
+      +(_cDot.total===0?'<span class="v2-bd-sub">No inspections recorded this month yet.</span>'
+        :'<span class="v2-bd-sub">'+_cDot.clean+' clean pass'+(_cDot.clean===1?'':'es')+' &middot; '+_cDot.issues+' violation'+(_cDot.issues===1?'':'s')+' / OOS</span>')
+    +'</div>'
+    +'<div class="v2-table-wrap"><table class="v2-table v2-drv-table"><thead><tr>'
+    +'<th>Month</th><th>Total</th><th>Clean</th><th>Violation</th><th>% clean</th>'
+    +'</tr></thead><tbody>';
+  if(!_dotHist.some(r=>r.total>0)&&_cDot.total===0){
+    html+='<tr><td colspan="5" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No DOT inspection data yet</td></tr>';
+  }
+  _dotHist.forEach(r=>{
+    const t=_tone(r.pct);
+    html+='<tr><td class="v2-cell-strong">'+_MO[r.month]+' '+r.year+'</td>'
+      +'<td class="v2-cell-num">'+r.total+'</td>'
+      +'<td class="v2-cell-num">'+(r.clean?'<span class="v2-cell-caught">'+r.clean+'</span>':'<span class="v2-cell-dim">0</span>')+'</td>'
+      +'<td class="v2-cell-num">'+(r.issues?'<span class="v2-cell-never">'+r.issues+'</span>':'<span class="v2-cell-dim">&mdash;</span>')+'</td>'
+      +'<td>'+(r.pct!==null
+        ?'<span class="v2-meter"><span class="v2-meter-track"><span class="v2-meter-fill '+t+'" style="width:'+r.pct+'%"></span></span><span class="v2-meter-pct '+t+'">'+r.pct+'%</span></span>'
+        :'<span class="v2-cell-dim">&mdash;</span>')+'</td></tr>';
+  });
+  html+='</tbody></table></div></section>';
+
+  // ── Driver compliance ─────────────────────────────────────────────────────
+  html+=_driverSafetyCard();
+
+  // ── Per-vehicle summary ───────────────────────────────────────────────────
+  html+='<section class="v2-table-card v2-rep-section" aria-label="Vehicle maintenance overview">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(_IC.truck)+'</span>'
+    +'<h2>Vehicle maintenance overview</h2><span class="v2-console-note">'+VEHICLES.length+' vehicles</span></div>'
+    +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
+    +'<th>Truck</th><th>Last brake</th><th>Last tyre</th><th>Last service</th><th>Status</th>'
+    +'</tr></thead><tbody>';
+  if(VEHICLES.length===0){
+    html+='<tr><td colspan="5" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No vehicles</td></tr>';
+  }
+  VEHICLES.forEach(v=>{
+    const st=getVehicleStatus(v.id);
+    const tone=st.critical?'is-defect':st.warning?'is-minor':'is-pass';
+    const label=st.critical?'Critical':st.warning?'Warning':'OK';
+    html+='<tr onclick="navigate(\'vehicle\',\''+v.id+'\')" style="cursor:pointer" title="Open truck">'
+      +'<td class="v2-cell-strong">Truck #'+esc(v.truckNumber)+'</td>'
+      +'<td class="v2-cell-num">'+(st.lastBrake?fmtDate(st.lastBrake.testDate):'<span class="v2-cell-dim">&mdash;</span>')+'</td>'
+      +'<td class="v2-cell-num">'+(st.lastTyre?fmtDate(st.lastTyre.photoDate):'<span class="v2-cell-dim">&mdash;</span>')+'</td>'
+      +'<td class="v2-cell-num">'+(st.lastService?fmtDate(st.lastService.serviceDate):st.maint?fmtDate(st.maint.serviceDate):'<span class="v2-cell-dim">&mdash;</span>')+'</td>'
+      +'<td><span class="v2-chip-status '+tone+'">'+label+'</span></td></tr>';
+  });
+  html+='</tbody></table></div></section>';
+
+  html+='</div>';
   return html;
 }
 

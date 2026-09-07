@@ -62,7 +62,7 @@ node v2/tools/check-isolation.js
 ## 2. The two integration modes
 
 **`.v2-region` — a page ported inside production's existing shell.** What the
-five shipped ports do. The render function returns v2 markup wrapped in
+six shipped ports do. The render function returns v2 markup wrapped in
 `.v2-region`, which `v2-bridge.css` gives the v2 ground and the anchor reset,
 because production's sidebar and topbar are still the ones on screen. This is
 the incremental mode: one page at a time, no chrome change, nothing else on the
@@ -180,7 +180,7 @@ dispatcher-versus-admin split still need a human with a session.
 | Inspections | `renderInspections` | ported |
 | Drivers | `renderDrivers` | ported |
 | Calendar | `renderCalendar` | v2 design exists — not ported |
-| Reports | `renderReports` | v2 design exists — not ported |
+| Reports | `renderReports` | ported |
 | Dispatch Board | `renderDispatcherBoard` | ported |
 | Reminders | `renderReminders` (`js/reminders.js`) | v2 design exists — not ported |
 | Vehicle detail | `renderVehicleDetail` | **no v2 design** |
@@ -194,10 +194,21 @@ resolve.
 
 ## 6. Open items
 
-- **The ported pages have not been seen with real data.** Dashboard, Vehicles
-  and Inspections were verified against synthetic fixtures and by the three
-  checkers above. Nobody has logged in and looked at them. This is the blocker
-  before merging to `main`.
+- **Light mode does not work on a ported page — deferred deliberately.** The
+  `--v2-*` token set has no light variant; it was only ever designed dark. In
+  light mode the sidebar, topbar and body flip correctly but the content area
+  stays dark, because every v2 component reads those tokens and
+  `v2-bridge.css` has an explicit `.light .v2-region` rule forcing it. That
+  rule was a reasonable call when one page was ported and is not now that five
+  are. The fix is a light palette for `--v2-*` plus deleting the force-dark
+  rule, and it needs its own contrast sweep — dark ratios do not carry over.
+  Being done in one pass across all pages rather than per port, since it is a
+  palette problem and not a page problem.
+- **The ported pages have been seen with real data as admin, but not as a
+  dispatcher.** Dashboard, Vehicles, Inspections, Drivers and the Dispatch
+  Board all render against the live database. The non-admin path has only been
+  exercised by overriding `isAdmin()` in the console, never by a real
+  dispatcher session. That is the remaining gap before merging to `main`.
 - **The standalone `v2/*.html` pages are published and serve invented fleet
   data** to anyone who finds the URL. They are reference designs now, not
   products. Retire each one as the real page it mocks is ported, or drop them
