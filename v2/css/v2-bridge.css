@@ -132,3 +132,63 @@
    class that sets display — which most v2 components do. Mirrored here for the
    region a ported render occupies, so filtering works the same either way. */
 .v2-region [hidden] { display: none !important; }
+
+/* ── Sidebar adoption ─────────────────────────────────────────────────────
+   index.html's sidebar now carries v2-shell.css's classes alongside its own
+   ids and .nav-item classes, so app.js keeps working untouched: navigate()
+   and render() still query '.nav-item', still toggle '.active', and still set
+   style.display='flex' on individual items — which is what .v2-nav-item is.
+
+   Two things need help from here.
+
+   1. #sidebar (1,0,0) outranks .v2-sidebar (0,1,0), so production's 230px
+      width and its padding win. Matched on the id to hand those back.
+   2. Production styles the current page with '.nav-item.active' (0,2,0) while
+      v2 uses '.v2-nav-item.is-active'. Rather than change the class app.js
+      toggles — navigate() and render() are exactly the functions the port
+      workflow protects — the v2 active look is mapped onto '.active' at a
+      specificity that clears production's rule.
+
+   #sidebar keeps its id for a second reason: the mobile drawer in styles.css
+   is keyed on it (transform: translateX(-100%), body.nav-open #sidebar), and
+   that is real behaviour on a phone in a truck yard. */
+
+#sidebar.v2-sidebar {
+  width: var(--v2-sidebar-w); min-width: var(--v2-sidebar-w);
+  gap: var(--v2-s5);
+  padding: var(--v2-s5) var(--v2-s4);
+  border-right: 1px solid var(--v2-line);
+}
+
+/* nav { padding: 14px 10px } in styles.css is an element selector, so this
+   single class already outranks it. */
+.v2-sidebar .v2-nav { padding: 0; flex: 1; }
+
+/* The uppercase, letter-spaced treatment production gives .nav-item would
+   otherwise leak through, since both selectors are one class and this sheet
+   only wins on order. Stated explicitly so it does not depend on load order. */
+.v2-sidebar .v2-nav-item {
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.v2-sidebar .v2-nav-item.active {
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
+  font-weight: var(--v2-fw-semibold);
+  box-shadow: none;
+}
+.v2-sidebar .v2-nav-item.active:hover { background: var(--v2-primary-soft); color: var(--v2-primary-hi); }
+
+/* Sign Out sits in the footer and reads as destructive, not navigational. */
+.v2-sidebar .v2-nav-item.is-signout { color: var(--v2-red-hi); }
+.v2-sidebar .v2-nav-item.is-signout:hover { background: var(--v2-red-soft); color: var(--v2-red-hi); }
+
+/* updateUserBar() rewrites #role-badge's className wholesale on every call, so
+   nothing v2- survives on that element. The role line is styled by targeting
+   its position in the chip instead. */
+.v2-user .v2-user-role { display: block; }
