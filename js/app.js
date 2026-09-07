@@ -1192,8 +1192,13 @@ function renderDashboard(){
     +'<h2>'+title+'</h2><span class="v2-panel-count">'+count+'</span></div>'
     +'<div class="v2-panel-body">'+body+'</div></article>';
 
+  let html='<div class="v2-region">';
+
+  html+='<div class="v2-page-head"><h1>Dashboard</h1>'
+    +'<p>Fleet roadworthiness at a glance &mdash; what is overdue, what is due soon, and what changed today.</p></div>';
+
   // ── Tier 1: headline counts ───────────────────────────────────────────────
-  let html='<div class="v2-region"><div class="v2-stat-row">'
+  html+='<div class="v2-stat-row">'
     +_tile('v2-accent-cyan',_I.truck,VEHICLES.length,'Total vehicles')
     +_tile('v2-accent-green',_I.shield,roadworthy,'Roadworthy',true)
     +_tile('v2-accent-red',_I.alert,critical,'Critical issues',true)
@@ -1311,6 +1316,9 @@ function renderVehicles(){
   };
 
   let html='<div class="v2-region">';
+
+  html+='<div class="v2-page-head"><h1>Vehicles</h1>'
+    +'<p>Every truck in the fleet, with its compliance clocks. Red means it should not roll.</p></div>';
 
   if(isAdmin()){
     html+='<section class="v2-form-card v2-accent-primary" aria-label="Add vehicle">'
