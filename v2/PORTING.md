@@ -204,11 +204,26 @@ resolve.
   rule, and it needs its own contrast sweep — dark ratios do not carry over.
   Being done in one pass across all pages rather than per port, since it is a
   palette problem and not a page problem.
-- **The ported pages have been seen with real data as admin, but not as a
-  dispatcher.** Dashboard, Vehicles, Inspections, Drivers and the Dispatch
-  Board all render against the live database. The non-admin path has only been
-  exercised by overriding `isAdmin()` in the console, never by a real
-  dispatcher session. That is the remaining gap before merging to `main`.
+- **Verified as admin against the live database, including the write paths.**
+  Every ported page renders on real data, and the contracts the checkers can
+  only assert statically have now been exercised for real: Mark repaired, Edit
+  truck then save, a driver phone edit through RLS, and a schedule change all
+  land in the database. That closes the question of whether the element ids,
+  the delegated `.mark-repaired-btn` binding and the inline handlers survived
+  the ports.
+- **The dispatcher path has still never run for real.** It is a materially
+  different app — no add forms, no Cell column, no Reminders, dispatcherNotice
+  banners in place of controls — and has only been exercised by overriding
+  `isAdmin()` in a console. This is the remaining verification gap before
+  merging to `main`.
+- **Two reachable pages are still un-ported.** `renderVehicleDetail` is reached
+  by clicking any truck row on Vehicles, Reports or the Dispatch drill-down,
+  and is where brake tests, service records and DOT inspections are entered;
+  `renderInspectionModal` opens from the Pre-Trip table. Neither has a v2
+  mock-up, so both need the same treatment the Reminders tabs got: mapped onto
+  the existing component vocabulary rather than designed from nothing.
+  `renderUsers` and `renderPortal` are NOT in this category — `navigate()`
+  refuses both for every role, so they cannot be reached at all.
 - **The standalone `v2/*.html` pages are published and serve invented fleet
   data** to anyone who finds the URL. They are reference designs now, not
   products. Retire each one as the real page it mocks is ported, or drop them
