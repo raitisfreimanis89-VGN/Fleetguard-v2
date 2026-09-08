@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>FleetGuard - Safety &amp; Compliance</title>
   <link rel="icon" type="image/png" href="img/fleetguard-icon.png?v=1"/>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://tmpdsiuadafbkmldvlki.supabase.co wss://tmpdsiuadafbkmldvlki.supabase.co; img-src 'self' data: https://tmpdsiuadafbkmldvlki.supabase.co;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://tmpdsiuadafbkmldvlki.supabase.co wss://tmpdsiuadafbkmldvlki.supabase.co https://api.weather.gov https://map.road511.com; img-src 'self' data: https://tmpdsiuadafbkmldvlki.supabase.co;">
   <script src="js/supabase.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
@@ -48,6 +48,8 @@
   <link rel="stylesheet" href="v2/css/v2-reports.css"/>
   <link rel="stylesheet" href="v2/css/v2-calendar.css"/>
   <link rel="stylesheet" href="v2/css/v2-reminders.css"/>
+  <link rel="stylesheet" href="v2/css/v2-hero.css"/>
+  <link rel="stylesheet" href="v2/css/v2-cards.css"/>
 </head>
 <body>
 
@@ -132,10 +134,14 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
         Pre-Trip Inspections
       </button>
-      <a class="nav-item v2-nav-item" href="guides.html" target="_blank" rel="noopener" id="nav-guides">
+      <!-- Was an anchor to guides.html with target="_blank". The Guides INDEX
+           renders in-app now, so this is a route like every other nav item and
+           the sidebar keeps its active state. The individual playbooks it links
+           to are still standalone documents and still open in a new tab. -->
+      <button class="nav-item v2-nav-item" onclick="navigate('guides')" id="nav-guides">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg>
         Guides
-      </a>
+      </button>
       <button class="nav-item v2-nav-item" onclick="navigate('portal')" id="nav-portal" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>
         Driver Portal

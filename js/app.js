@@ -813,7 +813,7 @@ function closeInspectionModal(){ const m=document.getElementById('insp-modal'); 
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides'};
 
 // ── Navigation state persistence ──
 // Remember where the user was so a manual refresh doesn't dump them back on the
@@ -882,6 +882,10 @@ function render(){
   else if(currentPage==='users') renderUsersAsync();
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
   else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
+  // Guides was a standalone document opened in a new tab. It renders in-app
+  // now; the weather tile fills itself in afterwards, and the filter is
+  // re-applied so a category survives leaving the page and coming back.
+  else if(currentPage==='guides'){ c.innerHTML=renderGuides(); guidesFilter(); guidesLoadWeather(); }
   // Bound after every render: the button lives in markup rebuilt each time.
   // data-* + addEventListener rather than an inline onclick, so ids never reach
   // a JS string context.
@@ -1511,6 +1515,245 @@ async function doDeleteVehicle(id,num){
 // ═══════════════════════════════════════════════════════
 // VEHICLE DETAIL
 // ═══════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// GUIDES
+// ═══════════════════════════════════════════════════════
+// Card data mirrors guides.html. Keeping it as data rather than markup means
+// the filter counts, the category tabs and the search haystack all derive from
+// one list instead of being maintained three times.
+const GUIDE_CARDS=[
+  {cat:'tools',accent:'v2-accent-amber',art:'v2-art-pti',tag:'Inspections',title:'PTI Driver Guide',
+   blurb:'Step-by-step pre-trip inspection &mdash; how a driver completes every PTI, tyres and photos included.',
+   meta:['DOT PART 396'],href:'PTI-driver-guide.html?dispatch=1',
+   search:'pti driver guide pre trip inspection tyres photos dot part 396'},
+  {cat:'tools',accent:'v2-accent-cyan',art:'v2-art-toll',tag:'Calculator',title:'Toll &amp; Route Console',
+   blurb:'Two ZIP codes in &mdash; toll cost, fuel cost, and whether going around the toll actually pays.',
+   meta:['80K / 5-AXLE','I-PASS'],href:'toll-console.html',
+   search:'toll route console zip code toll cost fuel cost ipass 80k 5 axle calculator turnpike'},
+  {cat:'tools',accent:'v2-accent-green',art:'v2-art-axle',tag:'Reference &middot; Tool',title:'Weight &amp; Axle Limits',
+   blurb:'Federal limits plus a live load checker &mdash; type your scale ticket and it says where the weight is.',
+   meta:['12K / 34K / 34K','KP-40'],href:'weight-axle-limits.html',
+   search:'weight axle limits federal gross tandem 5th wheel scale ticket kingpin'},
+  {cat:'maps',accent:'v2-accent-blue',art:'v2-art-scale',tag:'Locator &middot; External',title:'CAT Scale Locator',
+   blurb:'Find the nearest CAT Scale to weigh your load &mdash; opens the live locator map.',
+   meta:[],href:'https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=',
+   live:true,search:'cat scale locator weigh load nearest certified scale'},
+  {cat:'maps',accent:'v2-accent-red',art:'v2-art-traffic',tag:'Live map &middot; External',title:'Road Conditions &amp; Traffic',
+   blurb:'Live weather, traffic, accidents and construction across the country.',
+   meta:[],href:'https://map.road511.com/',live:true,
+   search:'road conditions traffic 511 map weather accidents construction'},
+  {cat:'maps',accent:'v2-accent-cyan',art:'v2-art-states',tag:'By state',title:'State DOT / 511 Maps',
+   blurb:'Official live road, weather and traffic map for every state &mdash; tap your state.',
+   meta:['50 STATES'],href:'dot-state-maps.html',
+   search:'state dot 511 maps by state road weather winter parking'},
+  {cat:'reference',accent:'v2-accent-red',art:'',tag:'Safety',title:'Low Clearance Playbook',
+   blurb:'What to do at a low bridge &mdash; spot it early, stop safely, and avoid a strike.',
+   meta:['13&#39;6&quot; RULE'],href:'low-clearance-playbook.html',
+   search:'low clearance playbook bridge strike height avoid'},
+  {cat:'reference',accent:'v2-accent-blue',art:'',tag:'Winter',title:'Winter Chain Law',
+   blurb:'When chains are required, how many to carry, and the states that enforce it.',
+   meta:['15 STATES','6 CHAINS / 3 BAGS'],href:'winter-chain-law.html',
+   search:'winter chain law snow chains required states bags'},
+  {cat:'reference',accent:'v2-accent-amber',art:'',tag:'Compliance &middot; CVSA',title:'DOT Enforcement Calendar',
+   blurb:'CVSA inspection blitz dates &mdash; Roadcheck, Safe Driver and Brake Safety Week.',
+   meta:[],href:'dot-enforcement-calendar.html',
+   search:'dot enforcement calendar cvsa inspection blitz roadcheck brake safety week'},
+  {cat:'reference',accent:'v2-accent-green',art:'',tag:'Reference',title:'Trailer Dimensions',
+   blurb:'Our 53&#39; dry van &mdash; exterior and interior dimensions, weight and cubic capacity.',
+   meta:['53&#39; &times; 102&quot;','4,070 FT&sup3;'],href:'trailer-dimensions.html',
+   search:'trailer dimensions 53 dry van exterior interior cubic'},
+];
+const GUIDE_SECTIONS=[
+  ['tools','Essential Tools'],
+  ['maps','Live Maps'],
+  ['reference','Reference &amp; Compliance'],
+];
+// Presentation state for the guides filter, same shape as the dispatch board's.
+let guideCat='all', guideQuery='';
+
+function renderGuides(){
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+    shield:'<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/>',
+    alert:'<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+    ok:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/>',
+    cal:'<rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+    map:'<path d="m9 4-6 2v14l6-2 6 2 6-2V4l-6 2Z"/><path d="M9 4v14M15 6v14"/>',
+    book:'<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/>',
+  };
+  const SEC_IC={tools:_IC.wrench,maps:_IC.map,reference:_IC.book};
+  const counts={all:GUIDE_CARDS.length};
+  GUIDE_SECTIONS.forEach(sec=>{counts[sec[0]]=GUIDE_CARDS.filter(c=>c.cat===sec[0]).length;});
+
+  let html='<div class="v2-region">';
+  html+='<div class="v2-page-head"><h1>Guides &amp; Playbooks</h1>'
+    +'<p>Everything dispatch and drivers need, one tap away &mdash; inspections, road maths, toll cards and DOT compliance.</p></div>';
+
+  // ── Hero tiles ────────────────────────────────────────────────────────────
+  // The weather tile starts in its "checking" state and is filled in by
+  // guidesLoadWeather(); the other two are static facts about the fleet.
+  html+='<section class="v2-hero-row" aria-label="Fleet status">'
+    +'<article class="v2-tile v2-accent-amber" id="g-wx-tile"><div class="v2-tile-body">'
+      +'<span class="v2-tile-ic">'+_sv(_IC.alert)+'</span>'
+      +'<span class="v2-tile-val" id="g-wx-value">Checking&hellip;</span>'
+      +'<span class="v2-tile-label">National weather service</span></div></article>'
+    +'<article class="v2-tile v2-accent-green"><div class="v2-tile-body">'
+      +'<span class="v2-tile-ic">'+_sv(_IC.ok)+'</span>'
+      +'<span class="v2-tile-val">'+VEHICLES.length+' trucks tracked</span>'
+      +'<span class="v2-tile-label">'+DRIVERS.length+' drivers on file</span></div></article>'
+    +'<article class="v2-tile v2-accent-cyan"><div class="v2-tile-body">'
+      +'<span class="v2-tile-ic">'+_sv(_IC.cal)+'</span>'
+      +'<span class="v2-tile-val">CVSA calendar</span>'
+      +'<span class="v2-tile-label">Roadcheck, Safe Driver, Brake Safety</span></div></article>'
+    +'</section>';
+
+  // Populated by guidesLoadWeather(); both stay hidden until the feed returns.
+  html+='<div class="v2-alerts" id="g-alerts" style="display:none"></div>';
+
+  // ── Filter bar ────────────────────────────────────────────────────────────
+  html+='<div class="v2-filterbar">'
+    +'<div class="v2-disp-search">'+_sv(_IC.search)
+      +'<label class="v2-sr-only" for="g-q">Search guides</label>'
+      +'<input id="g-q" type="text" placeholder="Search guides, tools, states" autocomplete="off" spellcheck="false" value="'+esc(guideQuery)+'" oninput="guidesFilter()"/>'
+    +'</div>'
+    +'<div class="v2-tabs" role="group" aria-label="Filter by category">'
+      +'<button class="v2-tab'+(guideCat==='all'?' is-active':'')+'" type="button" data-gcat="all" onclick="guidesSetCat(this)">All resources <span class="v2-tab-n">'+counts.all+'</span></button>';
+  GUIDE_SECTIONS.forEach(sec=>{
+    html+='<button class="v2-tab'+(guideCat===sec[0]?' is-active':'')+'" type="button" data-gcat="'+sec[0]+'" onclick="guidesSetCat(this)">'
+      +sec[1].replace(' &amp; Compliance','')+' <span class="v2-tab-n">'+counts[sec[0]]+'</span></button>';
+  });
+  html+='</div></div>';
+
+  // ── Sections ──────────────────────────────────────────────────────────────
+  GUIDE_SECTIONS.forEach(sec=>{
+    const cards=GUIDE_CARDS.filter(c=>c.cat===sec[0]);
+    html+='<section class="v2-section" data-gsec="'+sec[0]+'">'
+      +'<div class="v2-section-head"><span class="v2-section-ic">'+_sv(SEC_IC[sec[0]])+'</span>'
+      +'<h2 class="v2-section-title">'+sec[1]+'</h2><span class="v2-tab-n">'+cards.length+'</span></div>'
+      +'<div class="v2-tool-grid">';
+    cards.forEach(c=>{
+      const external=/^https?:/.test(c.href);
+      html+='<article class="v2-tool-card '+c.accent+'" data-gcat="'+c.cat+'" data-gsearch="'+esc(c.search)+'">'
+        +(c.art?'<div class="v2-tool-art '+c.art+'" aria-hidden="true"></div>':'')
+        +'<div class="v2-tool-body">'
+          +'<span class="v2-tag">'+c.tag+'</span>'
+          +'<h3>'+c.title+'</h3>'
+          +'<p>'+c.blurb+'</p>'
+          +'<div class="v2-tool-foot"><div class="v2-meta">'
+            +c.meta.map(m=>'<span class="v2-meta-pill">'+m+'</span>').join('')
+            +(c.live?'<span class="v2-meta-pill is-live">Live</span>':'')
+          +'</div>'
+          // These open the standalone playbook documents, which are separate
+          // pages by design — only the Guides INDEX moved into the app.
+          +'<a class="v2-btn" href="'+c.href+'" target="_blank" rel="noopener">Open'
+          +(external?' site':' guide')+' <span class="v2-arrow" aria-hidden="true">&#8594;</span></a>'
+        +'</div></div></article>';
+    });
+    html+='</div></section>';
+  });
+
+  html+='<div class="v2-empty" id="g-empty" style="display:none"><div class="v2-empty-ic">'+_sv(_IC.search)+'</div>'
+    +'Nothing matches that. Try a different word, or pick another category.</div>';
+  html+='</div>';
+  return html;
+}
+
+// ── Guides filter ───────────────────────────────────────────────────────────
+// Client-side only: hides cards already rendered, touches no data. Uses
+// style.display rather than el.hidden because a section is display:block and
+// a card display:flex — the UA's bare [hidden] rule loses to both, and the
+// .v2-region [hidden] rule in v2-bridge.css only covers a ported region, which
+// this is, but being explicit here keeps it independent of that file.
+function guidesSetCat(btn){
+  guideCat=btn.dataset.gcat||'all';
+  document.querySelectorAll('.v2-tab[data-gcat]').forEach(b=>b.classList.toggle('is-active',b===btn));
+  guidesFilter();
+}
+function guidesFilter(){
+  const q=document.getElementById('g-q');
+  guideQuery=q?q.value:'';
+  const term=guideQuery.trim().toLowerCase();
+  let shown=0;
+  document.querySelectorAll('.v2-section[data-gsec]').forEach(sec=>{
+    let inSection=0;
+    sec.querySelectorAll('.v2-tool-card').forEach(card=>{
+      const okCat=guideCat==='all'||card.dataset.gcat===guideCat;
+      const okText=!term||(card.dataset.gsearch||'').indexOf(term)>=0
+        ||card.textContent.toLowerCase().indexOf(term)>=0;
+      const show=okCat&&okText;
+      card.style.display=show?'':'none';
+      if(show){inSection++;shown++;}
+    });
+    // A section header with nothing under it reads as an empty category rather
+    // than a hidden one, so the whole section goes.
+    sec.style.display=inSection?'':'none';
+  });
+  const empty=document.getElementById('g-empty');
+  if(empty) empty.style.display=shown?'none':'';
+}
+
+// ── NWS weather alerts ──────────────────────────────────────────────────────
+// api.weather.gov is an official US government API: no key, no registration,
+// CORS open. Filtering by EVENT TYPE nationwide rather than by state keeps the
+// payload small — blizzards and tornadoes are rare, so a quiet day is a few KB,
+// while filtering by state would pull every heat advisory in the country.
+const GUIDE_NWS_EVENTS=['Tornado Warning','Tornado Watch','Blizzard Warning','Ice Storm Warning',
+  'Winter Storm Warning','Winter Storm Watch','High Wind Warning','Dust Storm Warning',
+  'Blowing Dust Advisory','Freezing Rain Advisory','Winter Weather Advisory','Extreme Cold Warning'];
+const GUIDE_SEV_RANK={Extreme:0,Severe:1,Moderate:2,Minor:3,Unknown:4};
+
+async function guidesLoadWeather(){
+  const val=document.getElementById('g-wx-value');
+  const tile=document.getElementById('g-wx-tile');
+  const box=document.getElementById('g-alerts');
+  if(!val) return;                       // page changed under us
+  try{
+    const url='https://api.weather.gov/alerts/active?status=actual&event='
+      +GUIDE_NWS_EVENTS.map(encodeURIComponent).join(',');
+    const r=await fetch(url,{headers:{'Accept':'application/geo+json'}});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const j=await r.json();
+    const feats=j.features||[];
+    if(!document.getElementById('g-wx-value')) return;   // navigated away mid-flight
+
+    const by={};
+    feats.forEach(f=>{
+      const pr=f.properties||{}, k=pr.event;
+      if(!k) return;
+      if(!by[k]) by[k]={event:k,n:0,sev:'Unknown'};
+      by[k].n++;
+      if((GUIDE_SEV_RANK[pr.severity]??4)<(GUIDE_SEV_RANK[by[k].sev]??4)) by[k].sev=pr.severity||'Unknown';
+    });
+    const groups=Object.values(by).sort((a,b)=>
+      (GUIDE_SEV_RANK[a.sev]??4)-(GUIDE_SEV_RANK[b.sev]??4)||b.n-a.n);
+
+    if(!groups.length){
+      val.textContent='All clear';
+      if(tile){tile.classList.remove('v2-accent-amber','v2-accent-red');tile.classList.add('v2-accent-green');}
+      return;
+    }
+    const total=groups.reduce((t,g)=>t+g.n,0);
+    val.textContent=total+' active alert'+(total===1?'':'s');
+    if(tile){
+      tile.classList.remove('v2-accent-green');
+      tile.classList.add(groups[0].sev==='Extreme'||groups[0].sev==='Severe'?'v2-accent-red':'v2-accent-amber');
+    }
+    if(box){
+      box.innerHTML=groups.slice(0,4).map(g=>
+        '<div class="v2-alert"><span class="v2-alert-st">'+esc(g.sev)+'</span>'
+        +'<span class="v2-alert-name">'+esc(g.event)+'</span>'
+        +'<span class="v2-alert-n">'+g.n+'</span></div>').join('');
+      box.style.display='';
+    }
+  }catch(e){
+    // A weather outage must not look like a broken page: say so and move on.
+    val.textContent='Unavailable';
+    if(tile){tile.classList.remove('v2-accent-amber','v2-accent-red');tile.classList.add('v2-accent-blue');}
+  }
+}
+
 function renderVehicleDetail(){
   const v=VEHICLES.find(v=>v.id===currentVehicleId);
   const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';

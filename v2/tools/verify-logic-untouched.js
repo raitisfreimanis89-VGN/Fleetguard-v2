@@ -71,6 +71,12 @@ const FEATURE_CHANGES = {
          + 'admin-only by RLS so a dispatcher gets an empty set, not an error.',
   doAddDriver: 'driver cell numbers — optional d-phone field, validated before '
              + 'the driver row is created, upserted after it.',
+  render: 'Guides moved in-app — one branch added for currentPage === "guides", '
+        + 'calling renderGuides() then its filter and weather helpers. Every '
+        + 'existing branch, the mark-repaired-btn binding and all the nav '
+        + 'display gating below it are byte-identical. navigate() needed no '
+        + 'change at all: guides is not in its refusal list and #nav-guides '
+        + 'already existed as an anchor.',
 };
 
 console.log('  baseline: ' + BASE + ':' + FILE + '\n');
