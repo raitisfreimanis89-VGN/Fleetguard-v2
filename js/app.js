@@ -1564,12 +1564,12 @@ const GUIDE_CARDS=[
    search:'trailer dimensions 53 dry van exterior interior cubic'},
 ];
 const GUIDE_SECTIONS=[
-  ['tools','Essential Tools'],
-  ['maps','Live Maps'],
-  ['reference','Reference &amp; Compliance'],
+  ['tools','Essential Tools','Interactive tools and calculators for daily operations.','View all tools'],
+  ['maps','Live Maps','Live road, traffic and weather maps, updated by the source.','View all maps'],
+  ['reference','Reference &amp; Compliance','Limits, law and enforcement dates worth keeping to hand.','View all references'],
 ];
 // Presentation state for the guides filter, same shape as the dispatch board's.
-let guideCat='all', guideQuery='';
+let guideCat='all', guideQuery='', guideSort='default';
 
 function renderGuides(){
   const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
@@ -1594,19 +1594,31 @@ function renderGuides(){
   // ── Hero tiles ────────────────────────────────────────────────────────────
   // The weather tile starts in its "checking" state and is filled in by
   // guidesLoadWeather(); the other two are static facts about the fleet.
+  const _arrow=' <span class="v2-arrow" aria-hidden="true">&#8594;</span>';
   html+='<section class="v2-hero-row" aria-label="Fleet status">'
-    +'<article class="v2-tile v2-accent-amber" id="g-wx-tile"><div class="v2-tile-body">'
+    +'<article class="v2-tile v2-accent-amber" id="g-wx-tile">'
       +'<span class="v2-tile-ic">'+_sv(_IC.alert)+'</span>'
-      +'<span class="v2-tile-val" id="g-wx-value">Checking&hellip;</span>'
-      +'<span class="v2-tile-label">National weather service</span></div></article>'
-    +'<article class="v2-tile v2-accent-green"><div class="v2-tile-body">'
+      +'<div class="v2-tile-body">'
+        +'<span class="v2-tile-label">Weather alerts</span>'
+        +'<span class="v2-tile-value" id="g-wx-value">Checking&hellip;</span>'
+        +'<span class="v2-tile-sub">National Weather Service &middot; api.weather.gov</span>'
+        +'<a class="v2-tile-link" href="https://map.road511.com/" target="_blank" rel="noopener">View on map'+_arrow+'</a>'
+      +'</div></article>'
+    +'<article class="v2-tile v2-accent-green">'
       +'<span class="v2-tile-ic">'+_sv(_IC.ok)+'</span>'
-      +'<span class="v2-tile-val">'+VEHICLES.length+' trucks tracked</span>'
-      +'<span class="v2-tile-label">'+DRIVERS.length+' drivers on file</span></div></article>'
-    +'<article class="v2-tile v2-accent-cyan"><div class="v2-tile-body">'
+      +'<div class="v2-tile-body">'
+        +'<span class="v2-tile-label">Fleet on file</span>'
+        +'<span class="v2-tile-value">'+VEHICLES.length+' trucks tracked</span>'
+        +'<span class="v2-tile-sub">'+DRIVERS.length+' drivers on file.</span>'
+      +'</div></article>'
+    +'<article class="v2-tile v2-accent-cyan">'
       +'<span class="v2-tile-ic">'+_sv(_IC.cal)+'</span>'
-      +'<span class="v2-tile-val">CVSA calendar</span>'
-      +'<span class="v2-tile-label">Roadcheck, Safe Driver, Brake Safety</span></div></article>'
+      +'<div class="v2-tile-body">'
+        +'<span class="v2-tile-label">DOT news &amp; updates</span>'
+        +'<span class="v2-tile-value">CVSA inspection calendar</span>'
+        +'<span class="v2-tile-sub">Roadcheck, Brake Safety Week and Safe Driver Week enforcement dates.</span>'
+        +'<a class="v2-tile-link" href="dot-enforcement-calendar.html" target="_blank" rel="noopener">View calendar'+_arrow+'</a>'
+      +'</div></article>'
     +'</section>';
 
   // Populated by guidesLoadWeather(); both stay hidden until the feed returns.
@@ -1624,18 +1636,34 @@ function renderGuides(){
     html+='<button class="v2-tab'+(guideCat===sec[0]?' is-active':'')+'" type="button" data-gcat="'+sec[0]+'" onclick="guidesSetCat(this)">'
       +sec[1].replace(' &amp; Compliance','')+' <span class="v2-tab-n">'+counts[sec[0]]+'</span></button>';
   });
-  html+='</div></div>';
+  html+='</div>'
+    +'<label class="v2-sort" for="g-sort"><span>Sort by</span>'
+      +'<span class="v2-sort-field">'
+        +'<select id="g-sort" onchange="guidesSort(this)">'
+          +'<option value="default"'+(guideSort==='default'?' selected':'')+'>Category</option>'
+          +'<option value="az"'+(guideSort==='az'?' selected':'')+'>A &ndash; Z</option>'
+          +'<option value="za"'+(guideSort==='za'?' selected':'')+'>Z &ndash; A</option>'
+        +'</select>'
+        +_sv('<path d="m6 9 6 6 6-6"/>')
+      +'</span></label>';
+  html+='</div>';
 
   // ── Sections ──────────────────────────────────────────────────────────────
   GUIDE_SECTIONS.forEach(sec=>{
     const cards=GUIDE_CARDS.filter(c=>c.cat===sec[0]);
+    if(guideSort!=='default') cards.sort((a,b)=>
+      guideSort==='az'?a.title.localeCompare(b.title):b.title.localeCompare(a.title));
     html+='<section class="v2-section" data-gsec="'+sec[0]+'">'
       +'<div class="v2-section-head"><span class="v2-section-ic">'+_sv(SEC_IC[sec[0]])+'</span>'
-      +'<h2 class="v2-section-title">'+sec[1]+'</h2><span class="v2-tab-n">'+cards.length+'</span></div>'
+      +'<div class="v2-section-title"><h2>'+sec[1]+' <span class="v2-tab-n">'+cards.length+'</span></h2>'
+      +'<p>'+sec[2]+'</p></div>'
+      +'<a class="v2-section-link" href="#" data-gcat="'+sec[0]+'" onclick="guidesSetCat(this);return false;">'
+      +sec[3]+' <span class="v2-arrow" aria-hidden="true">&#8594;</span></a></div>'
       +'<div class="v2-tool-grid">';
-    cards.forEach(c=>{
+    cards.forEach((c,i)=>{
       const external=/^https?:/.test(c.href);
-      html+='<article class="v2-tool-card '+c.accent+'" data-gcat="'+c.cat+'" data-gsearch="'+esc(c.search)+'">'
+      html+='<article class="v2-tool-card '+c.accent+'" data-gcat="'+c.cat+'" data-gsearch="'+esc(c.search)+'"'
+        +' data-gtitle="'+esc(c.title)+'" data-gorder="'+i+'">'
         +(c.art?'<div class="v2-tool-art '+c.art+'" aria-hidden="true"></div>':'')
         +'<div class="v2-tool-body">'
           +'<span class="v2-tag">'+c.tag+'</span>'
@@ -1668,8 +1696,25 @@ function renderGuides(){
 // this is, but being explicit here keeps it independent of that file.
 function guidesSetCat(btn){
   guideCat=btn.dataset.gcat||'all';
-  document.querySelectorAll('.v2-tab[data-gcat]').forEach(b=>b.classList.toggle('is-active',b===btn));
+  // Match on the category, not on element identity: the section headers'
+  // 'View all' links call this too, and they are not .v2-tab elements, so an
+  // identity test cleared every tab and left the bar with nothing selected.
+  document.querySelectorAll('.v2-tab[data-gcat]').forEach(b=>b.classList.toggle('is-active',b.dataset.gcat===guideCat));
   guidesFilter();
+}
+// Presentation only: reorders cards already rendered, the way guidesFilter
+// hides them. "Category" restores the order they were rendered in, which is
+// GUIDE_CARDS order within each section.
+function guidesSort(sel){
+  guideSort=sel.value||'default';
+  document.querySelectorAll('.v2-tool-grid').forEach(grid=>{
+    [...grid.children]
+      .sort((a,b)=>
+        guideSort==='az' ? a.dataset.gtitle.localeCompare(b.dataset.gtitle)
+      : guideSort==='za' ? b.dataset.gtitle.localeCompare(a.dataset.gtitle)
+      : (+a.dataset.gorder)-(+b.dataset.gorder))
+      .forEach(card=>grid.appendChild(card));
+  });
 }
 function guidesFilter(){
   const q=document.getElementById('g-q');
