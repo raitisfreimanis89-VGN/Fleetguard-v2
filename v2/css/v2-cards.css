@@ -139,11 +139,13 @@
    cannot: the plotted route with its toll gantry, and the state map with a
    lit state. Everything else is photographic.
 
-   Photos are hotlinked from images.unsplash.com. That is a third-party
-   dependency on a page drivers open in bad signal, and the CSP on
-   index.html (img-src 'self' data: <supabase>) would block it if that policy
-   is ever extended to this page. Download them into img/ before cutover and
-   only --art needs to change.                                              */
+   Every photo is a local asset in v2/img/. They were hotlinked from
+   images.unsplash.com until the Guides page moved into index.html, whose CSP
+   is img-src 'self' data: <supabase> — which blocked three of them outright,
+   silently, since a refused image throws nothing. Hosting them removes a
+   third-party dependency from a page drivers open in bad signal, and the
+   --art-lift values still hold because these are byte-for-byte the same
+   images at the same 760px width.                                          */
 
 .v2-tool-art { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
 
@@ -212,7 +214,7 @@
   background-position: center;
 }
 .v2-art-toll { --art-lift: 1.45; }
-.v2-art-toll::before    { background-image: url('https://images.unsplash.com/photo-1535953928289-6bac80e96f3c?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-toll::before    { background-image: url('../img/card-toll.jpg'); }
 
 /* Local asset, one fewer hotlink: this card no longer depends on Unsplash and
    would survive the index.html CSP (img-src 'self') if that policy is ever
@@ -323,9 +325,9 @@
   background-repeat: no-repeat;
 }
 .v2-art-traffic { --art-lift: 1.7; }
-.v2-art-traffic::before { background-image: url('https://images.unsplash.com/photo-1686006354746-2b243585a692?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-traffic::before { background-image: url('../img/card-traffic.jpg'); }
 .v2-art-states { --art-lift: 1.2; }
-.v2-art-states::before  { background-image: url('https://images.unsplash.com/photo-1506747111041-18b1844bf60f?auto=format&fit=crop&w=760&q=52'); }
+.v2-art-states::before  { background-image: url('../img/card-states.jpg'); }
 
 .v2-tool-card:hover .v2-tool-art::before {
   transform: scale(1.06);

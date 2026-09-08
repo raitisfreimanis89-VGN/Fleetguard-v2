@@ -244,6 +244,25 @@ resolve.
   the port; tracked separately.
 - **Pre-existing contrast**: `.nav-item.active` and `.nav-icon` sit at 3.56:1
   in `css/styles.css`.
+- **The three newly-visible Guides cards need a contrast pass.** Toll, Traffic
+  and States hotlinked Unsplash, so `img-src 'self'` blocked them outright and
+  nobody ever saw them in the app. They are local assets now and they render —
+  but unlike PTI, Weight & Axle and CAT Scale they have no constrained scrim
+  solve: they set only `--art-lift` and inherit the default gradient, which was
+  never measured against their photographs. Their titles run to 42-52% of the
+  card width, where the horizontal scrim has faded to roughly 0.6-0.76 alpha,
+  over images lifted 1.45-1.7x.
+
+  Two independent measurements of these cards disagreed with each other by a
+  wide margin on identical inputs, so no ratio is asserted here. What is known:
+  the three tuned cards carry recorded solves (PTI worst run 4.84:1, axle
+  4.77:1, both in rest and hover) and these three carry none. They need the
+  same treatment before this page is called finished.
+
+  Worth knowing while doing it: `.v2-art-scale` has a deliberately TRANSPARENT
+  horizontal scrim — all five stops at alpha 0 — because the CAT Scale card is
+  framed so a road sign stays unobscured. That is intentional and documented in
+  v2-cards.css; do not fix it by copying another card's values.
 
 - **Three Unsplash hotlinks** in `v2-cards.css` (toll, traffic, states) — remote
   dependencies in a page that otherwise ships its own assets.
