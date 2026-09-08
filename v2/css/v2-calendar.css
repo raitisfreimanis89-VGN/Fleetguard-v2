@@ -123,15 +123,15 @@
   padding: var(--v2-s3);
   /* Frosted: a translucent plate over the card, not an opaque fill, so the
      grid reads as one surface with cells cut into it. */
-  background: rgba(255, 255, 255, .014);
+  background: rgba(var(--v2-lift-rgb), calc(.014 * var(--v2-lift-k)));
   backdrop-filter: blur(6px);
   transition: background var(--v2-t-fast);
 }
-.v2-cal-day:hover { background: rgba(255, 255, 255, .04); }
+.v2-cal-day:hover { background: rgba(var(--v2-lift-rgb), calc(.04 * var(--v2-lift-k))); }
 
 /* Leading and trailing cells outside the month. */
-.v2-cal-day.is-blank { background: rgba(0, 0, 0, .22); }
-.v2-cal-day.is-blank:hover { background: rgba(0, 0, 0, .22); }
+.v2-cal-day.is-blank { background: rgba(var(--v2-well-rgb), calc(.22 * var(--v2-well-k))); }
+.v2-cal-day.is-blank:hover { background: rgba(var(--v2-well-rgb), calc(.22 * var(--v2-well-k))); }
 
 .v2-cal-num {
   font-size: var(--v2-fs-base); line-height: var(--v2-lh-base);

@@ -213,3 +213,11 @@
 @media (max-width: 620px) {
   .v2-add-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Row affordance ──────────────────────────────────────────────────────────
+   .v2-table sets cursor:pointer on every row, because in v2-inspections.css —
+   where the table shell is defined — a row opens the inspection it describes.
+   Driver rows do not open anything; their actions live in the Actions cell. In
+   the live app both sheets load together, so this has to key on the drivers
+   table specifically and cannot be a bare .v2-table override. */
+.v2-drv-table tbody tr { cursor: default; }

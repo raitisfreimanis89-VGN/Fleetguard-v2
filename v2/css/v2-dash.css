@@ -144,13 +144,13 @@
 .v2-banner-row {
   display: flex; align-items: center; gap: var(--v2-s4);
   padding: var(--v2-s3) var(--v2-s4);
-  background: rgba(0, 5, 13, .45);
+  background: rgba(var(--v2-well-rgb), calc(.45 * var(--v2-well-k)));
   border: 1px solid var(--v2-line-glass);
   border-radius: var(--v2-r-sm);
   color: inherit;
   transition: background var(--v2-t-fast), border-color var(--v2-t-fast);
 }
-.v2-banner-row:hover { background: rgba(0, 5, 13, .7); border-color: var(--tc-ring); }
+.v2-banner-row:hover { background: rgba(var(--v2-well-rgb), calc(.7 * var(--v2-well-k))); border-color: var(--tc-ring); }
 .v2-banner-truck {
   font-size: var(--v2-fs-base); font-weight: var(--v2-fw-semibold);
   font-variant-numeric: tabular-nums;
@@ -168,7 +168,7 @@
 .v2-chip {
   display: inline-flex; align-items: center; gap: var(--v2-s2);
   padding: var(--v2-s1) var(--v2-s3);
-  background: rgba(0, 5, 13, .45);
+  background: rgba(var(--v2-well-rgb), calc(.45 * var(--v2-well-k)));
   border: 1px solid var(--tc-ring);
   border-radius: var(--v2-r-pill);
   color: var(--tc-hi);

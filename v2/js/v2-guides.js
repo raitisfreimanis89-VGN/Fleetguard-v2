@@ -248,8 +248,10 @@
    Filtering matches production's behaviour — same data-title keyword strings,
    same "hide a section header once nothing under it survives" rule — but
    toggles el.hidden instead of writing style.display, which is why
-   v2-shell.css carries [hidden]{display:none!important}. Without that rule
-   the display:flex on these components would win and nothing would hide.
+   v2-shell.css carries .v2-app [hidden]{display:none!important}. Without that
+   rule the display:flex on these components would win and nothing would hide.
+   The rule is scoped to .v2-app, so every element it governs must live inside
+   the frame — all of these do.
    ========================================================================== */
 
 (function () {

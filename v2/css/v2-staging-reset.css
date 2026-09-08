@@ -1,0 +1,42 @@
+/* ==========================================================================
+   FleetGuard v2 — standalone-page reset
+   --------------------------------------------------------------------------
+   STAGING ONLY. Loaded by v2/*.html and by nothing else. These are the only
+   rules in the whole v2 design system that are not .v2- prefixed, and they
+   live here — alone, in a file the live app never links — precisely so that
+   every other v2 sheet stays safe to load into production.
+
+   Why the separation matters
+   The v2 pages are standalone documents: they own <body>, so they set the
+   page ground and base type on it. The live application does not — index.html
+   already has css/styles.css owning <body>, a .light theme, and its own link
+   styling. A v2 sheet that reaches for body or a would silently repaint the
+   whole application the moment it were linked there.
+
+   So the shell's equivalents are scoped to .v2-app in v2-shell.css, and this
+   file only extends them out to the document for the standalone case. Drop
+   this file and the v2 pages still render correctly inside .v2-app; the page
+   margin and the ground behind the frame are all that change.
+
+   NOTHING may be added here that the live app would need. If a rule turns out
+   to be load-bearing for a component, it belongs in that component's sheet,
+   .v2- prefixed.
+   ========================================================================== */
+
+/* Production's styles.css sets this globally; standalone pages have no such
+   sheet, so the box model is established here. v2-shell.css also scopes it to
+   .v2-app, which is what covers the ported-into-production case. */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Base type and page ground. .v2-app paints its own ground and carries the
+   same font stack (see v2-shell.css), so this governs the page margin and the
+   strip behind the frame during overscroll. */
+body {
+  margin: 0;
+  background: var(--v2-bg);
+  color: var(--v2-ink);
+  font-family: var(--v2-font-body);
+  font-size: var(--v2-fs-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

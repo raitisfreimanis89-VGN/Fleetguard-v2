@@ -331,3 +331,30 @@
 @media (max-width: 620px) {
   .v2-rem-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Overview / history additions ─────────────────────────────────────────
+   The v2 mock-up designs the Schedule panel only; these three carry the parts
+   of the Overview and History tabs that had no counterpart in it. Named
+   .v2-rem-* so they stay with this page. */
+
+/* "SMS sent — awaiting reply" on an alert row. Amber rather than the ink tone,
+   because it is a state that will change, not a static caption. */
+.v2-rem-await { color: var(--v2-amber-hi); }
+
+/* The message body of a sent SMS or an inbound reply. Clamped to two lines:
+   a reminder body runs to a couple of sentences, and letting it set the row
+   height makes a six-row list scroll for no reason. */
+.v2-rem-msg {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-xs);
+  color: var(--v2-ink-2);
+}
+
+/* Explanatory paragraph above an action, as on the manual trigger panel. */
+.v2-rem-hint {
+  margin: 0 0 var(--v2-s4);
+  max-width: 60ch;
+  font-size: var(--v2-fs-xs); line-height: var(--v2-lh-sm);
+  color: var(--v2-ink-2);
+}

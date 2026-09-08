@@ -1,0 +1,267 @@
+/* ==========================================================================
+   FleetGuard — v2 bridge for the LIVE application
+   --------------------------------------------------------------------------
+   Loaded by the production index.html so the running app can render v2
+   components against real Supabase data, one page at a time.
+
+   WHAT THIS FILE IS FOR
+   v2-dash.css (and the other component sheets) are safe to load in production:
+   every selector is .v2- prefixed and every custom property is --v2-, so
+   nothing collides with the production stylesheet. They do, however, depend on
+   two things that live elsewhere in the staging build:
+
+     1. the --v2-* token set          -> v2-tokens.css, also safe, :root only
+     2. the --tc accent indirection   -> declared by .v2-accent-* in
+                                         v2-cards.css
+
+   Rather than pull in v2-cards.css — which carries the whole photographic
+   tool-card system this app has no use for — the five accent helpers are
+   reproduced here.
+
+   WHAT MUST NOT BE LOADED
+   v2-staging-reset.css, and only that. It holds the four global rules
+   (*, [hidden], body, a) that the standalone v2/*.html pages need because
+   they own their <body>. In the live app the same rules would repaint the
+   application from #10131a to #00050d, break the .light theme production
+   supports and v2 never had, and strip link styling app-wide.
+
+   Every other v2 sheet — including v2-shell.css, which used to carry those
+   four rules — is now .v2- prefixed or .v2-app scoped throughout and is safe
+   to link here.
+
+   WHY THIS FILE STILL EXISTS
+   The ported pages render v2 components inside production's OWN shell, not
+   inside .v2-app, so the .v2-app-scoped rules in v2-shell.css do not reach
+   them. .v2-region is that shell's stand-in: it re-establishes the ground and
+   the anchor reset for the subtree a ported render occupies. When the live app
+   eventually adopts the v2 shell, .v2-app supplies both and this file's
+   region rules retire.
+   ========================================================================== */
+
+/* ── Accent indirection ───────────────────────────────────────────────────
+   Each v2 component reads --tc / --tc-hi / --tc-soft / --tc-ring and takes
+   its colour from whichever .v2-accent-* class its container carries, so a
+   panel is recoloured by swapping one class. */
+
+.v2-accent-amber { --tc: var(--v2-amber);  --tc-hi: var(--v2-amber-hi); --tc-soft: var(--v2-amber-soft); --tc-ring: var(--v2-amber-ring); }
+.v2-accent-cyan  { --tc: var(--v2-cyan);   --tc-hi: var(--v2-cyan-hi);  --tc-soft: var(--v2-cyan-soft);  --tc-ring: var(--v2-cyan-ring);  }
+.v2-accent-green { --tc: var(--v2-green);  --tc-hi: var(--v2-green-hi); --tc-soft: var(--v2-green-soft); --tc-ring: var(--v2-green-ring); }
+.v2-accent-red   { --tc: var(--v2-red);    --tc-hi: var(--v2-red-hi);   --tc-soft: var(--v2-red-soft);   --tc-ring: var(--v2-red-ring);   }
+.v2-accent-blue  { --tc: var(--v2-blue);   --tc-hi: var(--v2-blue-hi);  --tc-soft: var(--v2-blue-soft);  --tc-ring: var(--v2-blue-ring);  }
+.v2-accent-primary { --tc: var(--v2-primary); --tc-hi: var(--v2-primary-hi); --tc-soft: var(--v2-primary-soft); --tc-ring: var(--v2-primary-ring); }
+
+/* ── Ported-region ground ─────────────────────────────────────────────────
+   v2 cards are #030c19 and were designed to sit on the #00050d page ground.
+   Production's content area is #10131a, which is LIGHTER than the cards, so
+   without this they read as holes punched in the page rather than as raised
+   surfaces. Scoped to the region a ported render actually occupies, so the
+   rest of the app keeps production's own background.
+
+   This is transitional, and now doubly so. Since v2-skin.css remaps --bg to
+   var(--v2-bg), production's content ground already IS #00050d and this rule
+   paints the colour that is there anyway — measured: .v2-region and body both
+   resolve to rgb(0, 5, 13). It stays because it is what keeps a ported region
+   correct on its own terms, without depending on the skin being loaded, and
+   because the negative margin still does real work. It retires when the shell
+   is adopted, not before. */
+.v2-region {
+  background: var(--v2-bg);
+  color: var(--v2-ink);
+  margin: calc(var(--v2-s6) * -1);
+  padding: var(--v2-s6);
+  min-height: 100%;
+}
+
+/* The production content container has its own padding; the negative margin
+   above cancels it so the ground reaches the edges.
+
+   This used to be the rule that FORCED a ported page to stay dark in light
+   mode, back when --v2-* had no light values and a half-converted page would
+   have been worse than a consistent dark panel. v2-tokens.css now carries a
+   .light block, so the same two declarations resolve to the light ground and
+   dark ink instead. Kept rather than deleted because it still does the job it
+   was written for: restating the region ground at a specificity that clears
+   anything .light brings with it. */
+.light .v2-region { background: var(--v2-bg); color: var(--v2-ink); }
+
+/* Row, banner and card links are anchors so they keep keyboard focus and the
+   browser's own affordances. v2-shell.css neutralised anchor styling globally;
+   since that file is not loaded here, the UA default would otherwise underline
+   every row and paint it link-blue.
+
+   Wrapped in :where() so it carries ZERO specificity, and that is load-bearing.
+   Written plainly as `.v2-region a` it scores (0,1,1) and beats every single-
+   class component rule — including `.v2-btn { color: var(--v2-ink-on-accent) }`
+   at (0,1,0). Every Guides card button is an anchor, so the reset won, the
+   button inherited the card's body ink instead of its on-accent ink, and the
+   label sat at 2.26:1 on its own accent fill in the dark theme and 1.62:1 in
+   the light one. The light palette did not cause that; it only made it obvious,
+   because a deep light-mode fill and a dark light-mode ink collide harder than
+   a bright dark-mode fill and a pale dark-mode ink.
+
+   Zero specificity is safe here rather than merely weaker: css/styles.css,
+   css/reminders.css and css/titan-slate-login.css declare no anchor rules at
+   all, so the only thing this has to outrank is the UA stylesheet, which any
+   author rule outranks. Anything a v2 component states about its own links now
+   wins, which is the correct order. */
+:where(.v2-region a) { color: inherit; text-decoration: none; }
+
+/* Production's focus ring is defined for the app shell; give the ported region
+   the same visible focus these rows need for keyboard users. Deliberately NOT
+   wrapped in :where() like the reset above: a focus ring is an accessibility
+   affordance and should outrank a component's own idea of how a link looks. */
+.v2-region a:focus-visible {
+  outline: 2px solid var(--v2-cyan);
+  outline-offset: 2px;
+  border-radius: var(--v2-r-sm);
+}
+
+/* ── Shared controls ──────────────────────────────────────────────────────
+   Two generic controls the ported pages need that happen to live in sheets
+   this app does not load: .v2-icon-btn is defined in v2-shell.css (excluded
+   above) and .v2-btn-ghost in v2-inspections.css. Reproduced here so a page
+   port never has to pull in a whole unrelated sheet for one button. Both are
+   .v2- prefixed and cannot touch production's own .btn rules. */
+
+.v2-icon-btn {
+  display: grid; place-items: center;
+  width: 32px; height: 32px;
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--v2-r-md);
+  color: var(--v2-ink-3); cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-icon-btn:hover { background: var(--v2-surface-2); color: var(--v2-ink); }
+.v2-icon-btn svg { width: 17px; height: 17px; }
+
+.v2-btn-ghost {
+  display: inline-flex; align-items: center; gap: var(--v2-s2);
+  padding: var(--v2-s2) var(--v2-s4);
+  background: transparent;
+  border: 1px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-sm);
+  color: var(--v2-ink-2);
+  font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-medium);
+  cursor: pointer;
+  transition: background var(--v2-t-fast), border-color var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-btn-ghost:hover { background: var(--v2-surface-2); border-color: var(--v2-line-glass-hi); color: var(--v2-ink); }
+
+/* ── Hiding inside a ported region ────────────────────────────────────────
+   v2-shell.css scopes its [hidden] rule to .v2-app, which no page in the live
+   app emits, so a ported page that filters rows with el.hidden gets no rule at
+   all. The UA's own [hidden] is a bare attribute selector and loses to any
+   class that sets display — which most v2 components do. Mirrored here for the
+   region a ported render occupies, so filtering works the same either way. */
+.v2-region [hidden] { display: none !important; }
+
+/* ── Sidebar adoption ─────────────────────────────────────────────────────
+   index.html's sidebar now carries v2-shell.css's classes alongside its own
+   ids and .nav-item classes, so app.js keeps working untouched: navigate()
+   and render() still query '.nav-item', still toggle '.active', and still set
+   style.display='flex' on individual items — which is what .v2-nav-item is.
+
+   Two things need help from here.
+
+   1. #sidebar (1,0,0) outranks .v2-sidebar (0,1,0), so production's 230px
+      width and its padding win. Matched on the id to hand those back.
+   2. Production styles the current page with '.nav-item.active' (0,2,0) while
+      v2 uses '.v2-nav-item.is-active'. Rather than change the class app.js
+      toggles — navigate() and render() are exactly the functions the port
+      workflow protects — the v2 active look is mapped onto '.active' at a
+      specificity that clears production's rule.
+
+   #sidebar keeps its id for a second reason: the mobile drawer in styles.css
+   is keyed on it (transform: translateX(-100%), body.nav-open #sidebar), and
+   that is real behaviour on a phone in a truck yard. */
+
+#sidebar.v2-sidebar {
+  width: var(--v2-sidebar-w); min-width: var(--v2-sidebar-w);
+  gap: var(--v2-s5);
+  padding: var(--v2-s5) var(--v2-s4);
+  border-right: 1px solid var(--v2-line);
+}
+
+/* nav { padding: 14px 10px } in styles.css is an element selector, so this
+   single class already outranks it. */
+.v2-sidebar .v2-nav { padding: 0; flex: 1; }
+
+/* The uppercase, letter-spaced treatment production gives .nav-item would
+   otherwise leak through, since both selectors are one class and this sheet
+   only wins on order. Stated explicitly so it does not depend on load order. */
+.v2-sidebar .v2-nav-item {
+  text-transform: none;
+  letter-spacing: normal;
+  margin-bottom: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.v2-sidebar .v2-nav-item.active {
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
+  font-weight: var(--v2-fw-semibold);
+  box-shadow: none;
+}
+.v2-sidebar .v2-nav-item.active:hover { background: var(--v2-primary-soft); color: var(--v2-primary-hi); }
+
+/* Sign Out sits in the footer and reads as destructive, not navigational. */
+.v2-sidebar .v2-nav-item.is-signout { color: var(--v2-red-hi); }
+.v2-sidebar .v2-nav-item.is-signout:hover { background: var(--v2-red-soft); color: var(--v2-red-hi); }
+
+/* updateUserBar() rewrites #role-badge's className wholesale on every call, so
+   nothing v2- survives on that element. The role line is styled by targeting
+   its position in the chip instead. */
+.v2-user .v2-user-role { display: block; }
+
+/* ── Sticky offsets inside a ported region ────────────────────────────────
+   .v2-filterbar is position:sticky with top: var(--v2-topbar-h), which is
+   right for the standalone v2/*.html pages: there the DOCUMENT scrolls and the
+   bar has to come to rest below a topbar that scrolls with it.
+
+   In this app the scroll container is #content, and the topbar sits outside it
+   and never moves. Measured: #content has overflow:auto and scrolls, while
+   #main, #app and body do not. So an offset of one topbar height parks the bar
+   72px below the top of the scrollport — it does lock, but a screenful lower
+   than intended, which reads as the bar drifting rather than holding.
+
+   Scoped to .v2-region so the staging pages keep the offset they need.
+
+   Sticking it is only half the job. The bar sits inside .v2-region's padding,
+   so it is narrower than the scrollport and cards scroll past uncovered in the
+   gutters either side; and a sticky offset is resolved against the scroll
+   container's CONTENT box, so `top: 0` parks the bar 28px below the scrollport's
+   visible top edge — #content's own padding — and content slides visibly
+   through that strip, which .v2-region reaches into via its negative margin.
+   At 90% alpha with a blur behind it, both read as the page bleeding over
+   the bar.
+
+   The pull-out is 28px, not var(--v2-s6). #content carries padding: 28px in
+   styles.css while .v2-region above cancels only 24px, so the region sits 4px
+   inside the scrollport on every edge. That gap is invisible everywhere else —
+   the skin paints #content and the region the same ground — but a sticky bar
+   turns it into a 4px channel with cards sliding down it. Matching the
+   container's real padding closes it.
+
+   The strip is closed by parking the bar ON the scrollport's visible top edge
+   rather than by painting over the strip. `top: -28px` cancels exactly the
+   padding the sticky offset was measured against, so when the bar locks, its
+   top edge and the scrollport's clip edge coincide and nothing above it is
+   visible at all.
+
+   This replaces a 48px ::before that painted the ground above the bar. That
+   block covered the strip, but it scrolled WITH the bar and painted whether or
+   not the bar was stuck, so it sat over whatever happened to be above it. On
+   Guides the three status tiles clear the bar by only 12px, so the block ate
+   the bottom 36px of all three of them at every scroll position, at rest
+   included — they read as cropped. Height alone could not fix it: any block
+   tall enough to cover a 28px strip overlaps a 12px gap. Moving the lock point
+   removes the strip instead of masking it, so there is nothing left to cover. */
+.v2-region .v2-filterbar {
+  top: -28px;
+  margin-inline: -28px;
+  padding-inline: 28px;
+  background: var(--v2-bg);
+}
