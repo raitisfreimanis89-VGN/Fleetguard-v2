@@ -192,3 +192,47 @@
    nothing v2- survives on that element. The role line is styled by targeting
    its position in the chip instead. */
 .v2-user .v2-user-role { display: block; }
+
+/* ── Sticky offsets inside a ported region ────────────────────────────────
+   .v2-filterbar is position:sticky with top: var(--v2-topbar-h), which is
+   right for the standalone v2/*.html pages: there the DOCUMENT scrolls and the
+   bar has to come to rest below a topbar that scrolls with it.
+
+   In this app the scroll container is #content, and the topbar sits outside it
+   and never moves. Measured: #content has overflow:auto and scrolls, while
+   #main, #app and body do not. So an offset of one topbar height parks the bar
+   72px below the top of the scrollport — it does lock, but a screenful lower
+   than intended, which reads as the bar drifting rather than holding.
+
+   Scoped to .v2-region so the staging pages keep the offset they need.
+
+   Sticking it is only half the job. The bar sits inside .v2-region's padding,
+   so it is narrower than the scrollport and cards scroll past uncovered in the
+   gutters either side; and #content has 28px of its own padding above the
+   stuck position, which the region reaches into via its negative margin, so
+   content slides through that strip too. At 90% alpha with a blur behind it,
+   both read as the page bleeding over the bar.
+
+   Pulled out to the scrollport edges, made opaque, and given a block above it
+   that scrolls with it and covers the container's padding strip.
+
+   The pull-out is 28px, not var(--v2-s6). #content carries padding: 28px in
+   styles.css while .v2-region above cancels only 24px, so the region sits 4px
+   inside the scrollport on every edge. That gap is invisible everywhere else —
+   the skin paints #content and the region the same #00050d — but a sticky bar
+   turns it into a 4px channel with cards sliding down it. Matching the
+   container's real padding closes it. */
+.v2-region .v2-filterbar {
+  top: 0;
+  margin-inline: -28px;
+  padding-inline: 28px;
+  background: var(--v2-bg);
+}
+.v2-region .v2-filterbar::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 100%;
+  /* Taller than #content's 28px padding so it still covers if that changes. */
+  height: 48px;
+  background: var(--v2-bg);
+}
