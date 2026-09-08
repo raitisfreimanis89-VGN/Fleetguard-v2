@@ -231,31 +231,37 @@
 
    Sticking it is only half the job. The bar sits inside .v2-region's padding,
    so it is narrower than the scrollport and cards scroll past uncovered in the
-   gutters either side; and #content has 28px of its own padding above the
-   stuck position, which the region reaches into via its negative margin, so
-   content slides through that strip too. At 90% alpha with a blur behind it,
-   both read as the page bleeding over the bar.
-
-   Pulled out to the scrollport edges, made opaque, and given a block above it
-   that scrolls with it and covers the container's padding strip.
+   gutters either side; and a sticky offset is resolved against the scroll
+   container's CONTENT box, so `top: 0` parks the bar 28px below the scrollport's
+   visible top edge — #content's own padding — and content slides visibly
+   through that strip, which .v2-region reaches into via its negative margin.
+   At 90% alpha with a blur behind it, both read as the page bleeding over
+   the bar.
 
    The pull-out is 28px, not var(--v2-s6). #content carries padding: 28px in
    styles.css while .v2-region above cancels only 24px, so the region sits 4px
    inside the scrollport on every edge. That gap is invisible everywhere else —
-   the skin paints #content and the region the same #00050d — but a sticky bar
+   the skin paints #content and the region the same ground — but a sticky bar
    turns it into a 4px channel with cards sliding down it. Matching the
-   container's real padding closes it. */
+   container's real padding closes it.
+
+   The strip is closed by parking the bar ON the scrollport's visible top edge
+   rather than by painting over the strip. `top: -28px` cancels exactly the
+   padding the sticky offset was measured against, so when the bar locks, its
+   top edge and the scrollport's clip edge coincide and nothing above it is
+   visible at all.
+
+   This replaces a 48px ::before that painted the ground above the bar. That
+   block covered the strip, but it scrolled WITH the bar and painted whether or
+   not the bar was stuck, so it sat over whatever happened to be above it. On
+   Guides the three status tiles clear the bar by only 12px, so the block ate
+   the bottom 36px of all three of them at every scroll position, at rest
+   included — they read as cropped. Height alone could not fix it: any block
+   tall enough to cover a 28px strip overlaps a 12px gap. Moving the lock point
+   removes the strip instead of masking it, so there is nothing left to cover. */
 .v2-region .v2-filterbar {
-  top: 0;
+  top: -28px;
   margin-inline: -28px;
   padding-inline: 28px;
-  background: var(--v2-bg);
-}
-.v2-region .v2-filterbar::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 100%;
-  /* Taller than #content's 28px padding so it still covers if that changes. */
-  height: 48px;
   background: var(--v2-bg);
 }
