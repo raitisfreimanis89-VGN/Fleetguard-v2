@@ -73,20 +73,43 @@
 }
 
 /* The production content container has its own padding; the negative margin
-   above cancels it so the ground reaches the edges. Light theme keeps the v2
-   dark surface deliberately — the v2 palette has no light variant yet, and a
-   half-converted light mode would be worse than a consistent dark panel. */
+   above cancels it so the ground reaches the edges.
+
+   This used to be the rule that FORCED a ported page to stay dark in light
+   mode, back when --v2-* had no light values and a half-converted page would
+   have been worse than a consistent dark panel. v2-tokens.css now carries a
+   .light block, so the same two declarations resolve to the light ground and
+   dark ink instead. Kept rather than deleted because it still does the job it
+   was written for: restating the region ground at a specificity that clears
+   anything .light brings with it. */
 .light .v2-region { background: var(--v2-bg); color: var(--v2-ink); }
 
-/* Row and banner links are anchors so they keep keyboard focus and the
+/* Row, banner and card links are anchors so they keep keyboard focus and the
    browser's own affordances. v2-shell.css neutralised anchor styling globally;
-   since that file is not loaded here, production's link rules would otherwise
-   underline every row. Scoped to the ported region so the rest of the live app
-   keeps its own link styling untouched. */
-.v2-region a { color: inherit; text-decoration: none; }
+   since that file is not loaded here, the UA default would otherwise underline
+   every row and paint it link-blue.
+
+   Wrapped in :where() so it carries ZERO specificity, and that is load-bearing.
+   Written plainly as `.v2-region a` it scores (0,1,1) and beats every single-
+   class component rule — including `.v2-btn { color: var(--v2-ink-on-accent) }`
+   at (0,1,0). Every Guides card button is an anchor, so the reset won, the
+   button inherited the card's body ink instead of its on-accent ink, and the
+   label sat at 2.26:1 on its own accent fill in the dark theme and 1.62:1 in
+   the light one. The light palette did not cause that; it only made it obvious,
+   because a deep light-mode fill and a dark light-mode ink collide harder than
+   a bright dark-mode fill and a pale dark-mode ink.
+
+   Zero specificity is safe here rather than merely weaker: css/styles.css,
+   css/reminders.css and css/titan-slate-login.css declare no anchor rules at
+   all, so the only thing this has to outrank is the UA stylesheet, which any
+   author rule outranks. Anything a v2 component states about its own links now
+   wins, which is the correct order. */
+:where(.v2-region a) { color: inherit; text-decoration: none; }
 
 /* Production's focus ring is defined for the app shell; give the ported region
-   the same visible focus these rows need for keyboard users. */
+   the same visible focus these rows need for keyboard users. Deliberately NOT
+   wrapped in :where() like the reset above: a focus ring is an accessibility
+   affordance and should outrank a component's own idea of how a link looks. */
 .v2-region a:focus-visible {
   outline: 2px solid var(--v2-cyan);
   outline-offset: 2px;

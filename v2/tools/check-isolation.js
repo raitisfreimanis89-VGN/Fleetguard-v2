@@ -63,27 +63,51 @@ function rules(css) {
   const src = css.replace(/\/\*[\s\S]*?\*\//g, '');
   const out = [];
   const stack = [];
-  let depth = 0, buf = '';
-  for (const c of src) {
+  let depth = 0, buf = '', pending = null, blockStart = 0;
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i];
     if (c === '{') {
       const sel = buf.trim(); buf = '';
       const atRule = sel.startsWith('@');
       const nestable = atRule && /^@(media|supports|layer|container)\b/.test(sel);
-      if (!atRule && (depth === 0 || stack[depth - 1] === 'nestable')) out.push(...selectorList(sel));
+      if (!atRule && (depth === 0 || stack[depth - 1] === 'nestable')) {
+        pending = selectorList(sel);
+        blockStart = i + 1;
+      }
       stack[depth] = nestable ? 'nestable' : 'opaque';
       depth++;
-    } else if (c === '}') { depth = Math.max(0, depth - 1); buf = ''; }
+    } else if (c === '}') {
+      depth = Math.max(0, depth - 1);
+      if (pending) { out.push(...pending.map(s => ({ sel: s, body: src.slice(blockStart, i) }))); pending = null; }
+      buf = '';
+    }
     else buf += c;
   }
   return out;
+}
+
+/* A rule that declares ONLY --v2- custom properties cannot change anything
+   outside the v2 layer, whatever its selector: it paints nothing itself, and
+   only a v2 component reads those names. That is what lets the light theme
+   live on a bare `.light` — the same shape :root already gets.
+
+   The restriction to --v2- names is the whole safety argument, and it is not
+   cosmetic. `.light { --primary: red }` declares only a custom property too,
+   and would repaint production's buttons. v2-skin.css does exactly that on
+   purpose and is the documented exception, scoped :root:not(.light). */
+function tokensOnly(body) {
+  const decls = body.split(';').map(d => d.trim()).filter(Boolean);
+  if (!decls.length) return false;
+  return decls.every(d => /^--v2-[a-z0-9-]+\s*:/.test(d));
 }
 
 let failures = 0, checked = 0, safeCount = 0;
 const files = fs.readdirSync(DIR).filter(f => f.endsWith('.css')).sort();
 
 for (const file of files) {
-  const sels = rules(fs.readFileSync(path.join(DIR, file), 'utf8'));
-  const leaks = sels.filter(s => !isIsolated(s));
+  const parsed = rules(fs.readFileSync(path.join(DIR, file), 'utf8'));
+  const sels = parsed.map(r => r.sel);
+  const leaks = parsed.filter(r => !isIsolated(r.sel) && !tokensOnly(r.body)).map(r => r.sel);
   checked++;
   safeCount += sels.length - leaks.length;
 

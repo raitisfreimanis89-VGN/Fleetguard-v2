@@ -384,7 +384,7 @@
   letter-spacing: var(--v2-track-micro); text-transform: uppercase;
   /* Outline pill: accent hairline, accent text, near-transparent ground.
      Reads as a label on the photograph rather than a filled block. */
-  background: rgba(0, 5, 13, var(--tag-ground, .62));
+  background: rgba(var(--v2-well-rgb), calc(var(--tag-ground, .62) * var(--v2-well-k)));
   border: 1px solid var(--tc-ring);
   color: var(--tc-hi);
   backdrop-filter: blur(8px);
@@ -428,7 +428,7 @@
   padding: var(--v2-s1) var(--v2-s2);
   /* Same tinted-glass treatment as .v2-tag, minus the accent, so pills stay
      readable where they overlap the artwork at the foot of a card. */
-  background: rgba(0, 5, 13, var(--meta-ground, .52));
+  background: rgba(var(--v2-well-rgb), calc(var(--meta-ground, .52) * var(--v2-well-k)));
   border: 1px solid var(--v2-line-glass);
   backdrop-filter: blur(6px);
   border-radius: var(--v2-r-xs);

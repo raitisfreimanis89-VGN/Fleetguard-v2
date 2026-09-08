@@ -23,7 +23,40 @@
    at the bottom when it is scheduled; no other file needs to change.
    ========================================================================== */
 
-:root {
+:root,
+/* The sidebar is a dark island in the light theme. Production does the same
+   thing with a dedicated --sidebar-* family (--sidebar-bg stays #1a1f2e in its
+   own .light block, with light ink over it), so a dark rail against a light
+   page is the shape this app already has.
+
+   Listing .light .v2-sidebar alongside :root hands the whole DARK palette back
+   to that subtree, with no duplicated values that could drift: (0,2,0)
+   outranks the .light block below at (0,1,0) inside the rail, while .light
+   still wins everywhere else. Without this the rail kept its dark ground while
+   its ink followed the light theme. Measured before it existed: the brand
+   wordmark at 1.00:1 (#1a1f2e on #1a1f2e, invisible), all eight nav labels at
+   2.61:1, the active item at 1.60:1, Sign Out at 1.98:1. */
+.light .v2-sidebar,
+/* The Guides tool cards are the second dark island, for the same reason and a
+   sharper one: their substrate is a PHOTOGRAPH, which does not change with the
+   theme. The veil over the art is rgba(var(--v2-surface-rgb), ...), so it does
+   invert -- but it is deliberately not opaque where the text sits, because the
+   point of the cards is that the photograph shows through. Measured veil alpha
+   under the text, by multiplying the transmittances of both gradient layers:
+   card titles 0.10-0.42, body copy 0.22-0.75, on all six cards. Light ink over
+   a barely-veiled photograph is what the dark theme already solved; handing the
+   dark palette back reproduces that composition exactly, and needs no per-card
+   scrim tuning that would bury the artwork.
+
+   Worth recording how this was settled, because two earlier attempts got it
+   wrong in opposite directions. A CSS-layer sweep says these cards pass: it
+   composites the card gradient and never sees the photo. A canvas that redrew
+   the photo, filter and scrims said everything failed at 1.00:1, but it failed
+   its own validation on three of six cards, so its numbers meant nothing. The
+   veil-alpha calculation above is trustworthy where the pixel model was not,
+   because multiplying transmittances needs no image, no filter and no layer
+   order -- the product is the same whichever way round the layers stack. */
+.light .v2-tool-card {
 
   /* ── Surfaces ────────────────────────────────────────────────────────────
      Sampled from the reference, and note the ordering: the sidebar is the
@@ -38,6 +71,29 @@
   /* Channel form of --v2-surface, for rgba() overlays over card artwork.
      MUST track --v2-surface above, or the overlay edge shows as a seam. */
   --v2-surface-rgb:     3, 12, 25;
+
+  /* -- Wells and lifts ------------------------------------------------------
+     Two depth effects the component sheets hardcoded, which a token remap
+     could therefore not reach. Both were written as literals against the dark
+     ground, so a light theme inverted them: a well painted a near-black veil
+     across a white card (measured 1.09:1 on the Guides tags) and a lift
+     painted white on white, deleting the hover affordance.
+
+       WELL  a recess below the surface -- the ground behind a banner row, a
+             tag, a meta pill, a blank calendar cell. Dark: darken hard.
+       LIFT  a raise above it -- a hover ground, a top-edge highlight.
+             Dark: lighten slightly.
+
+     Split into a channel triplet and a multiplier so the alpha stays at each
+     call site, where the depth ordering lives: a row at .45 and its hover at
+     .7 keep their relative step automatically in both themes. The multiplier
+     is 1 here, so every dark value resolves exactly as it did as a literal.
+
+     Usage:  rgba(var(--v2-well-rgb), calc(.45 * var(--v2-well-k))) */
+  --v2-well-rgb:        0, 5, 13;
+  --v2-well-k:          1;
+  --v2-lift-rgb:        255, 255, 255;
+  --v2-lift-k:          1;
 
   /* ── Lines ───────────────────────────────────────────────────────────────
      -line is the solid hairline; -glass is the translucent border that gives
@@ -218,3 +274,117 @@
 
    Leave the accent values alone — they are tuned to carry both grounds.
    ────────────────────────────────────────────────────────────────────────── */
+
+/* ==========================================================================
+   LIGHT THEME
+   --------------------------------------------------------------------------
+   Production toggles .light on <html>. Every declaration here is a --v2-
+   custom property, so this block paints nothing on its own and can only be
+   read by a v2 component -- which is why check-isolation.js accepts a bare
+   .light selector here and nowhere else.
+
+   The -soft and -ring tints are deliberately NOT overridden. They are the
+   dark-theme hue at .12 / .38 alpha, and composited over white they give the
+   pale wash a light UI wants anyway (amber-soft lands on #fff1e0). Replacing
+   them with the deepened light hues would make every tinted chip muddy.
+   ========================================================================== */
+.light {
+  /* -- Grounds --------------------------------------------------------------
+     The sidebar stays dark. Production keeps it dark in light mode too
+     (--sidebar-bg: #1a1f2e), and a dark rail against a light page is the
+     shape people already know this app by. */
+  --v2-bg:              #f0f2f7;
+  --v2-bg-sidebar:      #1a1f2e;
+  --v2-surface:         #ffffff;
+  --v2-surface-2:       #eef0f5;
+  --v2-surface-3:       #e4e6ed;
+  /* Must track --v2-surface: the card overlays composite against this
+     triplet, and leaving it dark would paint black veils over white cards. */
+  --v2-surface-rgb:     255, 255, 255;
+
+  /* -- Lines ----------------------------------------------------------------
+     The glass lines are white-on-dark in the dark theme; inverted here, or
+     they vanish entirely against a white surface. */
+  --v2-line:            #e2e6ed;
+  --v2-line-strong:     #d0d4de;
+  --v2-line-glass:      rgba(15, 23, 42, .10);
+  --v2-line-glass-hi:   rgba(15, 23, 42, .18);
+
+  /* -- Ink ------------------------------------------------------------------
+     --v2-ink-3 is deliberately darker than production's own light --text3
+     (#9aa0b4). That value measures about 2.6:1 on white and fails AA; it is a
+     pre-existing problem in styles.css and there is no reason to reproduce it
+     in a palette being written from scratch. #5b6472 holds 4.80:1 on the
+     darkest ground it lands on. */
+  --v2-ink:             #1a1f2e;
+  --v2-ink-2:           #55607a;
+  --v2-ink-3:           #5b6472;
+  /* Every solid accent fill below is deep enough to carry white, so one
+     value serves all of them. */
+  --v2-ink-on-accent:   #ffffff;
+
+  /* -- Accents --------------------------------------------------------------
+     Every hue carries two duties, and in the light theme they collapse into
+     one constraint.
+
+       1. TEXT on a light ground.  Sixteen rules across the component sheets
+          say  color: var(--tc), and more say  color: var(--tc-hi). The
+          darkest ground any of that lands on is --v2-surface-3, #e4e6ed.
+       2. FILL under white text.   Solid chips, buttons and avatars fill with
+          the base hue and set --v2-ink-on-accent on top.
+
+     Duty 1 is the tighter: clearing 4.5:1 as text on #e4e6ed needs a relative
+     luminance at or below .137, while white-on-fill only needs .183. So each
+     base hue is the lightest tone on its ramp that satisfies duty 1, and duty
+     2 comes free. Measured worst case across white, the page ground, both
+     raised surfaces and all three well depths: 5.19:1.
+
+     The consequence is that light-mode amber reads brown and green reads
+     forest. That is arithmetic rather than taste -- no tone light enough to
+     still look like amber can hold white text at 4.5:1 -- and it is why -hi
+     undergoes a role reversal: on a dark ground -hi is the lightest tint, on
+     white it must be the deepest, or every status word drops to about 1.7:1.
+
+     An earlier draft kept the base hues bright, on the theory that they fill
+     dots and bars rather than carrying text. The contrast sweep falsified it:
+     they carry text in sixteen places. */
+  --v2-amber:           #92400e;
+  --v2-amber-hi:        #78350f;
+  --v2-amber-deep:      #6b2e0c;
+  --v2-primary:         #9a4520;
+  --v2-primary-hi:      #7c3714;
+  --v2-primary-deep:    #6b2f11;
+  --v2-cyan:            #155e75;
+  --v2-cyan-hi:         #164e63;
+  --v2-cyan-deep:       #134152;
+  --v2-green:           #166534;
+  --v2-green-hi:        #14532d;
+  --v2-red:             #b91c1c;
+  --v2-red-hi:          #991b1b;
+  --v2-red-deep:        #7f1d1d;
+  --v2-blue:            #1d4ed8;
+  --v2-blue-hi:         #1e40af;
+  --v2-slate:           #55607a;
+
+  /* -- Wells and lifts ------------------------------------------------------
+     On a white UI both a recess and a raised hover read as a grey tint of the
+     ink, so both channels become the same slate and only the multipliers
+     differ: wells are heavy on dark (.45-.7) and must come down hard, lifts
+     are already subtle (.014-.09) and need only a nudge. */
+  --v2-well-rgb:        15, 23, 42;
+  --v2-well-k:          .13;
+  --v2-lift-rgb:        15, 23, 42;
+  --v2-lift-k:          1.2;
+
+  /* -- Elevation ------------------------------------------------------------
+     Near-black drop shadows read as dirt on a white page, and the inset white
+     highlight that lifts a dark card does nothing on one. Softer and cooler. */
+  --v2-shadow-sm:
+    0 1px 2px rgba(15, 23, 42, .06);
+  --v2-shadow:
+    0 1px 2px rgba(15, 23, 42, .06),
+    0 12px 28px -14px rgba(15, 23, 42, .18);
+  --v2-shadow-hover:
+    0 2px 6px rgba(15, 23, 42, .09),
+    0 26px 54px -16px rgba(15, 23, 42, .26);
+}

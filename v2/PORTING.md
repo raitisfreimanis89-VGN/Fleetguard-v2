@@ -194,16 +194,75 @@ resolve.
 
 ## 6. Open items
 
-- **Light mode does not work on a ported page — deferred deliberately.** The
-  `--v2-*` token set has no light variant; it was only ever designed dark. In
-  light mode the sidebar, topbar and body flip correctly but the content area
-  stays dark, because every v2 component reads those tokens and
-  `v2-bridge.css` has an explicit `.light .v2-region` rule forcing it. That
-  rule was a reasonable call when one page was ported and is not now that five
-  are. The fix is a light palette for `--v2-*` plus deleting the force-dark
-  rule, and it needs its own contrast sweep — dark ratios do not carry over.
-  Being done in one pass across all pages rather than per port, since it is a
-  palette problem and not a page problem.
+- **Light mode: done.** `v2-tokens.css` carries a `.light` block, and the
+  sweep now measures 0 AA failures across the sidebar and all nine ported pages
+  in *both* themes. Four things had to be understood, and only the first was
+  the palette:
+
+  1. **The accent ramp reverses roles.** Each hue does double duty — text on a
+     light ground, and a solid fill under white text. Text on the darkest light
+     ground (`--v2-surface-3`, #e4e6ed) is the tighter constraint, so every
+     base hue is the lightest tone on its ramp that clears 4.5:1 there, and the
+     fill duty comes free. Consequence: light-mode amber reads brown and green
+     reads forest. That is arithmetic, not taste. An earlier draft kept the
+     hues bright on the theory that they "fill dots and bars rather than
+     carrying text"; the sweep found sixteen `color: var(--tc)` rules and
+     falsified it.
+
+  2. **Depth effects were hardcoded, so no token remap could reach them.**
+     Five scrims were literal `rgba(0, 5, 13, α)` and four raised grounds were
+     literal `rgba(255, 255, 255, α)`. In light mode the first painted a
+     near-black veil over white cards (1.09:1 on the Guides tags) and the
+     second painted white on white, deleting the hover affordance. Both now go
+     through `--v2-well-*` / `--v2-lift-*`, split into a channel triplet and a
+     multiplier so the alpha stays at the call site and a row at .45 keeps its
+     relative step over its hover at .7 in either theme. The three
+     `inset 0 1px 0 rgba(255,255,255,.0x)` sheens are left alone on purpose:
+     vanishing on white is correct for a top-edge highlight.
+
+  3. **Two subtrees must keep the dark palette, and `:root` hands it to them
+     with no duplicated values.** `v2-tokens.css` opens
+     `:root, .light .v2-sidebar, .light .v2-tool-card {`, which outranks the
+     `.light` block at (0,2,0) inside those subtrees only. The sidebar,
+     because production keeps a dark rail in light mode too (its own
+     `--sidebar-bg` stays #1a1f2e); the Guides tool cards, because their
+     substrate is a photograph and a photograph does not change with the theme.
+
+  4. **The force-dark rule is gone in effect.** `.light .v2-region` survives in
+     `v2-bridge.css` but now resolves to the light ground; see the comment
+     there.
+
+- **How the Guides card question was actually settled.** Text on those cards
+  sits over artwork, and two measurement approaches disagreed for a long time.
+  A CSS-layer sweep says the cards pass — it composites the card gradient and
+  never sees the photograph. A canvas that redrew the photo, its filter and
+  both scrim gradients said everything failed at 1.00:1 — but it failed its own
+  validation on three of six cards, so its numbers meant nothing either. What
+  settled it was measuring the *veil alpha* under each text run, by multiplying
+  the transmittances of the two scrim layers: titles sit at 0.10–0.42 and body
+  copy at 0.22–0.75, so the photograph is genuinely visible behind the text on
+  every card. That calculation is trustworthy where the pixel model was not,
+  because it needs no image, no filter and no layer order — the product of
+  transmittances is the same whichever way round the layers stack. The fix
+  follows from the finding: hand those cards the dark palette rather than tune
+  nine scrim variables per card and bury the artwork.
+
+- **Two contrast bugs the light theme exposed rather than caused.** Both were
+  already wrong in dark mode. `.v2-region a` in `v2-bridge.css` scored (0,1,1)
+  and so outranked `.v2-btn` at (0,1,0), meaning every Guides card button
+  inherited the card's body ink instead of its on-accent ink — 2.26:1 in dark,
+  1.62:1 in light. It is now `:where(.v2-region a)` at zero specificity, which
+  is safe because no app sheet declares an anchor rule at all. And the
+  dispatcher board's unknown-dispatcher avatar was emitting an inline
+  `style="background:var(--v2-surface-3)"` instead of the `.is-none` class that
+  exists for it, so it kept `--v2-ink-on-accent` and rendered white-on-white.
+
+- **A note on measuring the sidebar.** The first sidebar sweep reported the
+  user avatar at 1.04:1 in dark mode. That was a false positive: the simplified
+  stack walker used for it did not read gradients, and the avatar is
+  gradient-filled — exactly the trap the comment beside `.v2-user-avatar` in
+  `v2-shell.css` describes. The comment caught it. Any sweep run against this
+  app has to be gradient-aware or it will report noise.
 - **Verified as admin against the live database, including the write paths.**
   Every ported page renders on real data, and the contracts the checkers can
   only assert statically have now been exercised for real: Mark repaired, Edit

@@ -1106,7 +1106,7 @@ function renderDispatcherBoard(){
     const rows=unassigned.map(v=>'<div class="v2-truck-row"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
       +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span></span></div>').join('');
     html+='<article class="v2-disp-card" data-hay="unassigned" data-crit="0" data-warn="0" data-ok="0" style="opacity:.7">'
-      +'<header class="v2-disp-head"><span class="v2-disp-avatar" style="background:var(--v2-surface-3)">?</span>'
+      +'<header class="v2-disp-head"><span class="v2-disp-avatar is-none">?</span>'
       +'<span class="v2-disp-id"><span class="v2-disp-name">Unassigned</span>'
       +'<span class="v2-disp-meta">'+unassigned.length+' truck'+(unassigned.length!==1?'s':'')+'</span></span></header>'
       +'<div class="v2-fleet-list">'+rows+'</div></article>';
