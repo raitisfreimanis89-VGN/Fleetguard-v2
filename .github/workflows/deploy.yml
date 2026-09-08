@@ -28,6 +28,36 @@ jobs:
       # warning came from; v5 pins upload-artifact@v7.
       - uses: actions/checkout@v7
       - uses: actions/configure-pages@v6
+
+      # The v2/ tree is half live dependency and half staging, so it cannot be
+      # dropped or kept wholesale.
+      #
+      #   KEEP  v2/css/  index.html links fifteen sheets from it
+      #         v2/img/  the Guides card artwork, referenced from v2-cards.css
+      #   DROP  v2/*.html      mock pages serving invented fleet data
+      #         v2/js/         their page scripts, unused by the application
+      #         v2/tools/      the port checkers, developer-only
+      #         v2/PORTING.md  working notes
+      #
+      # The mock pages carry noindex, but noindex only keeps them out of search
+      # results -- anyone with a URL can still read fabricated driver names and
+      # truck numbers on the company domain. They are reference designs, not
+      # products, and they will drift from the real pages now that those are
+      # ported. They stay in the repository for side-by-side comparison; this
+      # only stops them being published.
+      #
+      # The two guards are the point of the step: a blanket 'rm -rf v2' would
+      # take the whole application down to unstyled HTML, and that failure
+      # would only be visible after deploying. Fail the build here instead.
+      - name: Drop the v2 staging pages from the published site
+        run: |
+          rm -f v2/*.html
+          rm -rf v2/js v2/tools
+          rm -f v2/PORTING.md
+          test -f v2/css/v2-tokens.css || { echo "::error::v2/css is missing - index.html would publish unstyled"; exit 1; }
+          test -f v2/img/card-pti-truck.jpg || { echo "::error::v2/img is missing - the Guides card art would 404"; exit 1; }
+          echo "published v2/: $(find v2 -type f | wc -l) files across $(ls v2 | tr '\n' ' ')"
+
       - uses: actions/upload-pages-artifact@v5
         with:
           path: '.'

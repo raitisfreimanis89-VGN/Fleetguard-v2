@@ -277,23 +277,33 @@ resolve.
   `setTimeout(loadPtiQueueStatus, 50)` all had to survive a full markup
   rewrite, and a typo in any one of them would have produced a button that
   simply did nothing. A link sent from the ported UI reached a real driver.
-- **The dispatcher path has still never run for real.** It is a materially
-  different app — no add forms, no Cell column, no Reminders, dispatcherNotice
-  banners in place of controls — and has only been exercised by overriding
-  `isAdmin()` in a console. This is the remaining verification gap before
-  merging to `main`.
-- **Two reachable pages are still un-ported.** `renderVehicleDetail` is reached
-  by clicking any truck row on Vehicles, Reports or the Dispatch drill-down,
-  and is where brake tests, service records and DOT inspections are entered;
-  `renderInspectionModal` opens from the Pre-Trip table. Neither has a v2
-  mock-up, so both need the same treatment the Reminders tabs got: mapped onto
-  the existing component vocabulary rather than designed from nothing.
-  `renderUsers` and `renderPortal` are NOT in this category — `navigate()`
-  refuses both for every role, so they cannot be reached at all.
-- **The standalone `v2/*.html` pages are published and serve invented fleet
-  data** to anyone who finds the URL. They are reference designs now, not
-  products. Retire each one as the real page it mocks is ported, or drop them
-  from the deploy in the meantime.
+- **The dispatcher path is verified.** Signed in as a real dispatcher account
+  against the live database and reported working as it did before the port.
+  This was the last verification gap: the role is a materially different app —
+  no add forms, no Cell column, no Reminders, dispatcherNotice banners in place
+  of controls — and until then it had only been exercised by overriding
+  `isAdmin()` in a console, which tests the branch but not the session, the
+  RLS or the data actually returned.
+- **One reachable surface is still un-ported.** `renderInspectionModal` opens
+  from the Pre-Trip table and still carries production markup, so it lands as
+  an old-skin modal over a ported page. Nothing breaks; it reads as
+  inconsistent. It has no v2 mock-up, so it needs the treatment the Reminders
+  tabs got: mapped onto the existing component vocabulary rather than designed
+  from nothing. `renderVehicleDetail` WAS in this list and is now ported.
+  `renderUsers` and `renderPortal` are not in this category at all —
+  `navigate()` refuses both for every role, so they cannot be reached.
+- **The standalone `v2/*.html` pages are no longer published.** They served
+  invented fleet data — fabricated driver names and truck numbers — to anyone
+  with a URL, and noindex only kept them out of search results. `deploy.yml`
+  now deletes them from the artifact before upload. They stay in the repository
+  for side-by-side comparison, which is what they are actually for.
+
+  The step deletes `v2/*.html`, `v2/js/`, `v2/tools/` and `v2/PORTING.md`, and
+  NOT `v2/css/` or `v2/img/`: index.html links fifteen sheets from the first
+  and the Guides card artwork comes from the second, so a blanket `rm -rf v2`
+  would publish the whole application as unstyled HTML. Two `test -f` guards
+  fail the build if either survives, because that breakage would otherwise only
+  be visible after deploying.
 - **Two orphaned functions in `js/app.js`.** `doAddMaintenance` (line 1510) and
   `doAddMileage` (line 1515) have no callers and read ids nothing emits —
   `m-date`, `m-notes`, `mil-driver`, `mil-val`. `doAddMaintenance` was
@@ -303,28 +313,32 @@ resolve.
   the port; tracked separately.
 - **Pre-existing contrast**: `.nav-item.active` and `.nav-icon` sit at 3.56:1
   in `css/styles.css`.
-- **The three newly-visible Guides cards need a contrast pass.** Toll, Traffic
-  and States hotlinked Unsplash, so `img-src 'self'` blocked them outright and
-  nobody ever saw them in the app. They are local assets now and they render —
-  but unlike PTI, Weight & Axle and CAT Scale they have no constrained scrim
-  solve: they set only `--art-lift` and inherit the default gradient, which was
-  never measured against their photographs. Their titles run to 42-52% of the
-  card width, where the horizontal scrim has faded to roughly 0.6-0.76 alpha,
-  over images lifted 1.45-1.7x.
+- **The Guides card artwork is settled, and the Unsplash hotlinks are gone.**
+  Toll, Traffic and States hotlinked images.unsplash.com, so `img-src 'self'`
+  blocked them outright and nobody ever saw them in the app. They are local
+  assets in `v2/img/` now.
 
-  Two independent measurements of these cards disagreed with each other by a
-  wide margin on identical inputs, so no ratio is asserted here. What is known:
-  the three tuned cards carry recorded solves (PTI worst run 4.84:1, axle
-  4.77:1, both in rest and hover) and these three carry none. They need the
-  same treatment before this page is called finished.
+  Their contrast was open for a long time because two measurements disagreed by
+  a wide margin on identical inputs, and neither deserved to be trusted: a
+  CSS-layer sweep composites the card gradient and never sees the photograph,
+  while a canvas that redrew the photo, its filter and both scrim layers failed
+  its own validation on three of six cards. What settled it was measuring the
+  veil alpha under each text run — the product of the two scrim layers'
+  transmittances, which needs no image, no filter and no layer order. Titles
+  sit at 0.10-0.42 and body copy at 0.22-0.75, so the photograph is genuinely
+  visible behind the text on every card, tuned or not.
 
-  Worth knowing while doing it: `.v2-art-scale` has a deliberately TRANSPARENT
-  horizontal scrim — all five stops at alpha 0 — because the CAT Scale card is
-  framed so a road sign stays unobscured. That is intentional and documented in
-  v2-cards.css; do not fix it by copying another card's values.
+  The fix follows from that: in light mode the cards keep the DARK palette
+  (`:root, .light .v2-sidebar, .light .v2-tool-card` in v2-tokens.css), because
+  a photograph does not change with the theme. That reproduces the dark
+  composition the artwork was chosen for, on both themes, without tuning nine
+  scrim variables per card and burying the photographs.
 
-- **Three Unsplash hotlinks** in `v2-cards.css` (toll, traffic, states) — remote
-  dependencies in a page that otherwise ships its own assets.
+  Still worth knowing if these are revisited: `.v2-art-scale` has a
+  deliberately TRANSPARENT horizontal scrim — all five stops at alpha 0 —
+  because the CAT Scale card is framed so a road sign stays unobscured. That is
+  intentional and documented in v2-cards.css; do not "fix" it by copying
+  another card's values.
 
 ## 7. Driver cell numbers
 
