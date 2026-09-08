@@ -1176,7 +1176,20 @@ function renderDashboard(){
     list:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
     check:'<circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/>',
   };
-  const _tile=(a,ic,n,l,toned)=>'<article class="v2-stat '+a+(toned?' is-toned':'')+'">'
+  // Decorative only: aria-hidden, no text, and it sits behind the number.
+  // Each tile gets the artwork v2/index.html pairs with it rather than one
+  // shared graphic — a radar sweep for the fleet count, a hex lattice with a
+  // tick for roadworthy, hazard hatching for critical, a node graph for
+  // drivers. currentColor throughout, so .v2-accent-* tints them.
+  const _ART={
+    radar:'<circle cx="112" cy="80" r="20" stroke-opacity=".9"/><circle cx="112" cy="80" r="38" stroke-opacity=".5"/><circle cx="112" cy="80" r="56" stroke-opacity=".28"/><circle cx="112" cy="80" r="74" stroke-opacity=".14"/><path d="M112 6v148M38 80h148" stroke-opacity=".18"/><circle cx="112" cy="42" r="3.5" fill="currentColor" stroke="none"/><circle cx="150" cy="80" r="3" fill="currentColor" stroke="none" fill-opacity=".7"/><circle cx="112" cy="118" r="2.5" fill="currentColor" stroke="none" fill-opacity=".5"/>',
+    hex:'<g stroke-opacity=".55"><path d="M96 44l18-10 18 10v20l-18 10-18-10z"/><path d="M132 64l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".5"/><path d="M96 84l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".75"/><path d="M60 64l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".3"/><path d="M132 104l18-10 18 10v20l-18 10-18-10z" stroke-opacity=".22"/></g><path d="M105 84l7 7 14-15" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+    hazard:'<g stroke-opacity=".3"><path d="M56 160L160 56M76 160L160 76M96 160L160 96M116 160L160 116M36 160L160 36M16 160L160 16"/></g><path d="M112 48l30 52h-60z" stroke-width="2" stroke-linejoin="round" stroke-opacity=".9"/><path d="M112 68v14" stroke-width="2.4" stroke-linecap="round"/><circle cx="112" cy="90" r="2.4" fill="currentColor" stroke="none"/>',
+    nodes:'<g stroke-opacity=".35"><path d="M112 80L74 46M112 80l38-30M112 80l-30 44M112 80l40 30M112 80l44-6"/></g><circle cx="112" cy="80" r="9" stroke-opacity=".95"/><circle cx="74" cy="46" r="5.5" stroke-opacity=".7"/><circle cx="150" cy="50" r="4.5" stroke-opacity=".55"/><circle cx="82" cy="124" r="5" stroke-opacity=".5"/><circle cx="152" cy="110" r="4" stroke-opacity=".4"/><circle cx="156" cy="74" r="3.5" stroke-opacity=".3"/><circle cx="112" cy="80" r="3" fill="currentColor" stroke="none"/>',
+  };
+  const _art=k=>'<div class="v2-stat-art" aria-hidden="true"><svg viewBox="0 0 160 160" fill="none" stroke="currentColor" stroke-width="1.4">'+_ART[k]+'</svg></div>';
+  const _tile=(a,ic,n,l,toned,art)=>'<article class="v2-stat '+a+(toned?' is-toned':'')+'">'
+    +(art?_art(art):'')
     +'<span class="v2-stat-ic">'+_sv(ic,'1.8')+'</span>'
     +'<div class="v2-stat-body"><span class="v2-stat-num">'+n+'</span>'
     +'<span class="v2-stat-label">'+l+'</span></div></article>';
@@ -1199,10 +1212,10 @@ function renderDashboard(){
 
   // ── Tier 1: headline counts ───────────────────────────────────────────────
   html+='<div class="v2-stat-row">'
-    +_tile('v2-accent-cyan',_I.truck,VEHICLES.length,'Total vehicles')
-    +_tile('v2-accent-green',_I.shield,roadworthy,'Roadworthy',true)
-    +_tile('v2-accent-red',_I.alert,critical,'Critical issues',true)
-    +_tile('v2-accent-primary',_I.users,DRIVERS.length,'Drivers')
+    +_tile('v2-accent-cyan',_I.truck,VEHICLES.length,'Total vehicles',false,'radar')
+    +_tile('v2-accent-green',_I.shield,roadworthy,'Roadworthy',true,'hex')
+    +_tile('v2-accent-red',_I.alert,critical,'Critical issues',true,'hazard')
+    +_tile('v2-accent-blue',_I.users,DRIVERS.length,'Drivers',false,'nodes')
     +'</div>';
 
   // ── Tier 2: banners ───────────────────────────────────────────────────────
