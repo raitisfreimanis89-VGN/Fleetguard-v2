@@ -1513,150 +1513,294 @@ async function doDeleteVehicle(id,num){
 // ═══════════════════════════════════════════════════════
 function renderVehicleDetail(){
   const v=VEHICLES.find(v=>v.id===currentVehicleId);
-  if(!v) return`<div class="alert alert-danger">Vehicle not found. <a href="#" onclick="navigate('vehicles');return false">Back</a></div>`;
+  const _sv=(d,w)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'1.9')+'" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const _IC={
+    back:'<path d="M19 12H5"/><path d="m12 19-7-7 7-7"/>',
+    wrench:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76Z"/>',
+    brake:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.2"/><path d="M12 3v3M12 18v3M21 12h-3M6 12H3"/>',
+    tyre:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>',
+    clip:'<path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/>',
+    truck:'<path d="M10 17h4V5H2v12h3"/><path d="M14 9h4l3 3v5h-2"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+    oil:'<path d="M12 22a7 7 0 0 0 7-7c0-5-7-13-7-13S5 10 5 15a7 7 0 0 0 7 7Z"/>',
+    send:'<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+    trash:'<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+    check:'<path d="m5 12 5 5L20 7"/>',
+    hist:'<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+  };
+  if(!v) return '<div class="v2-region"><div class="v2-page-head"><h1>Vehicle not found</h1>'
+    +'<p>This truck may have been deleted.</p></div>'
+    +'<button class="v2-btn-ghost" type="button" onclick="navigate(\'vehicles\')">'+_sv(_IC.back,'2')+'Back to Vehicles</button></div>';
+
   const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
   const s=getVehicleStatus(v.id);
   const maint=MAINTENANCE.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
   const brakes=BRAKE_TESTS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
   const tyres=TYRE_RECORDS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.photoDate.localeCompare(a.photoDate));
   const dots=DOT_INSPECTIONS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.inspectionDate.localeCompare(a.inspectionDate));
-  const miles=MILEAGE.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.date.localeCompare(a.date));
   const svcs=SERVICE_RECORDS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
-  const tabs=['maintenance','brakes','tyres','dot','pti'];
-  const tabLabels={maintenance:'🔧 Service',brakes:'🛑 Brakes',tyres:'⭕ Tyres',dot:'📋 DOT',pti:'🚛 PTI'};
-  let html=`<div style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
-    <button class="btn btn-ghost btn-sm" onclick="navigate('vehicles')">← Back</button>
-    <div>
-      <div style="font-size:20px;font-weight:700">Truck #${esc(v.truckNumber)}</div>
-      <div class="text-sm">Trailer #${esc(v.trailerNumber)}${driver?' · Driver: '+esc(driver.name):''}${v.assignedDispatcher?' · Dispatcher: '+esc(v.assignedDispatcher):''}</div>
-    </div>
-    <div style="margin-left:auto;display:flex;gap:8px">${s.critical?`<span class="badge badge-red">Critical</span>`:s.warning?`<span class="badge badge-yellow">Warning</span>`:`<span class="badge badge-green">Roadworthy</span>`}</div>
-  </div>
-  ${!isAdmin()?dispatcherNotice():''}
-  <div class="tabs">${tabs.map(t=>`<button class="tab ${currentVehicleTab===t?'active':''}" onclick="setVTab('${t}')">${tabLabels[t]}</button>`).join('')}</div>`;
 
+  const tabs=[['maintenance','Service',_IC.wrench],['brakes','Brakes',_IC.brake],['tyres','Tyres',_IC.tyre],['dot','DOT',_IC.clip],['pti','PTI',_IC.truck]];
+  const tone=s.critical?'is-crit':s.warning?'is-warn':'is-ok';
+  const label=s.critical?'Critical':s.warning?'Warning':'Roadworthy';
+  const _ini=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  // Panel shell used by every card on the page.
+  const panel=(accent,icon,title,tag,body)=>'<section class="v2-table-card">'
+    +'<div class="v2-panel-head '+accent+'"><span class="v2-panel-ic">'+_sv(icon)+'</span>'
+    +'<h2>'+title+'</h2>'+(tag?'<span class="v2-panel-tag">'+tag+'</span>':'')+'</div>'
+    +body+'</section>';
+  const row=(main,right)=>'<div class="v2-phone-item">'+main+right+'</div>';
+  // Takes the whole onclick attribute rather than a function NAME, so every
+  // handler appears literally in the source. Built from a variable it still
+  // fired, but nothing could grep for it — including check-contracts.js, which
+  // reported all five deletes as dropped when they were not.
+  const del=(onclickAttr,what)=>isAdmin()?'<button class="v2-icon-btn" type="button" '+onclickAttr+' aria-label="Delete '+what+'" title="Delete">'+_sv(_IC.trash)+'</button>':'';
+
+  let html='<div class="v2-region">';
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  html+='<div class="v2-page-head" style="display:flex;align-items:center;gap:var(--v2-s5);margin-bottom:var(--v2-s6)">'
+    +'<button class="v2-btn-ghost" type="button" onclick="navigate(\'vehicles\')">'+_sv(_IC.back,'2')+'Back</button>'
+    +'<span style="display:flex;align-items:center;gap:var(--v2-s3);min-width:0">'
+      +'<span class="v2-disp-avatar">'+esc(_ini(v.truckNumber)||'#')+'</span>'
+      +'<span class="v2-disp-id"><span class="v2-disp-name">Truck #'+esc(v.truckNumber)+'</span>'
+      +'<span class="v2-disp-meta">Trailer #'+esc(v.trailerNumber||'—')
+        +(driver?' &middot; '+esc(driver.name):'')
+        +(v.assignedDispatcher?' &middot; '+esc(v.assignedDispatcher):'')+'</span></span>'
+    +'</span>'
+    +'<span class="v2-chip-status '+(s.critical?'is-defect':s.warning?'is-minor':'is-pass')+'" style="margin-left:auto">'+label+'</span>'
+  +'</div>';
+
+  if(!isAdmin()) html+=dispatcherNotice();
+
+  // setVTab only sets currentVehicleTab and re-renders, so the active state is
+  // decided here rather than by class juggling in the handler.
+  html+='<nav class="v2-subtabs" aria-label="Vehicle record sections">';
+  tabs.forEach(t=>{
+    html+='<button class="v2-subtab'+(currentVehicleTab===t[0]?' is-active':'')+'" type="button"'
+      +(currentVehicleTab===t[0]?' aria-current="page"':'')
+      +' onclick="setVTab(\''+t[0]+'\')">'+_sv(t[2],'1.8')+t[1]+'</button>';
+  });
+  html+='</nav>';
+
+  // ── Service ───────────────────────────────────────────────────────────────
   if(currentVehicleTab==='maintenance'){
-    const allSvcRecords=[
-      ...maint.map(r=>({...r,_type:'maint',_date:r.serviceDate,_result:null})),
-      ...svcs.map(r=>({...r,_type:'svc',_date:r.serviceDate,_result:r.result}))
-    ].sort((a,b)=>b._date.localeCompare(a._date));
-    const nextDueDate=maint[0]?.nextInspectionDate||null;
-    const nextDueDays=nextDueDate?daysBetween(today(),nextDueDate):null;
-    const svcWarning=s.serviceOverdue||s.serviceDueSoon;
-    html+=`<div class="two-col">`;
-    if(isAdmin()) html+=`<div class="card"><div class="card-header">Record Service</div><div class="card-body">
-      <div class="form-grid">
-        <div><label>Service Date</label><input type="date" id="svc-date" value="${today()}" max="${today()}"/></div>
-        <div><label>Result</label><div class="toggle-group"><button class="toggle-btn active-pass" id="svctog-pass" onclick="setServiceResult('pass')">✓ Pass</button><button class="toggle-btn" id="svctog-fail" onclick="setServiceResult('fail')">✗ Fail</button></div></div>
-        <div><label>Notes (optional)</label><textarea id="svc-notes" rows="2" placeholder="Any notes..."></textarea></div>
-      </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddUnifiedService('${v.id}')">Save Service Record</button>
-    </div></div>`;
-    // PM/oil request lives here rather than on the Vehicles card: it belongs with
-    // the service actions, and the card had no room for a second button.
-    if(isAdmin()) html+=`<div class="card" style="grid-column:1/-1"><div class="card-header">🛢️ PM / Oil Change Request</div><div class="card-body">
-      ${v.assignedDriverId
-        ? `<div class="text-sm" style="margin-bottom:12px;color:var(--text2)">Texts ${driver?esc(driver.name):'the driver'} to route to any TA or Love's for an oil change ASAP and send the receipt back.</div>
-           <button class="btn btn-primary" onclick="doSendPM('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">🛢️ Send PM request${driver?' to '+esc(driver.name):''}</button>
-           <div class="text-sm" style="margin-top:10px;color:var(--text3)">🔒 Sent only when you click — never automatically.</div>`
-        : `<div class="empty">No driver assigned — assign a driver to this truck to send a PM request.</div>`}
-    </div></div>`;
-    html+=`<div class="card"><div class="card-header">Service History (${allSvcRecords.length})`;
-    if(nextDueDate) html+=` <span class="badge ${nextDueDays!==null&&nextDueDays<0?'badge-red':nextDueDays!==null&&nextDueDays<=14?'badge-yellow':'badge-blue'}" style="margin-left:8px">Next due: ${fmtDate(nextDueDate)}</span>`;
-    html+=`</div><div class="card-body">`;
-    if(svcWarning) html+=`<div class="history-item" style="border-left:3px solid ${s.serviceOverdue?'var(--danger)':'var(--warning)'};margin-bottom:8px"><div class="fw-600" style="color:${s.serviceOverdue?'var(--danger)':'var(--warning)'}">${s.serviceOverdue?'⚠️ Service overdue — '+s.serviceDays+' days since last service':'🔔 Service due soon — '+s.serviceDays+' days since last service'}</div></div>`;
-    if(allSvcRecords.length===0) html+=`<div class="empty">No records yet</div>`;
-    allSvcRecords.forEach(r=>{
-      if(r._type==='maint'){
-        html+=`<div class="history-item"><div><div class="fw-600">Service: ${fmtDate(r.serviceDate)}</div><div class="text-sm">Next due: ${fmtDate(r.nextInspectionDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge badge-blue">LOGGED</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteMaintenance('${r.id}')">🗑</button>`:''}</div></div>`;
-      } else {
-        html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.serviceDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteService('${r.id}')">🗑</button>`:''}</div></div>`;
-      }
-    });
-    html+=`</div></div></div>`;
-  }
-  if(currentVehicleTab==='brakes'){
-    html+=`<div class="two-col">`;
-    if(isAdmin()) html+=`<div class="card"><div class="card-header">Record Brake Test</div><div class="card-body">
-      <div class="form-grid">
-        <div><label>Test Date</label><input type="date" id="b-date" value="${today()}" max="${today()}"/></div>
-        <div><label>Result</label><div class="toggle-group"><button class="toggle-btn active-pass" id="btog-pass" onclick="setBrakeResult('pass')">✓ Pass</button><button class="toggle-btn" id="btog-fail" onclick="setBrakeResult('fail')">✗ Fail</button></div></div>
-        <div><label>Notes (optional)</label><textarea id="b-notes" rows="2"></textarea></div>
-      </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddBrake('${v.id}')">Save Brake Test</button>
-    </div></div>`;
-    html+=`<div class="card"><div class="card-header">Brake History (${brakes.length})</div><div class="card-body">`;
-    if(brakes.length===0) html+=`<div class="empty">No tests yet</div>`;
-    brakes.forEach(r=>{html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.testDate)}</div>${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:8px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteBrake('${r.id}')">🗑</button>`:''}</div></div>`;});
-    html+=`</div></div></div>`;
-  }
-  if(currentVehicleTab==='tyres'){
-    html+=`<div class="two-col">`;
+    const allSvc=[].concat(
+      maint.map(r=>Object.assign({},r,{_type:'maint',_date:r.serviceDate})),
+      svcs.map(r=>Object.assign({},r,{_type:'svc',_date:r.serviceDate}))
+    ).sort((a,b)=>b._date.localeCompare(a._date));
+    const nextDue=maint[0]&&maint[0].nextInspectionDate?maint[0].nextInspectionDate:null;
+    const nextDays=nextDue?daysBetween(today(),nextDue):null;
+
+    html+='<div class="v2-rem-grid">';
     if(isAdmin()){
-      html+=`<div class="card"><div class="card-header">Record Tyre Check</div><div class="card-body">
-        <div style="margin-bottom:12px"><label>Photo Date</label><input type="date" id="t-date" value="${today()}" max="${today()}"/></div>
-        <div class="tyre-grid">`;
-      AXLES.forEach((axle,ai)=>{
-        html+=`<div class="axle-row"><div class="axle-name">${axle.name}</div><div class="tyre-selects">`;
-        axle.sides.forEach(pos=>{html+=`<div class="tyre-select-row"><label>${pos.replace('-','<br>')}</label><select id="t-${ai}-${pos}" onchange="updateTyreDot(this,'t-dot-${ai}-${pos}')"><option value="good">Good</option><option value="bad">Bad</option><option value="uneven">Uneven</option></select><div class="tyre-dot dot-good" id="t-dot-${ai}-${pos}"></div></div>`;});
-        html+=`</div></div>`;
-      });
-      html+=`</div><button class="btn btn-primary mt-4" style="margin-top:14px" onclick="doAddTyre('${v.id}')">Save Tyre Record</button></div></div>`;
+      // toggle-btn / active-pass are production class names on purpose:
+      // setServiceResult() rewrites className and would strip anything else.
+      html+=panel('v2-accent-primary',_IC.wrench,'Record service','Admin only',
+        '<div style="padding:var(--v2-s5)"><div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="svc-date">Service date</label>'
+          +'<input class="v2-input" type="date" id="svc-date" value="'+today()+'" max="'+today()+'"/></div>'
+        +'<div class="v2-field"><label>Result</label><div class="toggle-group">'
+          +'<button class="toggle-btn active-pass" id="svctog-pass" onclick="setServiceResult(\'pass\')">Pass</button>'
+          +'<button class="toggle-btn" id="svctog-fail" onclick="setServiceResult(\'fail\')">Fail</button></div></div>'
+        +'<div class="v2-field" style="grid-column:1/-1"><label for="svc-notes">Notes</label>'
+          +'<textarea class="v2-input" id="svc-notes" rows="2" placeholder="Optional"></textarea></div>'
+        +'</div><div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddUnifiedService(\''+v.id+'\')">'
+        +_sv(_IC.check,'2.2')+'Save service record</button></div></div>');
+
+      html+=panel('v2-accent-amber',_IC.oil,'PM / oil change request',null,
+        '<div style="padding:var(--v2-s5)">'
+        +(v.assignedDriverId
+          ? '<p class="v2-rem-hint">Texts '+(driver?esc(driver.name):'the driver')+' to route to any TA or Love&rsquo;s for an oil change and send the receipt back.</p>'
+            +'<button class="v2-btn-primary" type="button" onclick="doSendPM(\''+v.assignedDriverId+'\',\''+v.id+'\',\''+esc(v.truckNumber)+'\')">'
+            +_sv(_IC.send,'2')+'Send PM request'+(driver?' to '+esc(driver.name):'')+'</button>'
+            +'<p class="v2-send-notice">Sent only when you click &mdash; never automatically.</p>'
+          : '<div class="v2-override-empty">No driver assigned &mdash; assign one to send a PM request.</div>')
+        +'</div>');
     }
-    html+=`<div class="card"><div class="card-header">Tyre History (${tyres.length})</div><div class="card-body">`;
-    if(tyres.length===0) html+=`<div class="empty">No tyre records yet</div>`;
-    tyres.forEach(r=>{const readings=Array.isArray(r.readings)?r.readings:[];const hasBad=readings.some(rd=>rd.status==='bad'),hasUneven=readings.some(rd=>rd.status==='uneven');html+=`<div class="history-item"><div><div class="fw-600">Photo: ${fmtDate(r.photoDate)}</div><div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">${readings.map(rd=>`<div class="tyre-dot ${rd.status==='good'?'dot-good':rd.status==='bad'?'dot-bad':'dot-uneven'}" title="${rd.position}: ${rd.status}"></div>`).join('')}</div></div><div style="display:flex;gap:6px;align-items:center">${hasBad?`<span class="badge badge-red">Bad</span>`:hasUneven?`<span class="badge badge-yellow">Uneven</span>`:`<span class="badge badge-green">OK</span>`}${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteTyre('${r.id}')">🗑</button>`:''}</div></div>`;});
-    html+=`</div></div></div>`;
+    let body='';
+    if(s.serviceOverdue||s.serviceDueSoon){
+      body+='<div class="v2-stream"><div class="v2-stream-row '+(s.serviceOverdue?'v2-accent-red':'v2-accent-amber')+'">'
+        +'<span class="v2-stream-ic">'+_sv(_IC.wrench)+'</span>'
+        +'<span class="v2-stream-main"><span class="v2-stream-label">'
+        +(s.serviceOverdue?'Service overdue':'Service due soon')+'</span>'
+        +'<span class="v2-stream-type">'+s.serviceDays+' days since the last service</span></span></div></div>';
+    }
+    body+='<div class="v2-phone-list">';
+    if(allSvc.length===0) body+='<div class="v2-override-empty">No records yet</div>';
+    allSvc.forEach(r=>{
+      const isMaint=r._type==='maint';
+      body+=row('<span class="v2-phone-who" style="flex:1;min-width:0">'
+        +'<span class="v2-phone-who-name">'+fmtDate(r.serviceDate)+'</span>'
+        +'<span class="v2-phone-who-truck">'+(isMaint?'Next due '+fmtDate(r.nextInspectionDate):'')
+        +(r.notes?(isMaint?' &middot; ':'')+esc(r.notes):'')+'</span></span>',
+        '<span class="v2-phone-badge '+(isMaint?'is-none':(r.result==='pass'?'is-ok':'is-crit'))+'">'
+        +(isMaint?'Logged':String(r.result).toUpperCase())+'</span>'
+        +del(isMaint?' onclick="doDeleteMaintenance(\''+r.id+'\')"': ' onclick="doDeleteService(\''+r.id+'\')"','service record'));
+    });
+    body+='</div>';
+    html+=panel('v2-accent-cyan',_IC.hist,'Service history',allSvc.length+(nextDue?' &middot; next '+fmtDate(nextDue)+(nextDays!==null&&nextDays<0?' (overdue)':''):''),body);
+    html+='</div>';
   }
+
+  // ── Brakes ────────────────────────────────────────────────────────────────
+  if(currentVehicleTab==='brakes'){
+    html+='<div class="v2-rem-grid">';
+    if(isAdmin()){
+      html+=panel('v2-accent-primary',_IC.brake,'Record brake test','Admin only',
+        '<div style="padding:var(--v2-s5)"><div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="b-date">Test date</label>'
+          +'<input class="v2-input" type="date" id="b-date" value="'+today()+'" max="'+today()+'"/></div>'
+        +'<div class="v2-field"><label>Result</label><div class="toggle-group">'
+          +'<button class="toggle-btn active-pass" id="btog-pass" onclick="setBrakeResult(\'pass\')">Pass</button>'
+          +'<button class="toggle-btn" id="btog-fail" onclick="setBrakeResult(\'fail\')">Fail</button></div></div>'
+        +'<div class="v2-field" style="grid-column:1/-1"><label for="b-notes">Notes</label>'
+          +'<textarea class="v2-input" id="b-notes" rows="2" placeholder="Optional"></textarea></div>'
+        +'</div><div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddBrake(\''+v.id+'\')">'
+        +_sv(_IC.check,'2.2')+'Save brake test</button></div></div>');
+    }
+    let body='<div class="v2-phone-list">';
+    if(brakes.length===0) body+='<div class="v2-override-empty">No tests yet</div>';
+    brakes.forEach(r=>{
+      body+=row('<span class="v2-phone-who" style="flex:1;min-width:0">'
+        +'<span class="v2-phone-who-name">'+fmtDate(r.testDate)+'</span>'
+        +(r.notes?'<span class="v2-phone-who-truck">'+esc(r.notes)+'</span>':'')+'</span>',
+        '<span class="v2-phone-badge '+(r.result==='pass'?'is-ok':'is-crit')+'">'+String(r.result).toUpperCase()+'</span>'
+        +del(' onclick="doDeleteBrake(\''+r.id+'\')"','brake test'));
+    });
+    body+='</div>';
+    html+=panel('v2-accent-cyan',_IC.hist,'Brake history',brakes.length,body);
+    html+='</div>';
+  }
+
+  // ── Tyres ─────────────────────────────────────────────────────────────────
+  if(currentVehicleTab==='tyres'){
+    html+='<div class="v2-rem-grid">';
+    if(isAdmin()){
+      // The whole grid keeps production markup. updateTyreDot() rewrites
+      // className on the dot, and the select ids are read positionally by
+      // doAddTyre(), so neither can be renamed.
+      let grid='<div style="padding:var(--v2-s5)">'
+        +'<div class="v2-field" style="margin-bottom:var(--v2-s4)"><label for="t-date">Photo date</label>'
+        +'<input class="v2-input" type="date" id="t-date" value="'+today()+'" max="'+today()+'"/></div>'
+        +'<div class="tyre-grid">';
+      AXLES.forEach(function(axle,ai){
+        grid+='<div class="axle-row"><div class="axle-name">'+axle.name+'</div><div class="tyre-selects">';
+        axle.sides.forEach(function(pos){
+          grid+='<div class="tyre-select-row"><label>'+pos.replace('-','<br>')+'</label>'
+            +'<select id="t-'+ai+'-'+pos+'" onchange="updateTyreDot(this,\'t-dot-'+ai+'-'+pos+'\')">'
+            +'<option value="good">Good</option><option value="bad">Bad</option><option value="uneven">Uneven</option></select>'
+            +'<div class="tyre-dot dot-good" id="t-dot-'+ai+'-'+pos+'"></div></div>';
+        });
+        grid+='</div></div>';
+      });
+      grid+='</div><div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddTyre(\''+v.id+'\')">'
+        +_sv(_IC.check,'2.2')+'Save tyre record</button></div></div>';
+      html+=panel('v2-accent-primary',_IC.tyre,'Record tyre check','Admin only',grid);
+    }
+    let body='<div class="v2-phone-list">';
+    if(tyres.length===0) body+='<div class="v2-override-empty">No tyre records yet</div>';
+    tyres.forEach(r=>{
+      const readings=Array.isArray(r.readings)?r.readings:[];
+      const hasBad=readings.some(x=>x.status==='bad'), hasUneven=readings.some(x=>x.status==='uneven');
+      const dotsHtml=readings.map(x=>'<div class="tyre-dot '+(x.status==='good'?'dot-good':x.status==='bad'?'dot-bad':'dot-uneven')+'" title="'+esc(x.position)+': '+esc(x.status)+'"></div>').join('');
+      body+=row('<span class="v2-phone-who" style="flex:1;min-width:0">'
+        +'<span class="v2-phone-who-name">'+fmtDate(r.photoDate)+'</span>'
+        +'<span style="display:flex;gap:4px;flex-wrap:wrap;margin-top:3px">'+dotsHtml+'</span></span>',
+        '<span class="v2-phone-badge '+(hasBad?'is-crit':hasUneven?'is-warn':'is-ok')+'">'
+        +(hasBad?'Bad':hasUneven?'Uneven':'OK')+'</span>'
+        +del(' onclick="doDeleteTyre(\''+r.id+'\')"','tyre record'));
+    });
+    body+='</div>';
+    html+=panel('v2-accent-cyan',_IC.hist,'Tyre history',tyres.length,body);
+    html+='</div>';
+  }
+
+  // ── DOT ───────────────────────────────────────────────────────────────────
   if(currentVehicleTab==='dot'){
-    html+=`<div class="two-col">`;
-    if(isAdmin()) html+=`<div class="card"><div class="card-header">Record DOT Inspection</div><div class="card-body">
-      <div class="form-grid">
-        <div><label>Inspection Date</label><input type="date" id="d-date" value="${today()}" max="${today()}"/></div>
-        <div><label>Driver</label><select id="d-driver"><option value="">— select —</option>${DRIVERS.map(d=>`<option value="${d.id}">${d.name}</option>`).join('')}</select></div>
-        <div><label>Result</label><div class="toggle-group"><button class="toggle-btn active-pass" id="dtog-pass" onclick="setDotResult('pass')">✓ Pass</button><button class="toggle-btn" id="dtog-violation" onclick="setDotResult('violation')">⚠ Violation</button><button class="toggle-btn" id="dtog-oos" onclick="setDotResult('oos')">🚫 OOS</button></div></div>
-        <div><label>Notes (optional)</label><textarea id="d-notes" rows="2"></textarea></div>
-      </div>
-      <button class="btn btn-primary mt-4" style="margin-top:12px" onclick="doAddDOT('${v.id}')">Save DOT Inspection</button>
-    </div></div>`;
-    html+=`<div class="card"><div class="card-header">DOT History (${dots.length})</div><div class="card-body">`;
-    if(dots.length===0) html+=`<div class="empty">No DOT inspections recorded</div>`;
-    dots.forEach(r=>{const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;html+=`<div class="history-item"><div><div class="fw-600">${fmtDate(r.inspectionDate)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${r.notes?`<div class="text-sm">${esc(r.notes)}</div>`:''}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${r.result==='pass'?'badge-green':r.result==='violation'?'badge-yellow':'badge-red'}">${r.result.toUpperCase()}</span>${isAdmin()?`<button class="btn btn-ghost btn-sm btn-icon" onclick="doDeleteDOT('${r.id}')">🗑</button>`:''}</div></div>`;});
-    html+=`</div></div></div>`;
+    html+='<div class="v2-rem-grid">';
+    if(isAdmin()){
+      html+=panel('v2-accent-primary',_IC.clip,'Record DOT inspection','Admin only',
+        '<div style="padding:var(--v2-s5)"><div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="d-date">Inspection date</label>'
+          +'<input class="v2-input" type="date" id="d-date" value="'+today()+'" max="'+today()+'"/></div>'
+        +'<div class="v2-field"><label for="d-driver">Driver</label><span class="v2-select-wrap">'
+          +'<select class="v2-select" id="d-driver"><option value="">&mdash; select &mdash;</option>'
+          +DRIVERS.map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join('')
+          +'</select>'+_sv('<path d="m6 9 6 6 6-6"/>','1.8')+'</span></div>'
+        +'<div class="v2-field" style="grid-column:1/-1"><label>Result</label><div class="toggle-group">'
+          +'<button class="toggle-btn active-pass" id="dtog-pass" onclick="setDotResult(\'pass\')">Pass</button>'
+          +'<button class="toggle-btn" id="dtog-violation" onclick="setDotResult(\'violation\')">Violation</button>'
+          +'<button class="toggle-btn" id="dtog-oos" onclick="setDotResult(\'oos\')">Out of service</button></div></div>'
+        +'<div class="v2-field" style="grid-column:1/-1"><label for="d-notes">Notes</label>'
+          +'<textarea class="v2-input" id="d-notes" rows="2" placeholder="Optional"></textarea></div>'
+        +'</div><div class="v2-add-foot"><button class="v2-btn-primary" type="button" onclick="doAddDOT(\''+v.id+'\')">'
+        +_sv(_IC.check,'2.2')+'Save DOT inspection</button></div></div>');
+    }
+    let body='<div class="v2-phone-list">';
+    if(dots.length===0) body+='<div class="v2-override-empty">No DOT inspections recorded</div>';
+    dots.forEach(r=>{
+      const dn=DRIVERS.find(d=>d.id===r.driverId);
+      body+=row('<span class="v2-phone-who" style="flex:1;min-width:0">'
+        +'<span class="v2-phone-who-name">'+fmtDate(r.inspectionDate)+'</span>'
+        +'<span class="v2-phone-who-truck">'+(dn?esc(dn.name):'')+(r.notes?(dn?' &middot; ':'')+esc(r.notes):'')+'</span></span>',
+        '<span class="v2-phone-badge '+(r.result==='pass'?'is-ok':r.result==='violation'?'is-warn':'is-crit')+'">'
+        +String(r.result).toUpperCase()+'</span>'
+        +del(' onclick="doDeleteDOT(\''+r.id+'\')"','DOT inspection'));
+    });
+    body+='</div>';
+    html+=panel('v2-accent-cyan',_IC.hist,'DOT history',dots.length,body);
+    html+='</div>';
   }
+
+  // ── PTI ───────────────────────────────────────────────────────────────────
   if(currentVehicleTab==='pti'){
     const preTrips=INSPECTIONS.filter(r=>r.vehicleId===v.id).sort((a,b)=>String(b.submittedAt||'').localeCompare(String(a.submittedAt||'')));
-    const lastLink=LINK_SENDS.filter(r=>r.status==='sent'&&(r.vehicleId===v.id||(v.assignedDriverId&&r.driverId===v.assignedDriverId))).sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];
-    html+=`<div class="two-col">`;
-    html+=`<div class="card"><div class="card-header">Send Pre-Trip Link</div><div class="card-body">`;
-    html+=`<div class="text-sm" style="margin-bottom:10px">📤 Last PTI link sent: <b>${lastLink?fmtDate(lastLink.createdAt):'never'}</b></div>`;
-    if(v.assignedDriverId){
-      html+=`<div class="text-sm" style="margin-bottom:12px;color:var(--text2)">Text the driver a link to complete a fresh pre-trip inspection (tyre photos required).</div>
-        <button class="btn btn-primary" onclick="doSendLink('${v.assignedDriverId}','${v.id}','${esc(v.truckNumber)}')">📲 Send PTI link${driver?' to '+esc(driver.name):''}</button>
-        <div class="text-sm" style="margin-top:10px;color:var(--text3)">🔒 Sent only when you click — never automatically.</div>`;
-    } else {
-      html+=`<div class="empty">No driver assigned — assign a driver to this truck to send a PTI link.</div>`;
-    }
-    html+=`</div></div>`;
-    html+=`<div class="card"><div class="card-header">Pre-Trip History (${preTrips.length})</div><div class="card-body">`;
-    if(preTrips.length===0) html+=`<div class="empty">No pre-trip inspections yet</div>`;
+    const lastLink=LINK_SENDS.filter(r=>r.status==='sent'&&(r.vehicleId===v.id||(v.assignedDriverId&&r.driverId===v.assignedDriverId)))
+      .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')))[0];
+
+    html+='<div class="v2-rem-grid">';
+    html+=panel('v2-accent-primary',_IC.send,'Send pre-trip link','Last sent: '+(lastLink?fmtDate(lastLink.createdAt):'never'),
+      '<div style="padding:var(--v2-s5)">'
+      +(v.assignedDriverId
+        ? '<p class="v2-rem-hint">Text the driver a link to complete a fresh pre-trip inspection. Tyre photos are required.</p>'
+          +'<button class="v2-btn-primary" type="button" onclick="doSendLink(\''+v.assignedDriverId+'\',\''+v.id+'\',\''+esc(v.truckNumber)+'\')">'
+          +_sv(_IC.send,'2')+'Send PTI link'+(driver?' to '+esc(driver.name):'')+'</button>'
+          +'<p class="v2-send-notice">Sent only when you click &mdash; never automatically.</p>'
+        : '<div class="v2-override-empty">No driver assigned &mdash; assign one to send a PTI link.</div>')
+      +'</div>');
+
+    let body='<div class="v2-phone-list">';
+    if(preTrips.length===0) body+='<div class="v2-override-empty">No pre-trip inspections yet</div>';
     preTrips.forEach(r=>{
-      const rb=r.overallResult==='defect'?'badge-red':r.overallResult==='minor'?'badge-yellow':'badge-green';
+      const rt=r.overallResult==='defect'?'is-crit':r.overallResult==='minor'?'is-warn':'is-ok';
       const rl=r.overallResult==='defect'?'Defect':r.overallResult==='minor'?'Minor':'Roadworthy';
-      const dName=DRIVERS.find(d=>d.id===r.driverId)?.name;
+      const dn=DRIVERS.find(d=>d.id===r.driverId);
       const flags=[];
-      if(r.tyresFlagged) flags.push(`${r.tyresFlagged} tyre${r.tyresFlagged>1?'s':''} flagged`);
-      if(r.checksFailed) flags.push(`${r.checksFailed} check${r.checksFailed>1?'s':''} failed`);
+      if(r.tyresFlagged) flags.push(r.tyresFlagged+' tyre'+(r.tyresFlagged>1?'s':'')+' flagged');
+      if(r.checksFailed) flags.push(r.checksFailed+' check'+(r.checksFailed>1?'s':'')+' failed');
       const isOpen=isOpenDefect(r);
-      const repairLine=isOpen
-        ? `<div class="text-sm" style="color:var(--danger);font-weight:600">🛠 Not repaired</div>`
-        : (r.repairStatus==='repaired'||r.repairStatus==='deferred')
-          ? `<div class="text-sm" style="color:var(--text3)">🛠 ${r.repairStatus==='repaired'?'Repaired':'Deferred'}${r.repairedAt?' · '+fmtDate(r.repairedAt):''}${r.repairNotes?' · '+esc(r.repairNotes):''}</div>`
-          : '';
-      html+=`<div class="history-item"${isOpen?' style="border-left:3px solid var(--danger);padding-left:9px"':''}><div style="cursor:pointer;flex:1" onclick="openInspection('${r.id}')" title="Open full inspection"><div class="fw-600">${inspDT(r.submittedAt)}</div>${dName?`<div class="text-sm">👤 ${esc(dName)}</div>`:''}${flags.length?`<div class="text-sm" style="color:var(--danger)">${flags.join(' · ')}</div>`:''}${repairLine}</div><div style="display:flex;gap:6px;align-items:center"><span class="badge ${rb}">${rl}</span>${isOpen&&isAdmin()?`<button class="btn btn-success btn-sm mark-repaired-btn" data-insp="${esc(r.id)}" title="Record that this defect has been repaired">✓ Repaired</button>`:''}</div></div>`;
+      const repair=isOpen?'<span class="v2-cell-never">Not repaired</span>'
+        :(r.repairStatus==='repaired'||r.repairStatus==='deferred')
+          ?'<span class="v2-cell-dim">'+(r.repairStatus==='repaired'?'Repaired':'Deferred')
+            +(r.repairedAt?' &middot; '+fmtDate(r.repairedAt):'')+(r.repairNotes?' &middot; '+esc(r.repairNotes):'')+'</span>'
+          :'';
+      const sub=[dn?esc(dn.name):'',flags.length?'<span class="v2-cell-never">'+flags.join(' &middot; ')+'</span>':'',repair].filter(Boolean).join(' &middot; ');
+      body+='<div class="v2-phone-item">'
+        +'<span class="v2-phone-who" style="flex:1;min-width:0;cursor:pointer" onclick="openInspection(\''+r.id+'\')" title="Open full inspection">'
+          +'<span class="v2-phone-who-name">'+inspDT(r.submittedAt)+'</span>'
+          +'<span class="v2-phone-who-truck">'+sub+'</span></span>'
+        +'<span class="v2-phone-badge '+rt+'">'+rl+'</span>'
+        // class AND data-insp are both required: render() binds this by
+        // querySelectorAll('.mark-repaired-btn') and reads dataset.insp.
+        +(isOpen&&isAdmin()?'<button class="v2-btn-repair mark-repaired-btn" type="button" data-insp="'+esc(r.id)+'">'+_sv(_IC.check,'2.2')+'Repaired</button>':'')
+      +'</div>';
     });
-    html+=`</div></div></div>`;
+    body+='</div>';
+    html+=panel('v2-accent-cyan',_IC.hist,'Pre-trip history',preTrips.length,body);
+    html+='</div>';
   }
+
+  html+='</div>';
   return html;
 }
 
