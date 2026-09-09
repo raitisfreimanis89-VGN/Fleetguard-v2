@@ -1635,7 +1635,7 @@ function renderGuides(){
     +'<div class="v2-i80-segs" id="g-i80"><div class="v2-i80-note">Checking the corridor&hellip;</div></div>'
     +'<div class="v2-i80-foot">Wind, snow and ice from the National Weather Service, by county along the route. '
       +'<b>Closures are not included</b> \u2014 WYDOT does not publish a feed this page can read. '
-      +'<a href="https://www.wyoroad.info" target="_blank" rel="noopener">Check WYDOT for closures</a>.</div>'
+      +'<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Check WYDOT for closures</a>.</div>'
   +'</section>';
 
   // ── Filter bar ────────────────────────────────────────────────────────────
@@ -1775,7 +1775,7 @@ function renderI80(){
   if(GUIDE_I80_DATA===null){ box.innerHTML='<div class="v2-i80-note">Checking the corridor&hellip;</div>'; return; }
   if(GUIDE_I80_DATA==='error'){
     box.innerHTML='<div class="v2-i80-note">Could not reach the National Weather Service. '
-      +'<a href="https://www.wyoroad.info" target="_blank" rel="noopener">Open WYDOT</a></div>';
+      +'<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Open WYDOT</a></div>';
     return;
   }
   const segs=guideI80Dir==='ne-ut'? [...GUIDE_I80_DATA].reverse() : GUIDE_I80_DATA;
