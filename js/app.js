@@ -1636,8 +1636,8 @@ function renderGuides(){
         +'<svg class="v2-i80-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'
       +'</button>'
       +'<div class="v2-i80-dirs" role="group" aria-label="Travel direction">'
-        +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ut-ne'?' is-active':'')+'" onclick="i80SetDir(\'ut-ne\')">UT &rarr; NE</button>'
-        +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ne-ut'?' is-active':'')+'" onclick="i80SetDir(\'ne-ut\')">NE &rarr; UT</button>'
+        +'<button type="button" data-dir="ut-ne" class="v2-i80-dir'+(guideI80Dir==='ut-ne'?' is-active':'')+'" onclick="i80SetDir(\'ut-ne\')">UT &rarr; NE</button>'
+        +'<button type="button" data-dir="ne-ut" class="v2-i80-dir'+(guideI80Dir==='ne-ut'?' is-active':'')+'" onclick="i80SetDir(\'ne-ut\')">NE &rarr; UT</button>'
       +'</div></div>'
     +'<div class="v2-i80-body" id="g-i80-body"'+(guideI80Open?'':' hidden')+'>'
       +'<div class="v2-i80-segs" id="g-i80"><div class="v2-i80-note">Checking the corridor&hellip;</div></div>'
@@ -1783,7 +1783,14 @@ async function guidesLoadI80(){
   }
   renderI80();
 }
-function i80SetDir(dir){ guideI80Dir=dir==='ne-ut'?'ne-ut':'ut-ne'; renderI80(); }
+function i80SetDir(dir){
+  guideI80Dir=dir==='ne-ut'?'ne-ut':'ut-ne';
+  // renderI80() only rewrites the segment list, so the highlight has to move
+  // here or the buttons keep reporting the direction you came from.
+  document.querySelectorAll('.v2-i80-dir[data-dir]').forEach(b=>
+    b.classList.toggle('is-active', b.dataset.dir===guideI80Dir));
+  renderI80();
+}
 function i80Toggle(){
   guideI80Open=!guideI80Open;
   const sec=document.querySelector('.v2-i80'), body=document.getElementById('g-i80-body'),

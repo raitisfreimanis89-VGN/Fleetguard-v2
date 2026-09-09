@@ -422,14 +422,26 @@
   border: 1px solid var(--v2-line); border-radius: var(--v2-r-sm); }
 .v2-i80-dir {
   padding: var(--v2-s2) var(--v2-s3);
-  background: none; border: 0; border-radius: calc(var(--v2-r-sm) - 2px);
+  background: none;
+  /* Transparent rather than none, so gaining the active border does not
+     nudge the pair sideways. */
+  border: 1px solid transparent;
+  border-radius: calc(var(--v2-r-sm) - 2px);
   font: inherit; font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
   letter-spacing: var(--v2-track-micro);
   color: var(--v2-ink-3); cursor: pointer;
   transition: background var(--v2-t-fast), color var(--v2-t-fast);
 }
 .v2-i80-dir:hover { color: var(--v2-ink); }
-.v2-i80-dir.is-active { background: var(--v2-surface-3); color: var(--v2-ink); }
+/* Same treatment .v2-tab.is-active uses for the category tabs on this page:
+   a tinted accent with accent text, so which way you are reading the corridor
+   is obvious. The grey it had before was too close to the inactive state. */
+.v2-i80-dir.is-active {
+  background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+  color: var(--v2-primary-hi);
+}
+.v2-i80-dir.is-active:hover { color: var(--v2-primary-hi); }
 .v2-i80-dir:focus-visible { outline: 2px solid var(--v2-cyan); outline-offset: 1px; }
 
 .v2-i80-segs { display: flex; flex-direction: column; gap: var(--v2-s2); }
