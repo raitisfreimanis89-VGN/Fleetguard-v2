@@ -376,10 +376,43 @@
   border-radius: var(--v2-r-lg);
   box-shadow: var(--v2-shadow-sm);
 }
+/* Closed by default, so the panel costs one row on the days -- most of them --
+   when the corridor is clear. The header still carries a live summary, so
+   folding it never hides an active alert. */
 .v2-i80-head {
   display: flex; align-items: center; justify-content: space-between;
-  gap: var(--v2-s4); margin-bottom: var(--v2-s4); flex-wrap: wrap;
+  gap: var(--v2-s4); flex-wrap: wrap;
 }
+.v2-i80.is-open .v2-i80-head { margin-bottom: var(--v2-s4); }
+
+.v2-i80-toggle {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  flex: 1; min-width: 0;
+  padding: 0; background: none; border: 0;
+  font: inherit; color: inherit; cursor: pointer; text-align: left;
+}
+.v2-i80-toggle:focus-visible { outline: 2px solid var(--v2-cyan); outline-offset: 3px; border-radius: var(--v2-r-xs); }
+.v2-i80-chev {
+  width: 16px; height: 16px; flex-shrink: 0;
+  color: var(--v2-ink-3);
+  transition: transform var(--v2-t-fast);
+}
+.v2-i80.is-open .v2-i80-chev { transform: rotate(180deg); }
+
+/* The one thing a closed panel must still say. */
+.v2-i80-status {
+  padding: 1px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  border: 1px solid var(--v2-line-strong);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink-3);
+  white-space: nowrap;
+}
+.v2-i80-status.is-clear { border-color: var(--v2-green-ring); background: var(--v2-green-soft); color: var(--v2-green-hi); }
+.v2-i80-status.is-alert { border-color: var(--v2-amber-ring); background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+
+@media (prefers-reduced-motion: reduce) { .v2-i80-chev { transition: none; } }
 .v2-i80-title {
   font-size: var(--v2-fs-md); font-weight: var(--v2-fw-semibold);
   letter-spacing: var(--v2-track-snug); color: var(--v2-ink);

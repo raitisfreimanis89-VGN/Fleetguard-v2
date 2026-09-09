@@ -1625,17 +1625,26 @@ function renderGuides(){
   // ── I-80 Wyoming ──────────────────────────────────────────────────────────
   // Sits with the status tiles rather than among the resource cards, and
   // deliberately carries no data-gsec, so the category filter leaves it alone.
-  html+='<section class="v2-i80" aria-label="I-80 Wyoming corridor">'
+  html+='<section class="v2-i80'+(guideI80Open?' is-open':'')+'" aria-label="I-80 Wyoming corridor">'
     +'<div class="v2-i80-head">'
-      +'<span class="v2-i80-title">I-80 Wyoming</span>'
+      // The title, the summary and the chevron are one button; the direction
+      // toggle sits outside it so changing direction cannot fold the panel.
+      +'<button type="button" class="v2-i80-toggle" id="g-i80-toggle" onclick="i80Toggle()"'
+        +' aria-expanded="'+(guideI80Open?'true':'false')+'" aria-controls="g-i80-body">'
+        +'<span class="v2-i80-title">I-80 Wyoming</span>'
+        +'<span class="v2-i80-status" id="g-i80-status">Checking&hellip;</span>'
+        +'<svg class="v2-i80-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'
+      +'</button>'
       +'<div class="v2-i80-dirs" role="group" aria-label="Travel direction">'
         +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ut-ne'?' is-active':'')+'" onclick="i80SetDir(\'ut-ne\')">UT &rarr; NE</button>'
         +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ne-ut'?' is-active':'')+'" onclick="i80SetDir(\'ne-ut\')">NE &rarr; UT</button>'
       +'</div></div>'
-    +'<div class="v2-i80-segs" id="g-i80"><div class="v2-i80-note">Checking the corridor&hellip;</div></div>'
-    +'<div class="v2-i80-foot">Wind, snow and ice from the National Weather Service, by county along the route. '
-      +'<b>Closures are not included</b> \u2014 WYDOT does not publish a feed this page can read. '
-      +'<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Check WYDOT for closures</a>.</div>'
+    +'<div class="v2-i80-body" id="g-i80-body"'+(guideI80Open?'':' hidden')+'>'
+      +'<div class="v2-i80-segs" id="g-i80"><div class="v2-i80-note">Checking the corridor&hellip;</div></div>'
+      +'<div class="v2-i80-foot">Wind, snow and ice from the National Weather Service, by county along the route. '
+        +'<b>Closures are not included</b> \u2014 WYDOT does not publish a feed this page can read. '
+        +'<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Check WYDOT for closures</a>.</div>'
+    +'</div>'
   +'</section>';
 
   // ── Filter bar ────────────────────────────────────────────────────────────
@@ -1731,6 +1740,11 @@ const GUIDE_I80=[
 ];
 let GUIDE_I80_DATA=null;          // null = not loaded yet, [] = loaded and clear
 let guideI80Dir='ut-ne';          // 'ut-ne' = westbound origin, reading west to east
+// Closed by default: the corridor is clear most days and the open panel took a
+// screen of space to say so. The header keeps a live summary either way, so a
+// closed panel never hides an active alert -- it just does not spell it out.
+// Module-level, so the choice survives leaving the page and coming back.
+let guideI80Open=false;
 
 // Bucket an event name into the three things that actually change how a truck
 // drives. "Black ice" is deliberately absent: the NWS issues no such product,
@@ -1770,13 +1784,37 @@ async function guidesLoadI80(){
   renderI80();
 }
 function i80SetDir(dir){ guideI80Dir=dir==='ne-ut'?'ne-ut':'ut-ne'; renderI80(); }
+function i80Toggle(){
+  guideI80Open=!guideI80Open;
+  const sec=document.querySelector('.v2-i80'), body=document.getElementById('g-i80-body'),
+        btn=document.getElementById('g-i80-toggle');
+  if(sec) sec.classList.toggle('is-open',guideI80Open);
+  if(body) body.hidden=!guideI80Open;
+  if(btn) btn.setAttribute('aria-expanded',String(guideI80Open));
+}
 function renderI80(){
   const box=document.getElementById('g-i80'); if(!box) return;
-  if(GUIDE_I80_DATA===null){ box.innerHTML='<div class="v2-i80-note">Checking the corridor&hellip;</div>'; return; }
+  const st0=document.getElementById('g-i80-status');
+  if(GUIDE_I80_DATA===null){
+    if(st0){ st0.className='v2-i80-status'; st0.textContent='Checking\u2026'; }
+    box.innerHTML='<div class="v2-i80-note">Checking the corridor&hellip;</div>'; return;
+  }
   if(GUIDE_I80_DATA==='error'){
+    if(st0){ st0.className='v2-i80-status'; st0.textContent='Unavailable'; }
     box.innerHTML='<div class="v2-i80-note">Could not reach the National Weather Service. '
       +'<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Open WYDOT</a></div>';
     return;
+  }
+  // Summary for the header. Counts SEGMENTS with a driving alert, not alerts:
+  // "2 of 5" is what a driver needs off a closed panel, and one county with
+  // three warnings is still one stretch of road to worry about.
+  const st=document.getElementById('g-i80-status');
+  if(st){
+    const hit=GUIDE_I80_DATA.filter(sg=>sg.alerts.some(a=>guideI80Kind(a.event)!=='other'));
+    st.className='v2-i80-status '+(hit.length?'is-alert':'is-clear');
+    st.textContent=hit.length
+      ? hit.length+' of '+GUIDE_I80_DATA.length+' segments'
+      : 'Corridor clear';
   }
   const segs=guideI80Dir==='ne-ut'? [...GUIDE_I80_DATA].reverse() : GUIDE_I80_DATA;
   box.innerHTML=segs.map(sg=>{
