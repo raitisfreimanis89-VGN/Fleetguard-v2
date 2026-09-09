@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover"/>
-<meta name="theme-color" content="#10131a"/>
+<meta name="theme-color" content="#00050d"/>
 <title>FleetGuard — Driver Pre-Trip</title>
 <!--
   ════════════════════════════════════════════════════════════════
@@ -15,24 +15,39 @@
 -->
 <style>
 :root{
-  --bg:#10131a; --surface:#10131a; --surface-low:#191c22; --surface-container:#1d2026;
-  --surface-high:#272a31; --surface-highest:#32353c;
-  --border:rgba(50,53,60,.6); --border-strong:rgba(50,53,60,1);
-  --primary:#da6536; --primary-glow:rgba(218,101,54,.25); --primary-text:#ffb5a0; --primary-dim:rgba(218,101,54,.12);
-  --success:#78dc77; --success-bg:rgba(120,220,119,.12);
-  --warning:#f59e0b; --warning-bg:rgba(245,158,11,.12);
-  --danger:#ff4444; --danger-bg:rgba(255,68,68,.12); --danger-text:#ffb4ab;
-  --text:#e1e2eb; --text2:#9aa3b8; --text3:#5b6478;
-  --radius:10px; --radius-lg:14px; --radius-xl:18px;
-  --shadow-card:0 2px 8px rgba(0,0,0,.25); --shadow-lg:0 8px 32px rgba(0,0,0,.4);
-  --input-bg:rgba(50,53,60,.3); --input-border:#32353c;
+  /* ── v2 palette ──────────────────────────────────────────────────────────
+     The same remap v2-skin.css performs for the application, written as
+     literal values rather than var(--v2-*) references: this page loads NO
+     external resource at all -- no stylesheet, no script, not even a font.
+     That is deliberate. A driver opens it on cellular in a yard, and one
+     request always renders. Linking v2-tokens.css to save the duplication
+     would trade that away, so the values are duplicated on purpose. If the
+     v2 palette moves, this block has to be updated by hand.
+
+     Token NAMES are unchanged, so every rule below this block is untouched. */
+  --bg:#00050d; --surface:#00050d; --surface-low:#030c19; --surface-container:#030c19;
+  --surface-high:#091528; --surface-highest:#111e34;
+  --border:#17263c; --border-strong:#24374f;
+  --primary:#da6536; --primary-glow:rgba(218,101,54,.45); --primary-text:#f08a5d; --primary-dim:rgba(218,101,54,.14);
+  --success:#4ade80; --success-bg:rgba(34,197,94,.12);
+  --warning:#ffa733; --warning-bg:rgba(255,138,0,.12);
+  /* --danger-text is deliberately NOT remapped to --v2-red-hi. It is a
+     text-on-dark tint rather than a status hue, and the nearest v2 red is a
+     mid-tone that costs contrast wherever this is used for error copy. Same
+     call, and the same reason, as in v2-skin.css. */
+  --danger:#f87171; --danger-bg:rgba(239,68,68,.12); --danger-text:#ffb4ab;
+  --text:#f1f5f9; --text2:#94a3b8; --text3:#74869f;
+  --radius:12px; --radius-lg:16px; --radius-xl:24px;
+  --shadow-card:0 1px 2px rgba(0,0,0,.6),0 12px 28px -14px rgba(0,0,0,.85);
+  --shadow-lg:0 2px 6px rgba(0,0,0,.6),0 26px 54px -16px rgba(0,0,0,.95);
+  --input-bg:#091528; --input-border:#24374f;
   --safe-top:env(safe-area-inset-top,0px); --safe-bot:env(safe-area-inset-bottom,0px);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{
   font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
-  background:radial-gradient(1200px 600px at 50% -10%,#171b24,#0b0e14 60%);
+  background:radial-gradient(1200px 600px at 50% -10%,#061426,#00050d 60%);
   color:var(--text); font-size:15px; line-height:1.45; -webkit-font-smoothing:antialiased;
   display:flex; align-items:stretch; justify-content:center;
 }
@@ -104,7 +119,14 @@ textarea{resize:vertical;min-height:64px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px 18px;border-radius:12px;
   font-size:15.5px;font-weight:800;cursor:pointer;border:none;transition:filter .15s,transform .1s;letter-spacing:.01em;font-family:inherit}
 .btn:active{transform:scale(.985)}
-.btn-primary{background:linear-gradient(135deg,var(--primary),#c0542a);color:#fff;box-shadow:0 6px 18px var(--primary-glow)}
+/* Flat fill with dark ink, matching .v2-btn-primary in the application:
+   white on this orange measures 3.56:1 and fails AA, dark ink measures 5.74:1.
+   The gradient had to go rather than shrink -- text has to clear both stops,
+   and #da6536 to #b04d24 is too wide a span for either ink to pass at both
+   ends (white 3.56 at the light end, dark ink 3.83 at the dark end). This
+   failure predates the skin; --primary was already #da6536. It matters more
+   here than in the office app, because this button is pressed outdoors. */
+.btn-primary{background:var(--primary);color:#00050d;box-shadow:0 6px 18px var(--primary-glow)}
 .btn-primary:hover{filter:brightness(1.07)}
 .btn-ghost{background:var(--surface-high);color:var(--text);border:1.5px solid var(--border-strong)}
 .btn-success{background:var(--success);color:#08260c}
@@ -184,7 +206,11 @@ textarea{resize:vertical;min-height:64px}
 .fail-extra.show{display:block;animation:fade .2s}
 .sev{display:flex;gap:6px;margin-bottom:12px}
 .sev button{flex:1;padding:9px 4px;border-radius:8px;border:1.5px solid var(--border-strong);background:var(--surface-container);color:var(--text2);font-weight:700;font-size:12px;cursor:pointer}
-.sev button.on{color:#fff}
+/* Dark ink on a bright fill, the same rule .btn-primary follows above.
+   White measured 1.94:1 on Minor, 3.58:1 on Major and 2.77:1 on Critical --
+   all three failed AA before the skin as well (2.15 / 3.58 / 3.41 on the old
+   palette), so none of them ever passed. Dark ink gives 10.54 / 5.71 / 7.39. */
+.sev button.on{color:#00050d}
 .sev button[data-sev="Minor"].on{background:var(--warning);border-color:var(--warning)}
 .sev button[data-sev="Major"].on{background:#e8590c;border-color:#e8590c}
 .sev button[data-sev="Critical"].on{background:var(--danger);border-color:var(--danger)}
