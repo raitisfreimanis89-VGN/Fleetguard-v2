@@ -194,6 +194,25 @@ resolve.
 
 ## 6. Open items
 
+- **driver.html carries its own COPY of the palette, and it will drift.** The
+  driver pre-trip page is a separate surface from index.html -- drivers reach
+  it from the PTI text at /driver, not through navigate() -- and it loads no
+  external resource at all: no stylesheet, no script, not even a font. That is
+  deliberate, so it renders on one request on cellular in a yard. The
+  consequence is that it cannot link v2-tokens.css, so its :root block repeats
+  the v2 values as literals.
+
+  **If you change the v2 palette, update driver.html by hand.** Nothing
+  enforces it: check-isolation.js only walks v2/css, so a drift here is
+  silent. The page is skinned and verified -- 0 AA failures across all six
+  screens, and a real driver has since completed a pre-trip on it, which
+  covered OTP, camera, GPS, the signature pad and submission.
+
+  It also fixed four contrast failures that predated the skin: the primary
+  button at 3.56:1 and all three severity buttons (worst 1.94:1), none of
+  which had ever passed. Both now follow the rule the application uses --
+  dark ink on a bright accent.
+
 - **Light mode: done.** `v2-tokens.css` carries a `.light` block, and the
   sweep now measures 0 AA failures across the sidebar and all nine ported pages
   in *both* themes. Four things had to be understood, and only the first was
