@@ -20,6 +20,95 @@ serve(async (req) => {
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* ignore */ }
 
+  // ── check_new_truck_policy action ────────────────────────────
+  // Read-only: confirm migration 010 is actually live, and show the current
+  // policy + (optionally) where a specific truck sits today.
+  if (body.action === "check_new_truck_policy") {
+    const truck = (body.truck as string | undefined)?.trim();
+    const { data: policy, error: polErr } = await sb.from("new_truck_policy").select("*").order("reminder_type");
+    if (polErr) return new Response(JSON.stringify({ ok: false, migrationApplied: false, error: polErr.message }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+    let vehicleStatus: unknown = null;
+    if (truck) {
+      const { data: veh } = await sb.from("vehicles").select("id, truck_number, assigned_driver_id").eq("truck_number", truck).maybeSingle();
+      if (veh) {
+        const { data: dr } = veh.assigned_driver_id ? await sb.from("drivers").select("name").eq("id", veh.assigned_driver_id).maybeSingle() : { data: null };
+        const { data: es } = await sb.from("vehicle_effective_schedules").select("*").eq("vehicle_id", veh.id);
+        vehicleStatus = { truck: veh.truck_number, driver: dr?.name ?? null, schedules: es };
+      } else {
+        vehicleStatus = { error: "no vehicle with that truck_number" };
+      }
+    }
+
+    return new Response(JSON.stringify({ ok: true, migrationApplied: true, policy, vehicleStatus }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── recent_otp_activity action ───────────────────────────────
+  // All recent OTP requests across every driver (phone masked), to spot a
+  // real delivery gap: many requested-but-never-consumed codes clustered in
+  // one window. driver-otp-request never records send success/failure
+  // itself (always returns generic ok), so consumed_at is the only signal.
+  if (body.action === "recent_otp_activity") {
+    const hours = Number(body.hours ?? 48);
+    const since = new Date(Date.now() - hours * 3_600_000).toISOString();
+    const { data: rows } = await sb.from("driver_otp_codes")
+      .select("phone, created_at, expires_at, consumed_at, attempts")
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(300);
+    const list = rows ?? [];
+    const consumed = list.filter((r) => r.consumed_at).length;
+    const neverConsumed = list.filter((r) => !r.consumed_at).length;
+    const masked = list.map((r) => ({
+      phone: r.phone ? r.phone.slice(0, 7) + "****" : r.phone,
+      created_at: r.created_at,
+      consumed: !!r.consumed_at,
+      attempts: r.attempts,
+    }));
+    return new Response(JSON.stringify({
+      ok: true, windowHours: hours, total: list.length, consumed, neverConsumed, rows: masked,
+    }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── apply_new_truck_exemption action ─────────────────────────
+  // Calls the migration-010 Postgres function directly. Raises (surfaced as
+  // a 400) if the truck number matches none or more than one vehicle.
+  if (body.action === "apply_new_truck_exemption") {
+    const truck    = (body.truck as string)?.trim();
+    const received = (body.received as string)?.trim(); // YYYY-MM-DD
+    if (!truck || !/^\d{4}-\d{2}-\d{2}$/.test(received ?? "")) {
+      return new Response(JSON.stringify({ error: "truck and received (YYYY-MM-DD) required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const { data, error } = await sb.rpc("apply_new_truck_exemption", { p_truck_number: truck, p_received: received });
+    if (error) return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 400, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ok: true, truck, received, result: data }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
+  // ── set_vehicle_interval action ──────────────────────────────
+  // Override interval_days on a vehicle's existing reminder_schedules row
+  // (created earlier by apply_new_truck_exemption or the normal onboarding
+  // flow). Only ever touches this one vehicle/reminder_type pair.
+  if (body.action === "set_vehicle_interval") {
+    const truck  = (body.truck as string)?.trim();
+    const type   = (body.reminderType as string)?.trim();
+    const days   = Number(body.intervalDays);
+    if (!truck || !type || !Number.isFinite(days) || days <= 0) {
+      return new Response(JSON.stringify({ error: "truck, reminderType, intervalDays required" }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+    const { data: veh } = await sb.from("vehicles").select("id").eq("truck_number", truck).maybeSingle();
+    if (!veh) return new Response(JSON.stringify({ error: "No vehicle with that truck_number", truck }), { status: 404, headers: { "Content-Type": "application/json" } });
+
+    const { data: updated, error } = await sb.from("reminder_schedules")
+      .update({ interval_days: days, updated_at: new Date().toISOString() })
+      .eq("vehicle_id", veh.id).eq("reminder_type", type)
+      .select("*");
+    if (error) return new Response(JSON.stringify({ ok: false, error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    if (!updated || updated.length === 0) {
+      return new Response(JSON.stringify({ error: "No existing reminder_schedules row for this vehicle/type — nothing to update" }), { status: 404, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ ok: true, truck, reminderType: type, intervalDays: days, row: updated[0] }, null, 2), { headers: { "Content-Type": "application/json" } });
+  }
+
   // ── otp_check action ─────────────────────────────────────────
   if (body.action === "otp_check") {
     const phone = (body.phone as string)?.trim();
