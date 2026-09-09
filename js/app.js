@@ -1601,8 +1601,8 @@ function renderGuides(){
       +'<div class="v2-tile-body">'
         +'<span class="v2-tile-label">Weather alerts</span>'
         +'<span class="v2-tile-value" id="g-wx-value">Checking&hellip;</span>'
-        +'<span class="v2-tile-sub">National Weather Service &middot; api.weather.gov</span>'
-        +'<a class="v2-tile-link" href="https://map.road511.com/" target="_blank" rel="noopener">View on map'+_arrow+'</a>'
+        +'<span class="v2-tile-sub" id="g-wx-sub">Contacting the National Weather Service&hellip;</span>'
+        +'<button class="v2-tile-link" type="button" id="g-wx-link" onclick="openWeatherAlerts()">View alerts'+_arrow+'</button>'
       +'</div></article>'
     +'<article class="v2-tile v2-accent-green">'
       +'<span class="v2-tile-ic">'+_sv(_IC.ok)+'</span>'
@@ -1621,8 +1621,6 @@ function renderGuides(){
       +'</div></article>'
     +'</section>';
 
-  // Populated by guidesLoadWeather(); both stay hidden until the feed returns.
-  html+='<div class="v2-alerts" id="g-alerts" style="display:none"></div>';
 
   // ── Filter bar ────────────────────────────────────────────────────────────
   html+='<div class="v2-filterbar">'
@@ -1688,6 +1686,54 @@ function renderGuides(){
   return html;
 }
 
+// ── Weather alerts popup ────────────────────────────────────────────────────
+// Read-only view of what guidesLoadWeather already fetched: no second request,
+// no state of its own beyond "is it open".
+function openWeatherAlerts(){
+  let ov=document.getElementById('g-wx-modal');
+  if(!ov){
+    ov=document.createElement('div');
+    ov.id='g-wx-modal';
+    ov.className='modal-overlay';
+    ov.style.display='none';
+    // Click the backdrop to dismiss, but not a click inside the panel.
+    ov.addEventListener('click',e=>{ if(e.target===ov) closeWeatherAlerts(); });
+    document.body.appendChild(ov);
+  }
+  const rows=GUIDE_WX.map(g=>
+    '<div class="v2-wx-row'+(g.sev==='Extreme'?' is-extreme':(g.sev==='Severe'?' is-severe':''))+'">'
+      +'<span class="v2-wx-ic" aria-hidden="true">'+guideWxIcon(g.event)+'</span>'
+      +'<span class="v2-wx-ev">'+esc(g.event)+'</span>'
+      +'<span class="v2-wx-n">'+g.n+'</span>'
+      +'<span class="v2-wx-st">'+esc(g.states.join(' '))+'</span>'
+      +'<span class="v2-wx-when">'+esc(guideWxUntil(g.ends))+'</span>'
+    +'</div>').join('');
+  const total=GUIDE_WX.reduce((t,g)=>t+g.n,0);
+  const stAll={}; GUIDE_WX.forEach(g=>g.states.forEach(x=>{stAll[x]=1;}));
+  const nSt=Object.keys(stAll).length;
+  ov.innerHTML='<div class="modal" role="dialog" aria-modal="true" aria-labelledby="g-wx-h">'
+    +'<div class="modal-header"><span id="g-wx-h">Active weather alerts</span>'
+      +'<button class="v2-icon-btn" type="button" onclick="closeWeatherAlerts()" aria-label="Close">'
+      +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>'
+    +'<div class="modal-body">'
+      +(GUIDE_WX.length
+        ? '<div class="v2-wx-sum"><b>'+total+'</b> alert'+(total===1?'':'s')
+            +' across <b>'+nSt+'</b> '+(nSt===1?'state':'states')+'</div>'
+          +'<div class="v2-wx-list">'+rows+'</div>'
+        : '<div class="v2-wx-empty">No active alerts in the lower 48.</div>')
+      +'<div class="v2-wx-foot">Source: National Weather Service &middot; api.weather.gov. '
+      +'Alaska, Hawaii, the territories and marine zones are excluded.</div>'
+    +'</div></div>';
+  ov.style.display='flex';
+  document.addEventListener('keydown',_wxEsc);
+}
+function _wxEsc(e){ if(e.key==='Escape') closeWeatherAlerts(); }
+function closeWeatherAlerts(){
+  const ov=document.getElementById('g-wx-modal');
+  if(ov) ov.style.display='none';
+  document.removeEventListener('keydown',_wxEsc);
+}
+
 // ── Guides filter ───────────────────────────────────────────────────────────
 // Client-side only: hides cards already rendered, touches no data. Uses
 // style.display rather than el.hidden because a section is display:block and
@@ -1749,10 +1795,51 @@ const GUIDE_NWS_EVENTS=['Tornado Warning','Tornado Watch','Blizzard Warning','Ic
   'Blowing Dust Advisory','Freezing Rain Advisory','Winter Weather Advisory','Extreme Cold Warning'];
 const GUIDE_SEV_RANK={Extreme:0,Severe:1,Moderate:2,Minor:3,Unknown:4};
 
+/* The lower 48 plus DC. An ALLOW-list, not a deny-list: a zone code this does
+   not recognise is dropped rather than shown, so a new NWS marine or territory
+   prefix cannot leak in unnoticed. That matters — checked against the live
+   feed while writing this, the only two active alerts nationwide were High
+   Wind Warnings in AKZ820 and AKZ821, so the tile was reporting Alaska weather
+   to a fleet that does not run there.
+
+   Excluded on purpose: AK, HI, PR, VI, GU, AS, MP, and every marine/lake zone
+   (AN, AM, GM, PZ, PK, LE, LO, LM, LH, LS, SL). */
+const GUIDE_CONUS=new Set(['AL','AZ','AR','CA','CO','CT','DE','DC','FL','GA','ID','IL','IN','IA','KS',
+  'KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK',
+  'OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY']);
+
+/* Zone ids arrive two ways and agree with each other: affectedZones holds
+   full URLs ending .../zones/forecast/WYZ278, geocode.UGC holds the bare
+   WYZ278. Read both so a feed change in either one cannot silently empty the
+   state list — an alert with no recognisable CONUS zone is dropped entirely,
+   which is the allow-list being consistent rather than an oversight. */
+function guideStatesOf(p){
+  const out={};
+  (p.affectedZones||[]).forEach(z=>{const m=/\/([A-Z]{2})[ZC]\d+$/.exec(z); if(m&&GUIDE_CONUS.has(m[1])) out[m[1]]=1;});
+  (((p.geocode||{}).UGC)||[]).forEach(u=>{const m=/^([A-Z]{2})[ZC]\d+$/.exec(u); if(m&&GUIDE_CONUS.has(m[1])) out[m[1]]=1;});
+  return Object.keys(out).sort();
+}
+function guideWxIcon(ev){
+  if(/Tornado/i.test(ev)) return '\uD83C\uDF2A\uFE0F';
+  if(/Wind|Dust/i.test(ev)) return '\uD83D\uDCA8';
+  return '\u2744\uFE0F';
+}
+/* "until 4:00 PM" today, "until Thu 4:00 PM" beyond it. */
+function guideWxUntil(iso){
+  if(!iso) return '';
+  const d=new Date(iso); if(isNaN(d)) return '';
+  const t=d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  return 'until '+(d.toDateString()===new Date().toDateString()
+    ? t : d.toLocaleDateString('en-US',{weekday:'short'})+' '+t);
+}
+// Filled by guidesLoadWeather, read by the alerts popup.
+let GUIDE_WX=[];
+
 async function guidesLoadWeather(){
   const val=document.getElementById('g-wx-value');
   const tile=document.getElementById('g-wx-tile');
-  const box=document.getElementById('g-alerts');
+  const sub=document.getElementById('g-wx-sub');
+  const link=document.getElementById('g-wx-link');
   if(!val) return;                       // page changed under us
   try{
     const url='https://api.weather.gov/alerts/active?status=actual&event='
@@ -1767,34 +1854,49 @@ async function guidesLoadWeather(){
     feats.forEach(f=>{
       const pr=f.properties||{}, k=pr.event;
       if(!k) return;
-      if(!by[k]) by[k]={event:k,n:0,sev:'Unknown'};
-      by[k].n++;
-      if((GUIDE_SEV_RANK[pr.severity]??4)<(GUIDE_SEV_RANK[by[k].sev]??4)) by[k].sev=pr.severity||'Unknown';
+      // Mainland only. An alert with no CONUS zone is not counted at all,
+      // rather than counted with an empty state list.
+      const st=guideStatesOf(pr);
+      if(!st.length) return;
+      if(!by[k]) by[k]={event:k,n:0,sev:'Unknown',states:{},ends:null};
+      const g=by[k];
+      g.n++;
+      st.forEach(x=>{g.states[x]=1;});
+      if((GUIDE_SEV_RANK[pr.severity]??4)<(GUIDE_SEV_RANK[g.sev]??4)) g.sev=pr.severity||'Unknown';
+      // Soonest end across the group: when the first of them lifts.
+      if(pr.ends&&(!g.ends||new Date(pr.ends)<new Date(g.ends))) g.ends=pr.ends;
     });
-    const groups=Object.values(by).sort((a,b)=>
-      (GUIDE_SEV_RANK[a.sev]??4)-(GUIDE_SEV_RANK[b.sev]??4)||b.n-a.n);
+    const groups=Object.values(by).map(g=>({...g,states:Object.keys(g.states).sort()}))
+      .sort((a,b)=>(GUIDE_SEV_RANK[a.sev]??4)-(GUIDE_SEV_RANK[b.sev]??4)||b.n-a.n);
+    GUIDE_WX=groups;
 
+    if(sub) sub.textContent='National Weather Service \u00b7 lower 48';
     if(!groups.length){
+      // Honest wording: the feed answered, and there is nothing in the lower 48.
       val.textContent='All clear';
+      if(sub) sub.textContent='No active alerts in the lower 48.';
       if(tile){tile.classList.remove('v2-accent-amber','v2-accent-red');tile.classList.add('v2-accent-green');}
+      if(link) link.textContent='View alerts';
       return;
     }
     const total=groups.reduce((t,g)=>t+g.n,0);
+    const stAll={}; groups.forEach(g=>g.states.forEach(x=>{stAll[x]=1;}));
+    const nSt=Object.keys(stAll).length;
     val.textContent=total+' active alert'+(total===1?'':'s');
+    if(sub) sub.textContent='Severe weather in '+nSt+' '+(nSt===1?'state':'states')+'.';
     if(tile){
       tile.classList.remove('v2-accent-green');
       tile.classList.add(groups[0].sev==='Extreme'||groups[0].sev==='Severe'?'v2-accent-red':'v2-accent-amber');
     }
-    if(box){
-      box.innerHTML=groups.slice(0,4).map(g=>
-        '<div class="v2-alert"><span class="v2-alert-st">'+esc(g.sev)+'</span>'
-        +'<span class="v2-alert-name">'+esc(g.event)+'</span>'
-        +'<span class="v2-alert-n">'+g.n+'</span></div>').join('');
-      box.style.display='';
-    }
+    if(link) link.textContent='View '+total+' alert'+(total===1?'':'s');
   }catch(e){
     // A weather outage must not look like a broken page: say so and move on.
+    // GUIDE_WX is cleared too, so the popup cannot show counts from a previous
+    // load as though they were current.
+    GUIDE_WX=[];
     val.textContent='Unavailable';
+    if(sub) sub.textContent='Could not reach the National Weather Service.';
+    if(link) link.textContent='View alerts';
     if(tile){tile.classList.remove('v2-accent-amber','v2-accent-red');tile.classList.add('v2-accent-blue');}
   }
 }

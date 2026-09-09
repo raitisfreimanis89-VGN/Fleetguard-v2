@@ -265,3 +265,95 @@
   padding-inline: 28px;
   background: var(--v2-bg);
 }
+
+
+/* ── Weather alerts popup, Guides ─────────────────────────────────────────
+   Content for the dialog openWeatherAlerts() builds. The shell is production's
+   own .modal-overlay / .modal, which v2-skin.css already paints with v2
+   tokens, so only the inside needs styling here.
+
+   Every row is one EVENT TYPE, not one alert: "High Wind Warning · 6 · KS NE
+   OK · until Thu 4:00 PM". The count and the state list are the two things
+   that decide whether it matters to a fleet, so they get their own columns
+   rather than being folded into prose. */
+
+.v2-wx-sum {
+  margin-bottom: var(--v2-s4);
+  padding-bottom: var(--v2-s3);
+  border-bottom: 1px solid var(--v2-line);
+  font-size: var(--v2-fs-sm); color: var(--v2-ink-2);
+}
+.v2-wx-sum b { color: var(--v2-ink); font-weight: var(--v2-fw-semibold); font-variant-numeric: tabular-nums; }
+
+.v2-wx-list { display: flex; flex-direction: column; gap: var(--v2-s2); }
+
+/* Icon and count are fixed; the event name takes the slack and the state list
+   wraps under it on a narrow screen rather than squeezing the name. */
+.v2-wx-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  grid-template-areas: 'ic ev n' '.  st st';
+  align-items: center;
+  gap: 2px var(--v2-s3);
+  padding: var(--v2-s3);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-left: 3px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-sm);
+}
+.v2-wx-row.is-severe  { border-left-color: var(--v2-amber); }
+.v2-wx-row.is-extreme { border-left-color: var(--v2-red); }
+
+.v2-wx-ic { grid-area: ic; font-size: 15px; line-height: 1; }
+.v2-wx-ev {
+  grid-area: ev; min-width: 0;
+  font-size: var(--v2-fs-sm); font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+}
+.v2-wx-n {
+  grid-area: n;
+  min-width: 24px; text-align: center;
+  padding: 1px var(--v2-s2);
+  background: var(--v2-surface-3);
+  border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  font-variant-numeric: tabular-nums;
+  color: var(--v2-ink-2);
+}
+/* Two-letter codes, so the eye can scan a run of them. */
+.v2-wx-st {
+  grid-area: st;
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-medium);
+  letter-spacing: .08em;
+  color: var(--v2-ink-2);
+  word-break: break-word;
+}
+.v2-wx-when {
+  grid-column: 1 / -1;
+  font-size: var(--v2-fs-micro); color: var(--v2-ink-3);
+}
+.v2-wx-when:empty { display: none; }
+
+.v2-wx-empty {
+  padding: var(--v2-s6) var(--v2-s4);
+  text-align: center;
+  font-size: var(--v2-fs-sm); color: var(--v2-ink-2);
+}
+
+/* Says what was excluded. A count that silently drops Alaska is a count the
+   reader cannot check. */
+.v2-wx-foot {
+  margin-top: var(--v2-s4);
+  padding-top: var(--v2-s3);
+  border-top: 1px solid var(--v2-line);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-3);
+}
+
+/* The weather tile's action is a <button> now, not an <a>, because it opens a
+   dialog rather than navigating. .v2-tile-link is styled for an anchor, so the
+   button defaults it would otherwise inherit are cleared here. */
+.v2-tile button.v2-tile-link {
+  background: none; border: 0; padding: 0;
+  font: inherit; cursor: pointer; text-align: left;
+}
