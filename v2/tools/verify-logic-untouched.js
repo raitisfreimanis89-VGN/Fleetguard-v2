@@ -76,7 +76,10 @@ const FEATURE_CHANGES = {
         + 'existing branch, the mark-repaired-btn binding and all the nav '
         + 'display gating below it are byte-identical. navigate() needed no '
         + 'change at all: guides is not in its refusal list and #nav-guides '
-        + 'already existed as an anchor.',
+        + 'already existed as an anchor. That same branch now also calls '
+        + 'guidesLoadI80() beside guidesLoadWeather(), which fetches the I-80 '
+        + 'Wyoming corridor. Both are read-only fetches that fill markup '
+        + 'renderGuides already emitted; neither writes anything.',
 };
 
 console.log('  baseline: ' + BASE + ':' + FILE + '\n');

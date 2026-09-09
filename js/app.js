@@ -885,7 +885,7 @@ function render(){
   // Guides was a standalone document opened in a new tab. It renders in-app
   // now; the weather tile fills itself in afterwards, and the filter is
   // re-applied so a category survives leaving the page and coming back.
-  else if(currentPage==='guides'){ c.innerHTML=renderGuides(); guidesFilter(); guidesLoadWeather(); }
+  else if(currentPage==='guides'){ c.innerHTML=renderGuides(); guidesFilter(); guidesLoadWeather(); guidesLoadI80(); }
   // Bound after every render: the button lives in markup rebuilt each time.
   // data-* + addEventListener rather than an inline onclick, so ids never reach
   // a JS string context.
@@ -1622,6 +1622,22 @@ function renderGuides(){
     +'</section>';
 
 
+  // ── I-80 Wyoming ──────────────────────────────────────────────────────────
+  // Sits with the status tiles rather than among the resource cards, and
+  // deliberately carries no data-gsec, so the category filter leaves it alone.
+  html+='<section class="v2-i80" aria-label="I-80 Wyoming corridor">'
+    +'<div class="v2-i80-head">'
+      +'<span class="v2-i80-title">I-80 Wyoming</span>'
+      +'<div class="v2-i80-dirs" role="group" aria-label="Travel direction">'
+        +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ut-ne'?' is-active':'')+'" onclick="i80SetDir(\'ut-ne\')">UT &rarr; NE</button>'
+        +'<button type="button" class="v2-i80-dir'+(guideI80Dir==='ne-ut'?' is-active':'')+'" onclick="i80SetDir(\'ne-ut\')">NE &rarr; UT</button>'
+      +'</div></div>'
+    +'<div class="v2-i80-segs" id="g-i80"><div class="v2-i80-note">Checking the corridor&hellip;</div></div>'
+    +'<div class="v2-i80-foot">Wind, snow and ice from the National Weather Service, by county along the route. '
+      +'<b>Closures are not included</b> \u2014 WYDOT does not publish a feed this page can read. '
+      +'<a href="https://www.wyoroad.info" target="_blank" rel="noopener">Check WYDOT for closures</a>.</div>'
+  +'</section>';
+
   // ── Filter bar ────────────────────────────────────────────────────────────
   html+='<div class="v2-filterbar">'
     +'<div class="v2-disp-search">'+_sv(_IC.search)
@@ -1684,6 +1700,102 @@ function renderGuides(){
     +'Nothing matches that. Try a different word, or pick another category.</div>';
   html+='</div>';
   return html;
+}
+
+// ── I-80 Wyoming corridor ───────────────────────────────────────────────────
+// The five counties I-80 crosses in Wyoming, in geographic order from the Utah
+// line to the Nebraska line. Ordering is the whole point: a driver wants to
+// read what is ahead of them in sequence, so the list is reversed for the
+// eastbound-to-westbound run rather than re-sorted by anything else.
+//
+// WHY COUNTY ZONES, AND WHY FIVE REQUESTS.
+// An alert returned by a county-zone query does NOT carry that county in its
+// own geocode.UGC -- a Red Flag Warning for Carbon County comes back listing
+// fire-weather zones WYZ419-427 and no WYC code at all. So an alert cannot be
+// mapped back to a segment from its payload, and one combined ?zone=A,B,C
+// query would return a flat list with no way to attribute it. Each segment is
+// therefore asked separately and attributed by which request answered. Five
+// small parallel requests, no guessing.
+//
+// WHAT THIS IS NOT: road closures. WYDOT is the only source for those and it
+// is not reachable from a browser -- www.wyoroad.info sends no CORS header and
+// the api/511 subdomains do not resolve, while road511's /events returns 401.
+// Closures need a keyed feed proxied through an Edge Function; until then the
+// panel links out rather than pretending to know.
+const GUIDE_I80=[
+  {zone:'WYC041', county:'Uinta',      towns:'Evanston \u2192 Fort Bridger'},
+  {zone:'WYC037', county:'Sweetwater', towns:'Green River \u2192 Wamsutter'},
+  {zone:'WYC007', county:'Carbon',     towns:'Rawlins \u2192 Elk Mountain'},
+  {zone:'WYC001', county:'Albany',     towns:'Laramie \u2192 Summit'},
+  {zone:'WYC021', county:'Laramie',    towns:'Cheyenne \u2192 Pine Bluffs'},
+];
+let GUIDE_I80_DATA=null;          // null = not loaded yet, [] = loaded and clear
+let guideI80Dir='ut-ne';          // 'ut-ne' = westbound origin, reading west to east
+
+// Bucket an event name into the three things that actually change how a truck
+// drives. "Black ice" is deliberately absent: the NWS issues no such product,
+// and the honest nearest signals are freezing fog, freezing rain and ice storm.
+function guideI80Kind(ev){
+  if(/Wind/i.test(ev)) return 'wind';
+  if(/Snow|Blizzard|Winter Storm|Winter Weather/i.test(ev)) return 'snow';
+  if(/Ice|Freezing|Frost|Freeze/i.test(ev)) return 'ice';
+  return 'other';
+}
+async function guidesLoadI80(){
+  if(!document.getElementById('g-i80')) return;
+  GUIDE_I80_DATA=null;
+  try{
+    const res=await Promise.all(GUIDE_I80.map(async seg=>{
+      const r=await fetch('https://api.weather.gov/alerts/active?zone='+seg.zone,
+        {headers:{'Accept':'application/geo+json'}});
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json();
+      const seen={};
+      (j.features||[]).forEach(f=>{
+        const p=f.properties||{};
+        if(!p.event) return;
+        // One entry per event type per segment: three Red Flag Warnings across
+        // one county is one thing to know about, not three.
+        if(!seen[p.event]) seen[p.event]={event:p.event,sev:p.severity||'Unknown',ends:p.ends||p.expires||null};
+        else if((GUIDE_SEV_RANK[p.severity]??4)<(GUIDE_SEV_RANK[seen[p.event].sev]??4)) seen[p.event].sev=p.severity;
+      });
+      const alerts=Object.values(seen).sort((a,b)=>
+        (GUIDE_SEV_RANK[a.sev]??4)-(GUIDE_SEV_RANK[b.sev]??4));
+      return {...seg, alerts};
+    }));
+    GUIDE_I80_DATA=res;
+  }catch(e){
+    GUIDE_I80_DATA='error';
+  }
+  renderI80();
+}
+function i80SetDir(dir){ guideI80Dir=dir==='ne-ut'?'ne-ut':'ut-ne'; renderI80(); }
+function renderI80(){
+  const box=document.getElementById('g-i80'); if(!box) return;
+  if(GUIDE_I80_DATA===null){ box.innerHTML='<div class="v2-i80-note">Checking the corridor&hellip;</div>'; return; }
+  if(GUIDE_I80_DATA==='error'){
+    box.innerHTML='<div class="v2-i80-note">Could not reach the National Weather Service. '
+      +'<a href="https://www.wyoroad.info" target="_blank" rel="noopener">Open WYDOT</a></div>';
+    return;
+  }
+  const segs=guideI80Dir==='ne-ut'? [...GUIDE_I80_DATA].reverse() : GUIDE_I80_DATA;
+  box.innerHTML=segs.map(sg=>{
+    // Only wind, snow and ice colour the segment. A Red Flag Warning is a
+    // FIRE product and comes back Severe, so letting every alert drive the
+    // colour painted the entire corridor red for something that does not
+    // change how a truck drives. Other alerts still show as neutral chips --
+    // visible, but not shouting.
+    const driving=sg.alerts.filter(a=>guideI80Kind(a.event)!=='other');
+    const worst=driving[0];
+    const cls=!driving.length?'is-clear'
+      :(worst.sev==='Extreme'||worst.sev==='Severe')?'is-alert':'is-watch';
+    const chips=(driving.length?'':'<span class="v2-i80-chip is-clear">No wind, snow or ice</span>')
+      +sg.alerts.map(a=>'<span class="v2-i80-chip is-'+guideI80Kind(a.event)+'">'+esc(a.event)+'</span>').join('');
+    return '<div class="v2-i80-seg '+cls+'">'
+      +'<div class="v2-i80-where"><span class="v2-i80-towns">'+esc(sg.towns)+'</span>'
+        +'<span class="v2-i80-county">'+esc(sg.county)+' County</span></div>'
+      +'<div class="v2-i80-chips">'+chips+'</div></div>';
+  }).join('');
 }
 
 // ── Weather alerts popup ────────────────────────────────────────────────────

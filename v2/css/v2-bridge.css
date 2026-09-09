@@ -357,3 +357,111 @@
   background: none; border: 0; padding: 0;
   font: inherit; cursor: pointer; text-align: left;
 }
+
+
+/* ── I-80 Wyoming corridor, Guides ────────────────────────────────────────
+   Five segments in geographic order, Utah line to Nebraska line, reversed by
+   the direction toggle. The order is the information: a driver reads what is
+   ahead of them, in sequence.
+
+   The left edge carries the state, so a run of segments can be scanned
+   vertically without reading a word: line = clear, amber = watch-level,
+   red = warning-level. */
+
+.v2-i80 {
+  margin-bottom: var(--v2-s5);
+  padding: var(--v2-s5);
+  background: var(--v2-surface);
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+  box-shadow: var(--v2-shadow-sm);
+}
+.v2-i80-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--v2-s4); margin-bottom: var(--v2-s4); flex-wrap: wrap;
+}
+.v2-i80-title {
+  font-size: var(--v2-fs-md); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug); color: var(--v2-ink);
+}
+
+.v2-i80-dirs { display: flex; gap: 2px; padding: 2px; background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line); border-radius: var(--v2-r-sm); }
+.v2-i80-dir {
+  padding: var(--v2-s2) var(--v2-s3);
+  background: none; border: 0; border-radius: calc(var(--v2-r-sm) - 2px);
+  font: inherit; font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-micro);
+  color: var(--v2-ink-3); cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-i80-dir:hover { color: var(--v2-ink); }
+.v2-i80-dir.is-active { background: var(--v2-surface-3); color: var(--v2-ink); }
+.v2-i80-dir:focus-visible { outline: 2px solid var(--v2-cyan); outline-offset: 1px; }
+
+.v2-i80-segs { display: flex; flex-direction: column; gap: var(--v2-s2); }
+
+.v2-i80-seg {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--v2-s4); flex-wrap: wrap;
+  padding: var(--v2-s3) var(--v2-s4);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line);
+  border-left: 3px solid var(--v2-line-strong);
+  border-radius: var(--v2-r-sm);
+}
+.v2-i80-seg.is-clear { border-left-color: var(--v2-green); }
+.v2-i80-seg.is-watch { border-left-color: var(--v2-amber); }
+.v2-i80-seg.is-alert { border-left-color: var(--v2-red); }
+
+.v2-i80-where { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.v2-i80-towns {
+  font-size: var(--v2-fs-sm); font-weight: var(--v2-fw-semibold);
+  color: var(--v2-ink);
+}
+.v2-i80-county {
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  letter-spacing: var(--v2-track-micro); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+
+.v2-i80-chips { display: flex; gap: var(--v2-s2); flex-wrap: wrap; justify-content: flex-end; }
+.v2-i80-chip {
+  padding: 2px var(--v2-s3);
+  border-radius: var(--v2-r-pill);
+  border: 1px solid var(--tc-ring);
+  background: var(--tc-soft);
+  color: var(--tc-hi);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  font-weight: var(--v2-fw-semibold);
+  white-space: nowrap;
+}
+/* The three things that change how a truck drives, plus a neutral for the
+   rest. Set --tc locally so a chip cannot inherit an accent from an ancestor. */
+.v2-i80-chip.is-wind  { --tc-hi: var(--v2-amber-hi); --tc-soft: var(--v2-amber-soft); --tc-ring: var(--v2-amber-ring); }
+.v2-i80-chip.is-snow  { --tc-hi: var(--v2-cyan-hi);  --tc-soft: var(--v2-cyan-soft);  --tc-ring: var(--v2-cyan-ring);  }
+.v2-i80-chip.is-ice   { --tc-hi: var(--v2-blue-hi);  --tc-soft: var(--v2-blue-soft);  --tc-ring: var(--v2-blue-ring);  }
+.v2-i80-chip.is-other { --tc-hi: var(--v2-ink-2);    --tc-soft: var(--v2-surface-3);  --tc-ring: var(--v2-line-strong); }
+.v2-i80-chip.is-clear { --tc-hi: var(--v2-green-hi); --tc-soft: var(--v2-green-soft); --tc-ring: var(--v2-green-ring); }
+
+.v2-i80-note {
+  padding: var(--v2-s4);
+  font-size: var(--v2-fs-sm); color: var(--v2-ink-2);
+}
+.v2-i80-note a, .v2-i80-foot a { color: var(--v2-cyan-hi); text-decoration: underline; }
+
+/* Says plainly what is missing. A corridor panel that stayed silent about
+   closures would read as though the road were open. */
+.v2-i80-foot {
+  margin-top: var(--v2-s4);
+  padding-top: var(--v2-s3);
+  border-top: 1px solid var(--v2-line);
+  font-size: var(--v2-fs-micro); line-height: var(--v2-lh-micro);
+  color: var(--v2-ink-3);
+}
+.v2-i80-foot b { color: var(--v2-ink-2); font-weight: var(--v2-fw-semibold); }
+
+@media (max-width: 620px) {
+  .v2-i80-seg { align-items: flex-start; flex-direction: column; gap: var(--v2-s2); }
+  .v2-i80-chips { justify-content: flex-start; }
+}
