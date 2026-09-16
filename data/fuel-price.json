@@ -1,8 +1,8 @@
 {
-  "price": 6.167,
-  "national": 5.967,
+  "price": 6.485,
+  "national": 6.285,
   "margin": 0.2,
-  "period": "2026-09-07",
+  "period": "2026-09-14",
   "source": "EIA weekly U.S. on-highway diesel retail average (eia.gov/petroleum/gasdiesel)",
-  "fetchedAt": "2026-09-10T00:31:34Z"
+  "fetchedAt": "2026-09-16T00:44:29Z"
 }
