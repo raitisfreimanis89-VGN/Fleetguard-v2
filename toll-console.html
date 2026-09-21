@@ -189,7 +189,7 @@
     </div>
 
     <div class="fuelrow">
-      <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="5.80"> $/gal</span>
+      <span class="mini">Fuel <input id="fuel" type="number" step="0.05" min="1" value="7.00"> $/gal</span>
       <span class="mini">MPG <input id="mpg" type="number" step="0.1" min="1" value="6.5"></span>
       <span class="mini">Trip miles <input id="miles" type="number" step="1" min="1" placeholder="auto"></span>
       <span class="mini" id="fuel-src" style="color:var(--ink3)">Got the miles off the rate con? Type them in and every cost below becomes exact.</span>
@@ -425,10 +425,22 @@
         E.setFuel(fp.price, parseFloat($('mpg').value));
         var wk = fp.period ? new Date(fp.period + 'T00:00:00')
               .toLocaleDateString('en-US',{month:'short', day:'numeric'}) : '';
-        $('fuel-src').innerHTML = '&#x26FD; EIA national average <b>$' + Number(fp.national).toFixed(3)
-          + '</b> + $' + Number(fp.margin).toFixed(2) + ' margin'
-          + (wk ? ' &middot; week of ' + wk : '')
-          + '. Override it above for a specific lane.';
+        // A price the office set by hand is labelled as such. Presenting it
+        // as "EIA average + margin" would state an arithmetic that does not
+        // add up to the number in the box.
+        if (fp.manual) {
+          var since = fp.manualSince ? new Date(fp.manualSince + 'T00:00:00')
+                .toLocaleDateString('en-US',{month:'short', day:'numeric'}) : '';
+          $('fuel-src').innerHTML = '&#x26FD; Set by the office'
+            + (since ? ' on ' + since : '')
+            + '. EIA national average ' + (wk ? 'for the week of ' + wk + ' ' : '')
+            + 'is <b>$' + Number(fp.national).toFixed(3) + '</b>. Override it above for a specific lane.';
+        } else {
+          $('fuel-src').innerHTML = '&#x26FD; EIA national average <b>$' + Number(fp.national).toFixed(3)
+            + '</b> + $' + Number(fp.margin).toFixed(2) + ' margin'
+            + (wk ? ' &middot; week of ' + wk : '')
+            + '. Override it above for a specific lane.';
+        }
         if ($('out').innerHTML) run();      // re-cost anything already showing
       })
       .catch(function(){

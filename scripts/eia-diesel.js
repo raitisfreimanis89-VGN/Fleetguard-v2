@@ -84,11 +84,31 @@ if (fs.existsSync(OUT)) {
   } catch (e) { /* unreadable previous file — fall through and rewrite it */ }
 }
 
-fs.mkdirSync('data', { recursive: true });
-fs.writeFileSync(OUT, JSON.stringify({
-  price, national, margin: MARGIN, period,
-  source: 'EIA weekly U.S. on-highway diesel retail average (eia.gov/petroleum/gasdiesel)',
-  fetchedAt: new Date().toISOString().replace(/\.\d+Z$/, 'Z')
-}, null, 2) + '\n');
+/* Office override. When the current file carries "manual": true, somebody
+   set the price by hand and it stands until they clear it -- this job must
+   not quietly replace it with national + margin the next Monday, which is
+   exactly what it would do otherwise, and since deploys now follow every
+   commit it would go live the same night. The EIA figures are still
+   refreshed alongside, so the console can show the national average next to
+   the office price; only "price" -- the figure every load is costed at -- is
+   held. To go back to the EIA feed, delete "manual" and "manualSince" and set
+   "price" to national + margin. */
+let held = null;
+try {
+  const prev = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+  if (prev.manual === true && prev.price > 0) held = prev;
+} catch (e) { /* no readable previous file: nothing to hold */ }
 
-console.log(`national=${national} + ${MARGIN} => ${price}  (week of ${period})`);
+fs.mkdirSync('data', { recursive: true });
+fs.writeFileSync(OUT, JSON.stringify(Object.assign(
+  { price: held ? held.price : price, national, margin: MARGIN, period },
+  held ? { manual: true, manualSince: held.manualSince || null } : {},
+  {
+    source: 'EIA weekly U.S. on-highway diesel retail average (eia.gov/petroleum/gasdiesel)',
+    fetchedAt: new Date().toISOString().replace(/\.\d+Z$/, 'Z')
+  }
+), null, 2) + '\n');
+
+console.log(held
+  ? `national=${national} (week of ${period}); office price ${held.price} held`
+  : `national=${national} + ${MARGIN} => ${price}  (week of ${period})`);

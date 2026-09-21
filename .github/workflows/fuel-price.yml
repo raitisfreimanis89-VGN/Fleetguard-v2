@@ -56,7 +56,9 @@ jobs:
           git add data/fuel-price.json
           git commit -m "Diesel price: $(node -e '
             const d=require("./data/fuel-price.json");
-            process.stdout.write(`${d.national} + ${d.margin} = ${d.price} (week of ${d.period})`);
+            process.stdout.write(d.manual
+              ? `EIA ${d.national} (week of ${d.period}); office price ${d.price} held`
+              : `${d.national} + ${d.margin} = ${d.price} (week of ${d.period})`);
           ')"
           git push
 
