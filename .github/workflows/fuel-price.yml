@@ -21,6 +21,7 @@ on:
 
 permissions:
   contents: write
+  actions: write            # to dispatch deploy.yml after committing a new price
 
 jobs:
   update:
@@ -41,7 +42,9 @@ jobs:
       - name: Parse and write data/fuel-price.json
         run: node scripts/eia-diesel.js /tmp/gasdiesel.html 0.20
 
-      - name: Commit if the price moved
+      - name: Commit if the price moved, then publish it
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if git diff --quiet -- data/fuel-price.json; then
@@ -56,3 +59,13 @@ jobs:
             process.stdout.write(`${d.national} + ${d.margin} = ${d.price} (week of ${d.period})`);
           ')"
           git push
+
+          # The push above does NOT start deploy.yml: a push made with
+          # GITHUB_TOKEN never triggers another workflow. Until this line
+          # existed the price sat in the repo unpublished and only went live
+          # when someone else happened to push -- in Sep 2026 that stranded
+          # two weekly updates for 12 days while the toll console showed the
+          # 31 Aug price. workflow_dispatch is the one event GITHUB_TOKEN may
+          # start. Only reached when the price actually moved.
+          gh workflow run deploy.yml --ref main
+          echo "Dispatched deploy.yml to publish the new price."

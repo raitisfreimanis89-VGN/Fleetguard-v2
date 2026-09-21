@@ -3,6 +3,12 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [ main, master ]
+  # The diesel-price job commits with GITHUB_TOKEN, and GitHub never lets a
+  # GITHUB_TOKEN push start another workflow -- so that commit alone does not
+  # deploy. workflow_dispatch is the one event GITHUB_TOKEN may trigger, so
+  # fuel-price.yml dispatches this workflow after it pushes. Also gives the
+  # Actions tab a manual "Run workflow" button.
+  workflow_dispatch:
 
 permissions:
   contents: read
