@@ -264,6 +264,13 @@ textarea{resize:vertical;min-height:64px}
 
   <div id="scroll">
 
+    <!-- Shown on every screen while a saved report has not reached the office.
+         style.display, not [hidden]: .note sets display:flex, which would
+         override the UA's [hidden] rule. -->
+    <div id="pending-note" class="note" style="display:none;margin-bottom:14px;border-color:rgba(245,158,11,.4);background:var(--warning-bg);color:var(--warning)">
+      <span class="i">📥</span><span id="pending-text"></span>
+    </div>
+
     <!-- ════════ 0 · OTP LOGIN ════════ -->
     <section class="screen" id="sc-otp">
       <div class="eyebrow">Secure sign-in</div>
@@ -474,7 +481,21 @@ function loadDraft(){
 const API_BASE='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
 let driverToken=null;
 try{ driverToken=sessionStorage.getItem('fg_driver_token')||null; }catch(e){}
-function setToken(t){ driverToken=t; try{ t?sessionStorage.setItem('fg_driver_token',t):sessionStorage.removeItem('fg_driver_token'); }catch(e){} }
+function setToken(t){ driverToken=t; try{ t?sessionStorage.setItem('fg_driver_token',t):sessionStorage.removeItem('fg_driver_token'); }catch(e){} renderPending(); }
+/* A driver sign-in is a JWT {sub: driverId, role, exp}, valid 12 hours. It is
+   decoded here only to decide which saved report may go out with which
+   sign-in; the server still verifies every token itself. */
+function tokenClaims(t){
+  try{
+    let p=String(t).split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    p+='='.repeat((4-p.length%4)%4);
+    const bin=atob(p), bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }catch(e){ return null; }
+}
+// Live = not expired, with a minute's margin so a token does not die mid-upload.
+function tokenLive(t){ const c=t?tokenClaims(t):null; return !!(c&&c.exp&&c.exp*1000>Date.now()+60000); }
 function toE164(s){ const d=digits(s); if(d.length===10) return '+1'+d; if(d.length===11&&d[0]==='1') return '+'+d; return d?('+'+d):''; }
 function uuid(){ try{ return crypto.randomUUID(); }catch(e){ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);}); } }
 
@@ -595,6 +616,9 @@ async function checkOtpComplete(boxes){
   if(res.ok && res.token){
     authed=true; setToken(res.token); clearInterval(rtTimer);
     toast('Signed in ✓','success');
+    // A report saved under an earlier, now-expired sign-in can go out with this
+    // one if it is the same driver -- see tokenFor().
+    queueFlush();
     const vParam=new URLSearchParams(location.search).get('v');
     const v0=res.vehicles&&res.vehicles[0];
     if(!state.truck) state.truck = vParam || (v0&&v0.truckNumber) || '';
@@ -947,11 +971,15 @@ async function submitInspection(){
     }
   }
 }
+// Which report the done screen is showing, so it can flip to "submitted" if
+// that report finishes uploading while the screen is still open.
+let doneShownId=null, doneQueued=false;
 function finishDone({queued,ref}){
   localStorage.removeItem(DRAFT_KEY);
+  doneShownId=state.inspectionId; doneQueued=!!queued;
   const badge=$('done-badge'); const tt=tyreTally(), fc=failedChecks();
-  if(queued){ badge.className='done-badge queued'; badge.textContent='📥'; $('done-title').textContent='Queued for upload';
-    $('done-sub').textContent='You’re offline. This will sync automatically when you’re back on signal.'; }
+  if(queued){ badge.className='done-badge queued'; badge.textContent='📥'; $('done-title').textContent='Saved — not sent yet';
+    $('done-sub').textContent='It didn’t reach the office: no connection. Keep this page open and it sends by itself when you have signal, or open this link again later.'; }
   else{ badge.className='done-badge'; badge.textContent='✅'; $('done-title').textContent='Inspection submitted';
     $('done-sub').textContent='Your pre-trip is on file. Dispatch can see it now.'; }
   $('done-ref').textContent=ref;
@@ -961,28 +989,96 @@ function finishDone({queued,ref}){
     +row('Tyres flagged',(tt.fail+tt.lowP)||'0')
     +row('Checks failed',fc.length||'0')
     +row('Photos',photoCount())
-    +row('Confirmation','📩 Text on its way');
+    +row('Confirmation','<span id="done-confirm">'+(queued?'⏳ Texted once it sends':'📩 Text on its way')+'</span>');
   show(5);
-  toast(queued?'Saved offline — will sync':'Submitted ✓', queued?'warning':'success');
+  toast(queued?'Saved on this phone — not sent yet':'Submitted ✓', queued?'warning':'success');
 }
 
-/* ── offline queue (simulated sync) ── */
-function queuePush(payload,token){ try{ const q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); q.push({payload,token,at:Date.now()}); localStorage.setItem(QUEUE_KEY,JSON.stringify(q)); }catch(e){} }
+/* ── offline queue ───────────────────────────────────────────────────────────
+   A report that could not be sent is kept on this phone and retried. Three
+   things used to keep it there for good:
+
+   1. It was retried only when the page loaded or the browser fired "online".
+      A phone with bars but no working data never goes offline as far as the
+      browser knows, so "online" never fired and nothing retried while the
+      page stayed open. It now also retries every 30 s while the page is in
+      front, when the page comes back to the front, and when Safari restores
+      it from its back/forward cache (pageshow), which does not re-run boot().
+   2. Each saved report carries the sign-in it was made with, and a driver
+      sign-in lasts 12 hours. After that every retry got 401 and the report
+      could never send -- "still pending" forever. Now, once the saved
+      sign-in has expired, the report goes with the driver's CURRENT sign-in,
+      but only if it is the same driver (same JWT sub), so a report is never
+      filed under somebody else's name on a shared phone. With nobody signed
+      in the notice asks for sign-in, and checkOtpComplete() retries.
+   3. The done screen promised "This will sync automatically" and "Text on its
+      way". Neither was true. It now says what happens, and flips to
+      "submitted" if the upload lands while it is open.
+
+   Seen 21 Sep 2026: FG-INSP-BFD782, truck 27015. The phone showed "Online",
+   the upload never reached the server, and the report was still queued when
+   its 12-hour sign-in ran out. */
+function queueRead(){ try{ return JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }catch(e){ return []; } }
+function queueWrite(q){ try{ q.length?localStorage.setItem(QUEUE_KEY,JSON.stringify(q)):localStorage.removeItem(QUEUE_KEY); }catch(e){} renderPending(); }
+function queuePush(payload,token){ const q=queueRead(); q.push({payload,token,at:Date.now()}); queueWrite(q); }
+
+// The sign-in this saved report may be sent with right now, or null.
+function tokenFor(item){
+  if(tokenLive(item.token)) return item.token;
+  const mine=tokenClaims(item.token), cur=tokenLive(driverToken)?tokenClaims(driverToken):null;
+  if(mine&&mine.sub&&cur&&cur.sub===mine.sub) return driverToken;
+  return null;
+}
+function renderPending(){
+  const el=$('pending-note'); if(!el) return;
+  const q=queueRead();
+  if(!q.length){ el.style.display='none'; return; }
+  const n=q.length, many=n>1;
+  const blocked=q.filter(it=>!tokenFor(it)).length;
+  const signedIn=tokenLive(driverToken);
+  let msg;
+  if(!blocked) msg=n+' pre-trip'+(many?'s':'')+' saved on this phone, not sent yet. '+(many?'They keep':'It keeps')+' trying while this page is open.';
+  else if(!signedIn) msg=n+' pre-trip'+(many?'s':'')+' saved on this phone '+(many?'have':'has')+' not reached the office. Sign in and '+(many?'they':'it')+' will send.';
+  else msg=blocked+' pre-trip'+(blocked>1?'s':'')+' saved on this phone '+(blocked>1?'belong':'belongs')+' to another driver, and will send when that driver signs in here.';
+  $('pending-text').textContent=msg; el.style.display='flex';
+}
+// If the report on the done screen just landed, say so there.
+function onQueuedSent(id,ref){
+  if(step!==5||!doneQueued||id!==doneShownId) return;
+  doneQueued=false;
+  const b=$('done-badge'); b.className='done-badge'; b.textContent='✅';
+  $('done-title').textContent='Inspection submitted';
+  $('done-sub').textContent='Your pre-trip is on file. Dispatch can see it now.';
+  if(ref) $('done-ref').textContent=ref;
+  const c=$('done-confirm'); if(c) c.textContent='📩 Text on its way';
+}
 let _flushing=false;
-async function queueFlush(){
+async function queueFlush(quiet){
   if(_flushing) return;
-  let q=[]; try{ q=JSON.parse(localStorage.getItem(QUEUE_KEY)||'[]'); }catch(e){}
-  if(!q.length)return;
+  const q=queueRead();
+  if(!q.length||navigator.onLine===false){ renderPending(); return; }
   _flushing=true;
-  toast('Back online — syncing '+q.length+' report'+(q.length>1?'s':'')+'…','info');
-  const remaining=[];
-  for(const item of q){
-    try{ await Api.submit(item.payload,item.token); }   // idempotent: server upserts by inspectionId
-    catch(e){ remaining.push(item); }
-  }
-  if(remaining.length){ localStorage.setItem(QUEUE_KEY,JSON.stringify(remaining)); toast(remaining.length+' still pending — will retry','warning'); }
-  else{ localStorage.removeItem(QUEUE_KEY); toast('All reports synced ✓','success'); }
-  _flushing=false;
+  try{
+    const ready=q.filter(it=>tokenFor(it)).length;
+    if(ready&&!quiet) toast('Sending '+ready+' saved report'+(ready>1?'s':'')+'…','info');
+    const remaining=[]; let sent=0;
+    for(const item of q){
+      const tok=tokenFor(item);
+      if(!tok){ remaining.push(item); continue; }        // needs sign-in, or another driver's
+      try{
+        const res=await Api.submit(item.payload,tok);    // idempotent: server returns the existing ref
+        sent++; onQueuedSent(item.payload&&item.payload.inspectionId,res&&res.ref);
+      }catch(e){
+        // Keep a fresh same-driver sign-in on the item, so it can still send
+        // after this tab closes and sessionStorage goes with it.
+        if(tok!==item.token&&!(e&&e.httpStatus===401)) item.token=tok;
+        remaining.push(item);
+      }
+    }
+    queueWrite(remaining);
+    if(sent) toast(sent+' saved report'+(sent>1?'s':'')+' sent ✓','success');
+    else if(ready&&!quiet) toast('Still no connection — will keep trying','warning');
+  }finally{ _flushing=false; }
 }
 
 /* ── connection toggle (demo) + real events ── */
@@ -995,6 +1091,14 @@ function setConn(isOnline){
 function toggleConn(){ const next=!online; setConn(next); toast(next?'Simulated: back online':'Simulated: offline (drafts queue locally)','info'); }
 window.addEventListener('online',()=>setConn(true));
 window.addEventListener('offline',()=>setConn(false));
+// Keep trying while the page is up: a timer while it is in front, and again
+// the moment it comes back to the front. pageshow covers Safari restoring the
+// page from its back/forward cache, which skips boot() entirely. All quiet --
+// the standing notice already says a report is waiting; a toast here would
+// fire every time the driver switches apps.
+setInterval(()=>{ if(document.visibilityState==='visible') queueFlush(true); },30000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') queueFlush(true); });
+window.addEventListener('pageshow',e=>{ if(e.persisted) queueFlush(true); });
 
 /* ════════════════════════════════════════════════════════════════
    IMAGE COMPRESS (canvas) — keeps photos small for slow networks
@@ -1021,6 +1125,7 @@ function restart(){ localStorage.removeItem(DRAFT_KEY); setToken(null); state=bl
 
 function boot(){
   setupOtpBoxes();
+  renderPending();
   setConn(navigator.onLine!==false);
   const hadDraft=loadDraft();
   // prefill truck from ?v=
