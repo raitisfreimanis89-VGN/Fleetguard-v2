@@ -33,6 +33,8 @@ async function initAuth() {
 
 async function setUserFromSession(session) {
   currentUser = session.user;
+  // Leads-only viewer (Ray): the dispatcher app isn't for them — send to the leads page.
+  if (currentUser && currentUser.email === 'reinox12@gmail.com') { window.location.replace('leads.html'); return; }
   try {
     const { data } = await sb.from('profiles').select('role, banned_at').eq('id', currentUser.id).single();
     if (data?.banned_at) { await sb.auth.signOut(); showLoginScreen(); return; }
@@ -903,6 +905,8 @@ function render(){
   if(vehiclesNav) vehiclesNav.style.display=isAdmin()?'flex':'none';
   const driversNav=document.getElementById('nav-drivers');
   if(driversNav) driversNav.style.display=isAdmin()?'flex':'none';
+  const leadsNav=document.getElementById('nav-leads');
+  if(leadsNav) leadsNav.style.display=isAdmin()?'flex':'none';   // Driver Leads: admin only (Ray uses leads.html)
   saveNavState();
 }
 
