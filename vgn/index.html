@@ -652,5 +652,67 @@ summary:focus-visible,a:focus-visible{outline:3px solid #ff7a18;outline-offset:3
 <a href="tel:7082328523" style="background:#ff5a00;color:#08111f;">CALL RAY</a>
 <a href="tel:5156030686" style="background:#ffffff;color:#08111f;">CALL CARL</a>
 </nav>
+<!-- APPLY CALLBACK MODAL (added) -->
+<style>@media(max-width:520px){#applyForm .apply-grid{grid-template-columns:1fr !important;}}</style>
+<div id="applyModal" role="dialog" aria-modal="true" aria-labelledby="applyTitle" style="display:none; position:fixed; inset:0; z-index:1000; background:rgba(3,8,16,.74); align-items:flex-start; justify-content:center; overflow:auto; padding:24px 16px;">
+<div style="background:#0e1a29; border:1px solid #26354a; border-radius:18px; width:100%; max-width:540px; margin:auto; box-shadow:0 30px 80px rgba(0,0,0,.55); overflow:hidden;">
+<div style="display:flex; align-items:center; justify-content:space-between; padding:20px 24px; border-bottom:1px solid #1c2a3d;">
+<div><div style="color:#ff7a18; font-weight:700; font-size:12px; letter-spacing:.12em; text-transform:uppercase;">Ready to roll?</div>
+<h3 id="applyTitle" style="margin:4px 0 0; font-family:Montserrat,sans-serif; font-weight:800; font-size:22px; color:#fff;">Request a callback</h3></div>
+<button type="button" onclick="closeApply()" aria-label="Close" style="background:none; border:none; color:#8ea0b6; font-size:28px; line-height:1; cursor:pointer; padding:0 4px;">&times;</button>
+</div>
+<div id="applyBody" style="padding:22px 24px;">
+<p style="margin:0 0 18px; color:#aeb9c8; font-size:15px;">Leave your number and Ray or Carl will call you back &mdash; takes 20 seconds.</p>
+<form id="applyForm" novalidate>
+<div aria-hidden="true" style="position:absolute; left:-9999px; top:-9999px;"><label>Company<input name="company" tabindex="-1" autocomplete="off"></label></div>
+<div class="apply-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+<label style="display:block;"><span style="display:block; font-weight:700; font-size:13px; color:#dbe3ee; margin-bottom:6px;">Full name</span>
+<input name="full_name" required autocomplete="name" style="width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #33455c; background:#0a1422; color:#fff; font-size:15px;"></label>
+<label style="display:block;"><span style="display:block; font-weight:700; font-size:13px; color:#dbe3ee; margin-bottom:6px;">Phone number</span>
+<input name="phone" type="tel" required autocomplete="tel" placeholder="(555) 555-5555" style="width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #33455c; background:#0a1422; color:#fff; font-size:15px;"></label>
+<label style="display:block;"><span style="display:block; font-weight:700; font-size:13px; color:#dbe3ee; margin-bottom:6px;">CDL-A experience</span>
+<select name="cdl_experience" style="width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #33455c; background:#0a1422; color:#fff; font-size:15px;"><option value="">Choose one</option><option>Less than 1 year</option><option>1&ndash;2 years</option><option>2+ years</option><option>5+ years</option></select></label>
+<label style="display:block;"><span style="display:block; font-weight:700; font-size:13px; color:#dbe3ee; margin-bottom:6px;">SAP (Substance Abuse Program)</span>
+<select name="sap" style="width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #33455c; background:#0a1422; color:#fff; font-size:15px;"><option value="">Choose one</option><option>No SAP history</option><option>Have SAP history</option></select></label>
+</div>
+<label style="display:block; margin-top:14px;"><span style="display:block; font-weight:700; font-size:13px; color:#dbe3ee; margin-bottom:6px;">Best time to call <span style="color:#7c8ba0; font-weight:400;">(optional)</span></span>
+<input name="best_time" placeholder="e.g. weekdays after 5pm" style="width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid #33455c; background:#0a1422; color:#fff; font-size:15px;"></label>
+<label style="display:flex; gap:10px; align-items:flex-start; margin-top:16px; color:#aeb9c8; font-size:13px; cursor:pointer;">
+<input type="checkbox" name="consent" required style="margin-top:3px; width:16px; height:16px; accent-color:#ff5a00;">
+<span>I agree that VGN Trucking may call or text me at this number about driving opportunities.</span></label>
+<div id="applyError" style="display:none; margin-top:14px; color:#ffb4ab; font-size:14px;"></div>
+<button type="submit" id="applySubmit" style="width:100%; margin-top:18px; padding:15px; border:none; border-radius:11px; background:#ff5a00; color:#08111f; font-family:Montserrat,sans-serif; font-weight:800; font-size:16px; cursor:pointer;">REQUEST A CALLBACK</button>
+</form>
+</div>
+</div>
+</div>
+<script>
+(function(){
+  var FN_URL='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/driver-apply';
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
+  var modal=document.getElementById('applyModal'), form=document.getElementById('applyForm');
+  var errEl=document.getElementById('applyError'), btn=document.getElementById('applySubmit'), body=document.getElementById('applyBody');
+  window.openApply=function(e){ if(e){e.preventDefault();} modal.style.display='flex'; document.body.style.overflow='hidden'; var f=form.querySelector('[name=full_name]'); if(f){setTimeout(function(){f.focus();},50);} };
+  window.closeApply=function(){ modal.style.display='none'; document.body.style.overflow=''; };
+  modal.addEventListener('click', function(e){ if(e.target===modal) closeApply(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape' && modal.style.display==='flex') closeApply(); });
+  document.querySelectorAll('a[href="#apply"]').forEach(function(a){ var t=(a.textContent||'').trim().toLowerCase(); if(t==='apply now'||t==='apply'){ a.addEventListener('click', window.openApply); } });
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    if(form.company && form.company.value){ done(); return; }
+    var name=form.full_name.value.trim(), phone=form.phone.value.trim(), consent=form.consent.checked;
+    if(!name||!phone){ return fail('Please enter your name and phone number.'); }
+    if(!consent){ return fail('Please check the consent box so we can contact you.'); }
+    errEl.style.display='none'; btn.disabled=true; btn.textContent='Sending…';
+    fetch(FN_URL,{ method:'POST', headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON},
+      body:JSON.stringify({ full_name:name, phone:phone, cdl_experience:form.cdl_experience.value, sap:form.sap.value, best_time:form.best_time.value, consent:true, source:'vgn-jobs' }) })
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }).catch(function(){ return {ok:r.ok,j:{}}; }); })
+      .then(function(res){ if(res.ok && res.j && res.j.ok){ done(); } else { fail((res.j&&res.j.error)||'Something went wrong. Please call 708-232-8523.'); } })
+      .catch(function(){ fail('Network error. Please call 708-232-8523.'); });
+  });
+  function fail(m){ errEl.textContent=m; errEl.style.display='block'; btn.disabled=false; btn.textContent='REQUEST A CALLBACK'; }
+  function done(){ body.innerHTML='<div style="text-align:center; padding:20px 8px 12px;"><div style="width:56px; height:56px; margin:0 auto 16px; border-radius:50%; background:rgba(61,220,132,.12); display:flex; align-items:center; justify-content:center;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><h3 style="font-family:Montserrat,sans-serif; font-weight:800; font-size:22px; color:#fff; margin:0 0 8px;">You’re on the list</h3><p style="color:#aeb9c8; font-size:15px; margin:0 0 20px;">Thanks! Ray or Carl will call you back shortly. Want to skip the wait?</p><a href="tel:7082328523" style="display:inline-block; padding:13px 24px; border-radius:11px; background:#ff5a00; color:#08111f; font-family:Montserrat,sans-serif; font-weight:800; text-decoration:none;">CALL 708-232-8523 NOW</a><div style="margin-top:14px;"><button type="button" onclick="closeApply()" style="background:none; border:none; color:#8ea0b6; font-size:14px; cursor:pointer; text-decoration:underline;">Close</button></div></div>'; }
+})();
+</script>
 </body>
 </html>

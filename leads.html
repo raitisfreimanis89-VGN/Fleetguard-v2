@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>VGN Driver Leads</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tmpdsiuadafbkmldvlki.supabase.co wss://tmpdsiuadafbkmldvlki.supabase.co; img-src 'self' data:;"/>
+<script src="js/supabase.min.js"></script>
+<style>
+  :root{ --bg:#08111f; --card:#111d2d; --line:#26354a; --orange:#ff5a00; --text:#dbe3ee; --muted:#aeb9c8; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif;}
+  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:16px;position:sticky;top:0;background:var(--bg);}
+  h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.02em;}
+  .btn{background:var(--orange);color:#08111f;border:none;border-radius:9px;padding:9px 16px;font-weight:800;cursor:pointer;font-size:14px;}
+  .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);}
+  .muted{color:var(--muted);}
+  /* login */
+  #login{max-width:360px;margin:12vh auto;padding:28px;background:var(--card);border:1px solid var(--line);border-radius:16px;}
+  #login h2{margin:0 0 4px;font-size:20px;} #login p{margin:0 0 18px;color:var(--muted);font-size:14px;}
+  label{display:block;font-size:13px;font-weight:700;margin:12px 0 6px;}
+  input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid #33455c;background:#0a1422;color:#fff;font-size:15px;}
+  #login .btn{width:100%;margin-top:18px;padding:12px;}
+  .err{color:#ffb4ab;font-size:14px;margin-top:12px;display:none;}
+  /* table */
+  #app{display:none;}
+  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0;}
+  .count{font-weight:800;font-size:15px;} .count span{color:var(--orange);}
+  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;}
+  table{width:100%;border-collapse:collapse;min-width:760px;}
+  th,td{text-align:left;padding:12px 14px;font-size:14px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap;}
+  th{color:#fff;font-weight:700;background:#0c1626;position:sticky;top:0;}
+  td.name{font-weight:700;color:#fff;white-space:normal;}
+  a.tel{color:var(--orange);text-decoration:none;font-weight:700;}
+  .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;}
+  .pill.sent{background:rgba(61,220,132,.14);color:#3ddc84;} .pill.failed{background:rgba(255,90,0,.14);color:#ff8a4a;}
+  .empty{padding:48px 16px;text-align:center;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Driver Leads</h2>
+  <p>Sign in to view VGN driver applications.</p>
+  <label for="email">Email</label>
+  <input id="email" type="email" autocomplete="username"/>
+  <label for="password">Password</label>
+  <input id="password" type="password" autocomplete="current-password"/>
+  <button class="btn" id="loginBtn">Sign In</button>
+  <div class="err" id="loginErr"></div>
+</div>
+
+<div id="app">
+  <header>
+    <h1>VGN Driver Leads</h1>
+    <div style="display:flex;gap:8px;">
+      <button class="btn ghost" id="refreshBtn">Refresh</button>
+      <button class="btn ghost" id="logoutBtn">Sign out</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="bar"><div class="count" id="count"></div><div class="muted" id="who"></div></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" style="display:none;">No leads yet — or this account doesn't have access to the leads list.</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var URL='https://tmpdsiuadafbkmldvlki.supabase.co';
+  var KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
+  if(!window.supabase||!window.supabase.createClient){ document.getElementById('loginErr').textContent='Could not load Supabase library.'; document.getElementById('loginErr').style.display='block'; return; }
+  var sb=window.supabase.createClient(URL,KEY);
+  var loginEl=document.getElementById('login'), appEl=document.getElementById('app');
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function fmt(ts){ try{ var d=new Date(ts); return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ts; } }
+  function digits(p){ return (p||'').replace(/[^0-9+]/g,''); }
+
+  function show(view){ loginEl.style.display=(view==='login')?'block':'none'; appEl.style.display=(view==='app')?'block':'none'; }
+
+  async function loadLeads(){
+    var rows=document.getElementById('rows'), empty=document.getElementById('empty'), count=document.getElementById('count');
+    rows.innerHTML=''; empty.style.display='none';
+    var res=await sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500);
+    if(res.error){ empty.textContent='Could not load leads: '+res.error.message; empty.style.display='block'; count.innerHTML=''; return; }
+    var data=res.data||[];
+    count.innerHTML='<span>'+data.length+'</span> lead'+(data.length===1?'':'s');
+    if(!data.length){ empty.style.display='block'; return; }
+    rows.innerHTML=data.map(function(r){
+      var pill=r.sms_status==='sent'?'<span class="pill sent">sent</span>':(r.sms_status==='failed'?'<span class="pill failed">not sent</span>':'<span class="muted">—</span>');
+      return '<tr><td class="muted">'+esc(fmt(r.created_at))+'</td>'+
+        '<td class="name">'+esc(r.full_name)+'</td>'+
+        '<td><a class="tel" href="tel:'+esc(digits(r.phone))+'">'+esc(r.phone)+'</a></td>'+
+        '<td>'+esc(r.cdl_experience||'—')+'</td>'+
+        '<td>'+esc(r.sap||'—')+'</td>'+
+        '<td>'+esc(r.best_time||'—')+'</td>'+
+        '<td>'+pill+'</td></tr>';
+    }).join('');
+  }
+
+  async function enterApp(session){
+    show('app');
+    document.getElementById('who').textContent='Signed in as '+(session.user.email||'');
+    await loadLeads();
+  }
+
+  document.getElementById('loginBtn').addEventListener('click', async function(){
+    var email=document.getElementById('email').value.trim(), pw=document.getElementById('password').value;
+    var err=document.getElementById('loginErr'), btn=this;
+    if(!email||!pw){ err.textContent='Enter email and password.'; err.style.display='block'; return; }
+    err.style.display='none'; btn.disabled=true; btn.textContent='Signing in…';
+    var res=await sb.auth.signInWithPassword({email:email,password:pw});
+    btn.disabled=false; btn.textContent='Sign In';
+    if(res.error){ err.textContent='Invalid email or password.'; err.style.display='block'; return; }
+    await enterApp(res.data.session);
+  });
+  document.getElementById('password').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('loginBtn').click(); });
+  document.getElementById('logoutBtn').addEventListener('click', async function(){ await sb.auth.signOut(); show('login'); });
+  document.getElementById('refreshBtn').addEventListener('click', loadLeads);
+
+  (async function init(){
+    var s=await sb.auth.getSession();
+    if(s.data && s.data.session){ await enterApp(s.data.session); } else { show('login'); }
+  })();
+})();
+</script>
+</body>
+</html>
