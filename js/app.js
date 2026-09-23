@@ -1525,6 +1525,14 @@ async function doDeleteVehicle(id,num){
 // Card data mirrors guides.html. Keeping it as data rather than markup means
 // the filter counts, the category tabs and the search haystack all derive from
 // one list instead of being maintained three times.
+// Watermark for the Transflo locator: a map pin holding a sheet of
+// paperwork -- "where do I send the BOLs". Stroke-only in the same icon
+// language as the section icons (round caps and joins, the same 1.9/24 weight
+// scaled up), inside a wide viewBox whose RIGHT edge the glyph hugs: with
+// preserveAspectRatio="xMaxYMid" it stays clear of the copy column at every
+// card width, and v2-cards.css tints it with the card's accent.
+const ART_TRANSFLO=
+ "<svg viewBox=\"0 0 300 150\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" preserveAspectRatio=\"xMaxYMid meet\" aria-hidden=\"true\"><path stroke-width=\"7\" d=\"M240 23c-27 0-49 22-49 49 0 36 49 78 49 78s49-42 49-78c0-27-22-49-49-49z\"/><path stroke-width=\"5\" d=\"M226 50h20l12 12v26a4 4 0 0 1-4 4h-28a4 4 0 0 1-4-4V54a4 4 0 0 1 4-4z\"/><path stroke-width=\"5\" d=\"M246 50v8a4 4 0 0 0 4 4h8\"/><path stroke-width=\"5\" d=\"M231 74h18M231 84h12\"/></svg>";
 const GUIDE_CARDS=[
   {cat:'tools',accent:'v2-accent-amber',art:'v2-art-pti',tag:'Inspections',title:'PTI Driver Guide',
    blurb:'Step-by-step pre-trip inspection &mdash; how a driver completes every PTI, tyres and photos included.',
@@ -1562,6 +1570,10 @@ const GUIDE_CARDS=[
    blurb:'CVSA inspection blitz dates &mdash; Roadcheck, Safe Driver and Brake Safety Week.',
    meta:[],href:'dot-enforcement-calendar.html',
    search:'dot enforcement calendar cvsa inspection blitz roadcheck brake safety week'},
+  {cat:'reference',accent:'v2-accent-cyan',art:'v2-art-transflo',artSvg:ART_TRANSFLO,tag:'Locator &middot; External',title:'Transflo TripPak Locations',
+   blurb:'Truckstop scanning and dropbox shipping &mdash; type an address and it maps the nearest place to send your paperwork in.',
+   meta:['1,400+ LOCATIONS'],href:'https://www.transflo.com/for-customers/service-locations/',
+   live:true,search:'transflo trippak trippack trip pak scanning locations dropbox drop box paperwork bol pod proof of delivery truckstop nearest scan envelope express'},
   {cat:'reference',accent:'v2-accent-green',art:'',tag:'Reference',title:'Trailer Dimensions',
    blurb:'Our 53&#39; dry van &mdash; exterior and interior dimensions, weight and cubic capacity.',
    meta:['53&#39; &times; 102&quot;','4,070 FT&sup3;'],href:'trailer-dimensions.html',
@@ -1691,7 +1703,7 @@ function renderGuides(){
       const external=/^https?:/.test(c.href);
       html+='<article class="v2-tool-card '+c.accent+'" data-gcat="'+c.cat+'" data-gsearch="'+esc(c.search)+'"'
         +' data-gtitle="'+esc(c.title)+'" data-gorder="'+i+'">'
-        +(c.art?'<div class="v2-tool-art '+c.art+'" aria-hidden="true"></div>':'')
+        +(c.art?'<div class="v2-tool-art '+c.art+'" aria-hidden="true">'+(c.artSvg||'')+'</div>':'')
         +'<div class="v2-tool-body">'
           +'<span class="v2-tag">'+c.tag+'</span>'
           +'<h3>'+c.title+'</h3>'

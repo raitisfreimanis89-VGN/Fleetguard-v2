@@ -367,6 +367,24 @@
 }
 .v2-tool-card:hover .v2-tool-art svg { opacity: 1; transform: scale(1.04); }
 
+/* ── Reference locator: a vector watermark, not a photograph ──────────────
+   The Reference cards carry no artwork, and a photograph here would read as a
+   Tools or Maps card. This one takes a stroke glyph in the same art layer
+   instead: tinted with --tc so it follows the card's accent and both themes,
+   and anchored right by its own viewBox so it never crosses the copy column.
+
+   No photograph means no scrim. ::before and ::after are dropped outright --
+   left in place, ::after would lay the full five-stop darkening gradient over
+   a card with nothing to darken, dimming the surface behind the title. The
+   glyph's own opacity is the only thing doing any work here, and it stays a
+   watermark on hover rather than going to the full brightness a photograph
+   gets. Both rules outrank the base ones on specificity; the hover pair ties
+   at (0,3,1) and wins by sitting below it. */
+.v2-art-transflo::before,
+.v2-art-transflo::after { content: none; }
+.v2-art-transflo svg { color: var(--tc); opacity: .13; }
+.v2-tool-card:hover .v2-art-transflo svg { opacity: .2; transform: scale(1.04); }
+
 /* ── Card body ───────────────────────────────────────────────────────────── */
 
 /* Tag sits tight to the title; the title/description pair is the tighter
