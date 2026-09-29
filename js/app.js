@@ -929,17 +929,16 @@ async function loadViewStats(){
   const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
   const dow=(dayStart.getDay()+6)%7;                       // 0=Mon … 6=Sun
   const weekStart=new Date(dayStart); weekStart.setDate(dayStart.getDate()-dow);
-  const lastWeekStart=new Date(weekStart); lastWeekStart.setDate(weekStart.getDate()-7);
   const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
-  const cnt=async(fromD,toD)=>{
-    let q=sb.from('page_views').select('id',{count:'exact',head:true}).gte('created_at',fromD.toISOString());
-    if(toD) q=q.lt('created_at',toD.toISOString());
+  const cnt=async(fromD)=>{
+    let q=sb.from('page_views').select('id',{count:'exact',head:true});
+    if(fromD) q=q.gte('created_at',fromD.toISOString());
     const {count,error}=await q; return error?null:(count||0);
   };
-  const [today,thisWeek,lastWeek,month]=await Promise.all([
-    cnt(dayStart), cnt(weekStart), cnt(lastWeekStart,weekStart), cnt(monthStart)
+  const [today,thisWeek,month,total]=await Promise.all([
+    cnt(dayStart), cnt(weekStart), cnt(monthStart), cnt(null)
   ]);
-  return {today,thisWeek,lastWeek,month};
+  return {today,thisWeek,month,total};
 }
 
 async function renderLeadsAsync(){
@@ -969,8 +968,8 @@ async function renderLeadsAsync(){
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
     +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(stats.today)+'</span><span class="v2-pulse-label">Today</span></div>'
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(stats.thisWeek)+'</span><span class="v2-pulse-label">This week</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.lastWeek)+'</span><span class="v2-pulse-label">Last week</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(stats.month)+'</span><span class="v2-pulse-label">This month</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.total)+'</span><span class="v2-pulse-label">Total</span></div>'
     +'</div></div></article></section>';
 
   // Leads table — same shell as Drivers / Inspections.
