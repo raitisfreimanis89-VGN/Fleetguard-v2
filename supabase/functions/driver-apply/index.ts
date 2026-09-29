@@ -70,17 +70,24 @@ serve(async (req) => {
   }).select("id").single();
   if (insErr) return json({ error: "Could not save right now - please call instead." }, 500);
 
-  // Short heads-up to recruiting (under Google Voice's 153-char single-segment limit).
+  // Text the heads-up to recruiting in the BACKGROUND so the driver isn't held on
+  // "Sending…" for the ~25s the Google Voice bot takes to send. EdgeRuntime.waitUntil
+  // keeps the isolate alive to finish the send AFTER we've already replied "Sent".
+  // The lead is already saved above, so nothing is lost if the send is slow or fails.
   const expBit = cdl_experience ? ` - ${cdl_experience}` : "";
   const msg = clip(`New driver lead: ${full_name}, ${phoneRaw}${expBit}. Full details in Leads.`, 150);
-  const gv = await fetch(`${GV_SERVICE_URL}/send`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
-    body: JSON.stringify({ to: RECRUIT_PHONE, body: msg }),
-    signal: AbortSignal.timeout(60_000),
-  }).catch((e) => ({ ok: false, statusText: String(e) } as Response));
+  const notify = (async () => {
+    const gv = await fetch(`${GV_SERVICE_URL}/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": GV_SECRET },
+      body: JSON.stringify({ to: RECRUIT_PHONE, body: msg }),
+      signal: AbortSignal.timeout(60_000),
+    }).catch((e) => ({ ok: false, statusText: String(e) } as Response));
+    await svc.from("driver_leads").update({ sms_status: gv.ok ? "sent" : "failed" }).eq("id", lead.id);
+  })();
+  const wu = (globalThis as any).EdgeRuntime?.waitUntil;
+  if (typeof wu === "function") wu(notify); else notify.catch(() => {});
 
-  await svc.from("driver_leads").update({ sms_status: gv.ok ? "sent" : "failed" }).eq("id", lead.id);
-
+  // Respond immediately — the lead is saved; the SMS to recruiting sends in the background.
   return json({ ok: true });
 });
