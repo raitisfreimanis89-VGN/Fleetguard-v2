@@ -975,7 +975,8 @@ async function renderLeadsAsync(){
   // Leads table — same shell as Drivers / Inspections.
   html+='<section class="v2-table-card" aria-label="Driver leads">'
     +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(IC_INBOX)+'</span>'
-    +'<h2>All leads</h2><span class="v2-console-note">'+leads.length+' total</span></div>'
+    +'<h2>All leads</h2><span class="v2-console-note">'+leads.length+' total</span>'
+    +'<button class="v2-btn-ghost" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px" onclick="downloadLeadsExcel(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Excel</button></div>'
     +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
     +'<th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th>'
     +'</tr></thead><tbody>';
@@ -999,6 +1000,66 @@ async function renderLeadsAsync(){
   }
   html+='</tbody></table></div></section></div>';
   c.innerHTML=html;
+}
+
+// Lazy-load a same-origin script once (used for the heavy SheetJS lib).
+function loadScriptOnce(src){
+  return new Promise((resolve,reject)=>{
+    if([...document.scripts].some(s=>s.src&&s.src.indexOf(src)!==-1)) return resolve();
+    const s=document.createElement('script'); s.src=src;
+    s.onload=()=>resolve(); s.onerror=()=>reject(new Error('Could not load '+src));
+    document.head.appendChild(s);
+  });
+}
+
+// Export all driver leads to an .xlsx with ONE TAB PER CALENDAR MONTH.
+async function downloadLeadsExcel(btn){
+  const orig = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.textContent='Preparing…'; }
+  try{
+    if(!window.XLSX){ await loadScriptOnce('js/xlsx.min.js'); }
+    if(!window.XLSX) throw new Error('Excel library did not load');
+    const {data,error}=await sb.from('driver_leads')
+      .select('created_at,full_name,phone,cdl_experience,sap,best_time,consent,sms_status')
+      .order('created_at',{ascending:true});
+    if(error) throw error;
+    const rows=data||[];
+    // Group by calendar month; sheet key sorts, label names the tab ("Sep 2026").
+    const byMonth={};
+    rows.forEach(l=>{
+      const d=new Date(l.created_at);
+      const key=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+      const label=d.toLocaleString('en-US',{month:'short',year:'numeric'});
+      (byMonth[key]=byMonth[key]||{label,items:[]}).items.push(l);
+    });
+    const wb=XLSX.utils.book_new();
+    const keys=Object.keys(byMonth).sort();
+    if(keys.length===0){
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['No leads yet']]), 'Leads');
+    } else {
+      keys.forEach(k=>{
+        const rowsForSheet=byMonth[k].items.map(l=>({
+          'Received': new Date(l.created_at).toLocaleString(),
+          'Name': l.full_name||'',
+          'Phone': l.phone||'',
+          'CDL-A experience': l.cdl_experience||'',
+          'SAP': l.sap||'',
+          'Best time to call': l.best_time||'',
+          'Consent': l.consent?'Yes':'No',
+          'Text sent': l.sms_status||''
+        }));
+        const ws=XLSX.utils.json_to_sheet(rowsForSheet);
+        ws['!cols']=[{wch:20},{wch:22},{wch:16},{wch:16},{wch:16},{wch:20},{wch:9},{wch:10}];
+        XLSX.utils.book_append_sheet(wb, ws, byMonth[k].label.slice(0,31));  // tab name, 31-char max
+      });
+    }
+    XLSX.writeFile(wb, 'vgn-driver-leads-'+new Date().toISOString().slice(0,10)+'.xlsx');
+  }catch(e){
+    if(typeof showToast==='function') showToast('Excel export failed: '+(e.message||e),'danger');
+    else alert('Excel export failed: '+(e.message||e));
+  }finally{
+    if(btn){ btn.disabled=false; btn.innerHTML=orig; }
+  }
 }
 
 // ═══════════════════════════════════════════════════════
