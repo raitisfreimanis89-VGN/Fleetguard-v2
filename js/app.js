@@ -948,11 +948,17 @@ async function renderLeadsAsync(){
   const IC_CHART='<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>';
   c.innerHTML='<div class="v2-region"><div class="v2-page-head"><h1>Driver Leads</h1><p>Loading…</p></div></div>';
 
-  const [leadsRes, stats] = await Promise.all([
+  const [leadsRes, stats, leadsCountRes] = await Promise.all([
     sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
-    loadViewStats()
+    loadViewStats(),
+    sb.from('driver_leads').select('id',{count:'exact',head:true})
   ]);
   const leads=leadsRes.data||[];
+  // Conversion: all-time visits vs all-time leads received.
+  const leadsTotal = (leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null) ? leadsCountRes.count : leads.length;
+  const visitsTotal = (stats.total==null) ? 0 : stats.total;
+  const ratioStr = (leadsTotal>0) ? (visitsTotal/leadsTotal).toFixed(1) : '—';       // visits per lead
+  const rateStr  = (visitsTotal>0) ? ((leadsTotal/visitsTotal)*100).toFixed(1)+'%' : '—';
   const num=(v)=>v==null?'—':String(v);
   const digits=(p)=>String(p||'').replace(/[^0-9+]/g,'');
   const dt=(s)=>{ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); };
@@ -970,6 +976,14 @@ async function renderLeadsAsync(){
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(stats.thisWeek)+'</span><span class="v2-pulse-label">This week</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(stats.month)+'</span><span class="v2-pulse-label">This month</span></div>'
     +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.total)+'</span><span class="v2-pulse-label">Total</span></div>'
+    +'</div></div></article>'
+    +'<article class="v2-console v2-accent-green"><div class="v2-console-head">'
+    +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>'
+    +'<h2>Conversion</h2><span class="v2-console-note">visits &rarr; leads (all time)</span></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(leadsTotal)+'</span><span class="v2-pulse-label">Leads received</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+ratioStr+'</span><span class="v2-pulse-label">Visits per lead</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+rateStr+'</span><span class="v2-pulse-label">Conversion rate</span></div>'
     +'</div></div></article></section>';
 
   // Leads table — same shell as Drivers / Inspections.
