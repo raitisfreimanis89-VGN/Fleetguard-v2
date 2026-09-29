@@ -690,6 +690,8 @@ summary:focus-visible,a:focus-visible{outline:3px solid #ff7a18;outline-offset:3
 (function(){
   var FN_URL='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/driver-apply';
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
+  // fire-and-forget visit beacon (first-party page-view tracking)
+  try{ fetch('https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/track-view',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON},body:JSON.stringify({path:location.pathname,ref:document.referrer})}).catch(function(){}); }catch(e){}
   var modal=document.getElementById('applyModal'), form=document.getElementById('applyForm');
   var errEl=document.getElementById('applyError'), btn=document.getElementById('applySubmit'), body=document.getElementById('applyBody');
   window.openApply=function(e){ if(e){e.preventDefault();} modal.style.display='flex'; document.body.style.overflow='hidden'; var f=form.querySelector('[name=full_name]'); if(f){setTimeout(function(){f.focus();},50);} };

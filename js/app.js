@@ -815,7 +815,7 @@ function closeInspectionModal(){ const m=document.getElementById('insp-modal'); 
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides',leads:'Driver Leads'};
 
 // ── Navigation state persistence ──
 // Remember where the user was so a manual refresh doesn't dump them back on the
@@ -840,7 +840,7 @@ function restoreNavState(){
     if(s.vehicleTab) currentVehicleTab=s.vehicleTab;
     currentDispatcherFilter=s.dispatcherFilter||null;
     // Drop views the current role can't open, or a vehicle that no longer exists.
-    if(['vehicles','drivers','reminders'].includes(currentPage)&&!isAdmin()) currentPage='dashboard';
+    if(['vehicles','drivers','reminders','leads'].includes(currentPage)&&!isAdmin()) currentPage='dashboard';
     if(currentPage==='vehicle'&&!VEHICLES.some(v=>v.id===currentVehicleId)){ currentPage='dashboard'; currentVehicleId=null; }
   }catch(e){}
 }
@@ -858,6 +858,7 @@ function navigate(page,vehicleId){
   if(page==='reminders'&&!isAdmin()) return;
   // Dispatchers may only see Dashboard, Calendar, Reports, Dispatch Board
   if((page==='vehicles'||page==='drivers')&&!isAdmin()) return;
+  if(page==='leads'&&!isAdmin()) return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -873,6 +874,7 @@ function render(){
   if(currentPage==='users'||currentPage==='portal') currentPage='dashboard';
   // Dispatchers may not open Vehicles list or Drivers — redirect
   if(!isAdmin()&&(currentPage==='vehicles'||currentPage==='drivers')) currentPage='dashboard';
+  if(currentPage==='leads'&&!isAdmin()) currentPage='dashboard';
   if(currentPage==='dashboard') c.innerHTML=renderDashboard();
   else if(currentPage==='vehicles') c.innerHTML=renderVehicles();
   else if(currentPage==='vehicle') c.innerHTML=renderVehicleDetail();
@@ -888,6 +890,7 @@ function render(){
   // now; the weather tile fills itself in afterwards, and the filter is
   // re-applied so a category survives leaving the page and coming back.
   else if(currentPage==='guides'){ c.innerHTML=renderGuides(); guidesFilter(); guidesLoadWeather(); guidesLoadI80(); }
+  else if(currentPage==='leads'&&isAdmin()){ renderLeadsAsync(); }
   // Bound after every render: the button lives in markup rebuilt each time.
   // data-* + addEventListener rather than an inline onclick, so ids never reach
   // a JS string context.
@@ -915,6 +918,88 @@ async function renderUsersAsync(){
   document.querySelectorAll('.del-user-btn').forEach(btn=>{
     btn.addEventListener('click',()=>doDeleteUser(btn.dataset.uid, btn.dataset.email));
   });
+}
+
+// ═══════════════════════════════════════════════════════
+// DRIVER LEADS (recruiting site — callback form + visit stats)
+// ═══════════════════════════════════════════════════════
+async function loadViewStats(){
+  // Calendar-aligned buckets in the viewer's local time. Weeks start Monday.
+  const now=new Date();
+  const dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const dow=(dayStart.getDay()+6)%7;                       // 0=Mon … 6=Sun
+  const weekStart=new Date(dayStart); weekStart.setDate(dayStart.getDate()-dow);
+  const lastWeekStart=new Date(weekStart); lastWeekStart.setDate(weekStart.getDate()-7);
+  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  const cnt=async(fromD,toD)=>{
+    let q=sb.from('page_views').select('id',{count:'exact',head:true}).gte('created_at',fromD.toISOString());
+    if(toD) q=q.lt('created_at',toD.toISOString());
+    const {count,error}=await q; return error?null:(count||0);
+  };
+  const [today,thisWeek,lastWeek,month]=await Promise.all([
+    cnt(dayStart), cnt(weekStart), cnt(lastWeekStart,weekStart), cnt(monthStart)
+  ]);
+  return {today,thisWeek,lastWeek,month};
+}
+
+async function renderLeadsAsync(){
+  const c=document.getElementById('content');
+  const _sv=(d)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>';
+  const IC_INBOX='<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>';
+  const IC_CHART='<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>';
+  c.innerHTML='<div class="v2-region"><div class="v2-page-head"><h1>Driver Leads</h1><p>Loading…</p></div></div>';
+
+  const [leadsRes, stats] = await Promise.all([
+    sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
+    loadViewStats()
+  ]);
+  const leads=leadsRes.data||[];
+  const num=(v)=>v==null?'—':String(v);
+  const digits=(p)=>String(p||'').replace(/[^0-9+]/g,'');
+  const dt=(s)=>{ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); };
+
+  let html='<div class="v2-region">';
+  html+='<div class="v2-page-head"><h1>Driver Leads</h1><p>Callback requests from the recruiting site, and how many people are visiting it.</p></div>';
+
+  // Website visits — stat console (the corner window), matching other pages.
+  html+='<section class="v2-console-row" aria-label="Website traffic">'
+    +'<article class="v2-console v2-accent-blue"><div class="v2-console-head">'
+    +'<span class="v2-console-ic">'+_sv(IC_CHART)+'</span><h2>Website visits</h2>'
+    +'<span class="v2-console-note">fleetguards.app/vgn/</span></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(stats.today)+'</span><span class="v2-pulse-label">Today</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(stats.thisWeek)+'</span><span class="v2-pulse-label">This week</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.lastWeek)+'</span><span class="v2-pulse-label">Last week</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(stats.month)+'</span><span class="v2-pulse-label">This month</span></div>'
+    +'</div></div></article></section>';
+
+  // Leads table — same shell as Drivers / Inspections.
+  html+='<section class="v2-table-card" aria-label="Driver leads">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(IC_INBOX)+'</span>'
+    +'<h2>All leads</h2><span class="v2-console-note">'+leads.length+' total</span></div>'
+    +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
+    +'<th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th>'
+    +'</tr></thead><tbody>';
+  if(leadsRes.error){
+    html+='<tr><td colspan="7" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">Could not load leads: '+esc(leadsRes.error.message)+'</td></tr>';
+  } else if(leads.length===0){
+    html+='<tr><td colspan="7" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No leads yet — they’ll appear here when drivers submit the form.</td></tr>';
+  } else {
+    leads.forEach(l=>{
+      const pill=l.sms_status==='sent'?'<span class="v2-truck-chip">sent</span>':(l.sms_status==='failed'?'<span class="v2-truck-chip" style="color:#ff8a4a">not sent</span>':'—');
+      html+='<tr>'
+        +'<td style="color:var(--v2-ink-3);white-space:nowrap">'+esc(dt(l.created_at))+'</td>'
+        +'<td><strong>'+esc(l.full_name)+'</strong></td>'
+        +'<td><a href="tel:'+esc(digits(l.phone))+'">'+esc(l.phone)+'</a></td>'
+        +'<td>'+esc(l.cdl_experience||'—')+'</td>'
+        +'<td>'+esc(l.sap||'—')+'</td>'
+        +'<td>'+esc(l.best_time||'—')+'</td>'
+        +'<td>'+pill+'</td>'
+        +'</tr>';
+    });
+  }
+  html+='</tbody></table></div></section></div>';
+  c.innerHTML=html;
 }
 
 // ═══════════════════════════════════════════════════════
