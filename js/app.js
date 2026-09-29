@@ -948,12 +948,21 @@ async function renderLeadsAsync(){
   const IC_CHART='<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>';
   c.innerHTML='<div class="v2-region"><div class="v2-page-head"><h1>Driver Leads</h1><p>Loading…</p></div></div>';
 
-  const [leadsRes, stats, leadsCountRes] = await Promise.all([
+  const [leadsRes, stats, leadsCountRes, dwellRes] = await Promise.all([
     sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
     loadViewStats(),
-    sb.from('driver_leads').select('id',{count:'exact',head:true})
+    sb.from('driver_leads').select('id',{count:'exact',head:true}),
+    sb.from('page_views').select('dwell_ms').not('dwell_ms','is',null).limit(10000)
   ]);
   const leads=leadsRes.data||[];
+  // Engagement: average time on page + bounces (under 10s) from measured visits.
+  const dwells=((dwellRes&&dwellRes.data)||[]).map(function(r){return r.dwell_ms;}).filter(function(v){return v!=null;});
+  const measured=dwells.length;
+  const avgMs= measured ? dwells.reduce(function(a,b){return a+b;},0)/measured : null;
+  const bounces= dwells.filter(function(v){return v<10000;}).length;
+  const bounceRate= measured ? Math.round((bounces/measured)*100)+'%' : '—';
+  const fmtDwell=function(ms){ if(ms==null) return '—'; var s=Math.round(ms/1000); if(s<60) return s+'s'; return Math.floor(s/60)+'m '+(s%60)+'s'; };
+  const avgStr= fmtDwell(avgMs);
   // Conversion: all-time visits vs all-time leads received.
   const leadsTotal = (leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null) ? leadsCountRes.count : leads.length;
   const visitsTotal = (stats.total==null) ? 0 : stats.total;
@@ -984,6 +993,14 @@ async function renderLeadsAsync(){
     +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(leadsTotal)+'</span><span class="v2-pulse-label">Leads received</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+ratioStr+'</span><span class="v2-pulse-label">Visits per lead</span></div>'
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+rateStr+'</span><span class="v2-pulse-label">Conversion rate</span></div>'
+    +'</div></div></article>'
+    +'<article class="v2-console v2-accent-cyan"><div class="v2-console-head">'
+    +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'
+    +'<h2>Engagement</h2><span class="v2-console-note">'+measured+' measured</span></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+avgStr+'</span><span class="v2-pulse-label">Avg. time on page</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(bounces)+'</span><span class="v2-pulse-label">Bounces (&lt;10s)</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+bounceRate+'</span><span class="v2-pulse-label">Bounce rate</span></div>'
     +'</div></div></article></section>';
 
   // Leads table — same shell as Drivers / Inspections.

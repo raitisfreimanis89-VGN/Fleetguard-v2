@@ -635,8 +635,19 @@ summary:focus-visible,a:focus-visible{outline:3px solid #ff7a18;outline-offset:3
 (function(){
   var FN_URL='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/driver-apply';
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
-  // fire-and-forget visit beacon (first-party page-view tracking)
-  try{ fetch('https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/track-view',{method:'POST',keepalive:true,headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON},body:JSON.stringify({path:location.pathname,ref:document.referrer})}).catch(function(){}); }catch(e){}
+  // first-party visit + time-on-page tracking: log the visit on load, then send
+  // how long they stayed when they leave (largest dwell wins on the server).
+  try{
+    var _TRACK='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1/track-view';
+    var _hdrs={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
+    var _vid=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(16).slice(2));
+    var _t0=Date.now();
+    fetch(_TRACK,{method:'POST',keepalive:true,headers:_hdrs,body:JSON.stringify({path:location.pathname,ref:document.referrer,vid:_vid})}).catch(function(){});
+    function _leave(){ var dwell=Math.min(Date.now()-_t0,1800000);
+      try{ fetch(_TRACK,{method:'POST',keepalive:true,headers:_hdrs,body:JSON.stringify({vid:_vid,dwell_ms:dwell})}).catch(function(){}); }catch(e){} }
+    window.addEventListener('pagehide', _leave);
+    document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') _leave(); });
+  }catch(e){}
   var modal=document.getElementById('applyModal'), form=document.getElementById('applyForm');
   var errEl=document.getElementById('applyError'), btn=document.getElementById('applySubmit'), body=document.getElementById('applyBody');
   window.openApply=function(e){ if(e){e.preventDefault();} modal.style.display='flex'; document.body.style.overflow='hidden'; var f=form.querySelector('[name=full_name]'); if(f){setTimeout(function(){f.focus();},50);} };
