@@ -7,10 +7,10 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://tmpdsiuadafbkmldvlki.supabase.co wss://tmpdsiuadafbkmldvlki.supabase.co; img-src 'self' data:;"/>
 <script src="js/supabase.min.js"></script>
 <style>
-  :root{ --bg:#08111f; --card:#111d2d; --line:#26354a; --orange:#ff5a00; --text:#dbe3ee; --muted:#aeb9c8; }
+  :root{ --bg:#08111f; --card:#111d2d; --line:#26354a; --orange:#ff5a00; --text:#dbe3ee; --muted:#8796a9; }
   *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,sans-serif;}
-  .wrap{max-width:1100px;margin:0 auto;padding:20px 16px;}
-  header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line);padding:16px;position:sticky;top:0;background:var(--bg);}
+  .wrap{max-width:1160px;margin:0 auto;padding:20px 16px;}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(255,255,255,.07);padding:16px;position:sticky;top:0;background:var(--bg);z-index:5;}
   h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.02em;}
   .btn{background:var(--orange);color:#08111f;border:none;border-radius:9px;padding:9px 16px;font-weight:800;cursor:pointer;font-size:14px;}
   .btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text);}
@@ -22,18 +22,36 @@
   input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid #33455c;background:#0a1422;color:#fff;font-size:15px;}
   #login .btn{width:100%;margin-top:18px;padding:12px;}
   .err{color:#ffb4ab;font-size:14px;margin-top:12px;display:none;}
-  /* table */
+  /* dashboard cards */
   #app{display:none;}
-  .bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:18px 0;}
-  .count{font-weight:800;font-size:15px;} .count span{color:var(--orange);}
-  .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:14px;}
+  .chartcard,.statcard{background:var(--card);border:1px solid rgba(255,255,255,.07);border-radius:16px;padding:20px;}
+  .chartcard{margin-bottom:16px;}
+  .cardtitle{margin:0 0 16px;font-size:13px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .cardtitle .note{font-size:11px;color:var(--muted);font-weight:600;text-transform:none;letter-spacing:0;}
+  .statgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:16px;}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(68px,1fr));gap:14px;}
+  .stat .n{font-size:26px;font-weight:800;line-height:1;}
+  .stat .l{font-size:11px;color:var(--muted);margin-top:6px;text-transform:uppercase;letter-spacing:.03em;}
+  .c-cyan{color:#22d3ee}.c-green{color:#3ddc84}.c-amber{color:#ffb547}.c-blue{color:#6ea8fe}
+  /* chart */
+  .pv-chart{margin-top:20px;border-top:1px solid rgba(255,255,255,.06);padding-top:16px}
+  .chart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+  .chart-head b{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  .chart-head span{font-size:11px;color:var(--muted)}
+  .pv-bars{display:flex;align-items:flex-end;gap:2px;height:90px}
+  .pv-bar{flex:1 1 0;min-width:2px;background:#3ecf8e;border-radius:2px 2px 0 0;opacity:.85}
+  .pv-bar:hover{opacity:1}
+  .pv-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted)}
+  /* table */
+  .count{font-weight:800;font-size:15px;margin:20px 0 10px;} .count span{color:var(--orange);}
+  .tablewrap{overflow-x:auto;border:1px solid rgba(255,255,255,.07);border-radius:14px;}
   table{width:100%;border-collapse:collapse;min-width:760px;}
   th,td{text-align:left;padding:12px 14px;font-size:14px;border-bottom:1px solid rgba(255,255,255,.06);white-space:nowrap;}
   th{color:#fff;font-weight:700;background:#0c1626;position:sticky;top:0;}
   td.name{font-weight:700;color:#fff;white-space:normal;}
   a.tel{color:var(--orange);text-decoration:none;font-weight:700;}
   .pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:700;}
-  .pill.sent{background:rgba(61,220,132,.14);color:#3ddc84;} .pill.failed{background:rgba(255,90,0,.14);color:#ff8a4a;}
+  .pill.sent{background:rgba(61,220,132,.14);color:#3ddc84;} .pill.failed{background:rgba(255,138,74,.14);color:#ff8a4a;}
   .empty{padding:48px 16px;text-align:center;color:var(--muted);}
 </style>
 </head>
@@ -53,13 +71,15 @@
 <div id="app">
   <header>
     <h1>VGN Driver Leads</h1>
-    <div style="display:flex;gap:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <span class="muted" id="who" style="font-size:12px;"></span>
       <button class="btn ghost" id="refreshBtn">Refresh</button>
       <button class="btn ghost" id="logoutBtn">Sign out</button>
     </div>
   </header>
   <div class="wrap">
-    <div class="bar"><div class="count" id="count"></div><div class="muted" id="who"></div></div>
+    <div id="dash"></div>
+    <div class="count" id="count"></div>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th></tr></thead>
@@ -77,16 +97,71 @@
   if(!window.supabase||!window.supabase.createClient){ document.getElementById('loginErr').textContent='Could not load Supabase library.'; document.getElementById('loginErr').style.display='block'; return; }
   var sb=window.supabase.createClient(URL,KEY);
   var loginEl=document.getElementById('login'), appEl=document.getElementById('app');
+
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
   function fmt(ts){ try{ var d=new Date(ts); return d.toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ts; } }
   function digits(p){ return (p||'').replace(/[^0-9+]/g,''); }
-
+  function num(v){ return v==null?'—':String(v); }
+  function dayKey(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function shortDay(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+  function fmtDwell(ms){ if(ms==null) return '—'; var s=Math.round(ms/1000); if(s<60) return s+'s'; return Math.floor(s/60)+'m '+(s%60)+'s'; }
+  function classifySrc(utm,ref){
+    var s=(utm||'').toLowerCase();
+    if(s.indexOf('indeed')>=0) return 'indeed';
+    if(s.indexOf('facebook')>=0||s==='fb'||s==='meta') return 'facebook';
+    if(s.indexOf('craigslist')>=0||s==='cl') return 'craigslist';
+    if(!s){ var r=(ref||'').toLowerCase();
+      if(r.indexOf('indeed')>=0) return 'indeed';
+      if(r.indexOf('facebook')>=0||r.indexOf('fb.')>=0||r.indexOf('fb.me')>=0) return 'facebook';
+      if(r.indexOf('craigslist')>=0) return 'craigslist'; }
+    return 'direct';
+  }
   function show(view){ loginEl.style.display=(view==='login')?'block':'none'; appEl.style.display=(view==='app')?'block':'none'; }
 
-  async function loadLeads(){
+  function renderDash(pv, leadsTotal){
+    var now=new Date();
+    var dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    var dow=(dayStart.getDay()+6)%7; var weekStart=new Date(dayStart); weekStart.setDate(dayStart.getDate()-dow);
+    var monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+    var DAY=86400000, CHART_DAYS=30;
+    var chartStart=new Date(dayStart); chartStart.setDate(dayStart.getDate()-(CHART_DAYS-1));
+    var buckets={}; for(var i=0;i<CHART_DAYS;i++){ var dd=new Date(chartStart.getTime()+i*DAY); buckets[dayKey(dd)]={d:dd,n:0}; }
+    var total=pv.length, today=0, week=0, month=0, dwells=[], src={indeed:0,facebook:0,craigslist:0,direct:0};
+    pv.forEach(function(r){
+      var t=new Date(r.created_at);
+      if(t>=dayStart) today++; if(t>=weekStart) week++; if(t>=monthStart) month++;
+      var dk=dayKey(new Date(t.getFullYear(),t.getMonth(),t.getDate())); if(buckets[dk]) buckets[dk].n++;
+      if(r.dwell_ms!=null) dwells.push(r.dwell_ms);
+      src[classifySrc(r.source,r.referrer)]++;
+    });
+    var series=Object.keys(buckets).sort().map(function(k){return buckets[k];});
+    var maxN=Math.max.apply(null,[1].concat(series.map(function(s){return s.n;})));
+    var measured=dwells.length;
+    var avgMs=measured?dwells.reduce(function(a,b){return a+b;},0)/measured:null;
+    var bounces=dwells.filter(function(v){return v<10000;}).length;
+    var bounceRate=measured?Math.round(bounces/measured*100)+'%':'—';
+    var ratioStr=leadsTotal>0?(total/leadsTotal).toFixed(1):'—';
+    var rateStr=total>0?((leadsTotal/total)*100).toFixed(1)+'%':'—';
+    var labels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+    var topKey='direct',topN=-1; Object.keys(src).forEach(function(k){ if(src[k]>topN){topN=src[k];topKey=k;} });
+    var topStr=topN>0?('Top: '+labels[topKey]):'by utm_source';
+    var bars=series.map(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; return '<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; }).join('');
+    var st=function(cls,n,l){ return '<div class="stat"><div class="n '+cls+'">'+num(n)+'</div><div class="l">'+l+'</div></div>'; };
+    document.getElementById('dash').innerHTML=
+      '<div class="chartcard"><div class="cardtitle">Website visits <span class="note">fleetguards.app/vgn/</span></div>'+
+        '<div class="stats">'+st('c-cyan',today,'Today')+st('c-green',week,'This week')+st('c-amber',month,'This month')+st('c-blue',total,'Total')+'</div>'+
+        '<div class="pv-chart"><div class="chart-head"><b>Daily visits</b><span>last 30 days · peak '+maxN+'/day</span></div><div class="pv-bars">'+bars+'</div><div class="pv-axis"><span>'+shortDay(series[0].d)+'</span><span>'+shortDay(series[series.length-1].d)+'</span></div></div>'+
+      '</div>'+
+      '<div class="statgrid">'+
+        '<div class="statcard"><div class="cardtitle">Conversion <span class="note">visits &rarr; leads</span></div><div class="stats">'+st('c-cyan',leadsTotal,'Leads received')+st('c-amber',ratioStr,'Visits per lead')+st('c-green',rateStr,'Conversion rate')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Engagement <span class="note">'+measured+' measured</span></div><div class="stats">'+st('c-cyan',fmtDwell(avgMs),'Avg. time on page')+st('c-amber',bounces,'Bounces (&lt;10s)')+st('c-green',bounceRate,'Bounce rate')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">'+topStr+'</span></div><div class="stats">'+st('c-cyan',src.indeed,'Indeed')+st('c-blue',src.facebook,'Facebook')+st('c-green',src.craigslist,'Craigslist')+st('c-amber',src.direct,'Direct / other')+'</div></div>'+
+      '</div>';
+  }
+
+  function renderTable(res){
     var rows=document.getElementById('rows'), empty=document.getElementById('empty'), count=document.getElementById('count');
     rows.innerHTML=''; empty.style.display='none';
-    var res=await sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500);
     if(res.error){ empty.textContent='Could not load leads: '+res.error.message; empty.style.display='block'; count.innerHTML=''; return; }
     var data=res.data||[];
     count.innerHTML='<span>'+data.length+'</span> lead'+(data.length===1?'':'s');
@@ -103,10 +178,23 @@
     }).join('');
   }
 
+  async function loadAll(){
+    document.getElementById('dash').innerHTML='<div class="muted" style="padding:20px 0">Loading…</div>';
+    var r=await Promise.all([
+      sb.from('page_views').select('created_at,dwell_ms,source,referrer').limit(50000),
+      sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
+      sb.from('driver_leads').select('id',{count:'exact',head:true})
+    ]);
+    var pvRes=r[0], leadsRes=r[1], leadsCountRes=r[2];
+    var leadsTotal=(leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null)?leadsCountRes.count:((leadsRes.data||[]).length);
+    renderDash(pvRes.data||[], leadsTotal);
+    renderTable(leadsRes);
+  }
+
   async function enterApp(session){
     show('app');
-    document.getElementById('who').textContent='Signed in as '+(session.user.email||'');
-    await loadLeads();
+    document.getElementById('who').textContent=session.user.email||'';
+    await loadAll();
   }
 
   document.getElementById('loginBtn').addEventListener('click', async function(){
@@ -121,7 +209,7 @@
   });
   document.getElementById('password').addEventListener('keydown',function(e){ if(e.key==='Enter') document.getElementById('loginBtn').click(); });
   document.getElementById('logoutBtn').addEventListener('click', async function(){ await sb.auth.signOut(); show('login'); });
-  document.getElementById('refreshBtn').addEventListener('click', loadLeads);
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
 
   (async function init(){
     var s=await sb.auth.getSession();
