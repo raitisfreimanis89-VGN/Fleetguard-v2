@@ -46,6 +46,7 @@ serve(async (req) => {
     referrer: clip(b.ref, 300),
     ua,
     vid: vid || null,
+    source: clip(b.source, 60) || null,
   });
   return json({ ok: true });
 });

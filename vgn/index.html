@@ -642,7 +642,8 @@ summary:focus-visible,a:focus-visible{outline:3px solid #ff7a18;outline-offset:3
     var _hdrs={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
     var _vid=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(16).slice(2));
     var _t0=Date.now();
-    fetch(_TRACK,{method:'POST',keepalive:true,headers:_hdrs,body:JSON.stringify({path:location.pathname,ref:document.referrer,vid:_vid})}).catch(function(){});
+    var _src=''; try{ _src=(new URLSearchParams(location.search).get('utm_source')||'').slice(0,60); }catch(e){}
+    fetch(_TRACK,{method:'POST',keepalive:true,headers:_hdrs,body:JSON.stringify({path:location.pathname,ref:document.referrer,vid:_vid,source:_src})}).catch(function(){});
     function _leave(){ var dwell=Math.min(Date.now()-_t0,1800000);
       try{ fetch(_TRACK,{method:'POST',keepalive:true,headers:_hdrs,body:JSON.stringify({vid:_vid,dwell_ms:dwell})}).catch(function(){}); }catch(e){} }
     window.addEventListener('pagehide', _leave);

@@ -951,12 +951,13 @@ async function renderLeadsAsync(){
   const DAY=86400000, CHART_DAYS=30;
   const chartStart=new Date(); chartStart.setHours(0,0,0,0); chartStart.setDate(chartStart.getDate()-(CHART_DAYS-1));
 
-  const [leadsRes, stats, leadsCountRes, dwellRes, dailyRes] = await Promise.all([
+  const [leadsRes, stats, leadsCountRes, dwellRes, dailyRes, srcRes] = await Promise.all([
     sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
     loadViewStats(),
     sb.from('driver_leads').select('id',{count:'exact',head:true}),
     sb.from('page_views').select('dwell_ms').not('dwell_ms','is',null).limit(10000),
-    sb.from('page_views').select('created_at').gte('created_at', chartStart.toISOString()).limit(50000)
+    sb.from('page_views').select('created_at').gte('created_at', chartStart.toISOString()).limit(50000),
+    sb.from('page_views').select('source,referrer').limit(50000)
   ]);
   const leads=leadsRes.data||[];
   // Engagement: average time on page + bounces (under 10s) from measured visits.
@@ -989,6 +990,25 @@ async function renderLeadsAsync(){
   series.forEach(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; chartHtml+='<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; });
   chartHtml+='</div><div class="pv-axis"><span>'+shortDay(series[0].d)+'</span><span>'+shortDay(series[series.length-1].d)+'</span></div></div>';
 
+  // Traffic sources: utm_source first, else infer from referrer.
+  const srcCounts={indeed:0,facebook:0,craigslist:0,direct:0};
+  const classifySrc=function(utm,ref){
+    var s=(utm||'').toLowerCase();
+    if(s.indexOf('indeed')>=0) return 'indeed';
+    if(s.indexOf('facebook')>=0||s==='fb'||s==='meta') return 'facebook';
+    if(s.indexOf('craigslist')>=0||s==='cl') return 'craigslist';
+    if(!s){ var r=(ref||'').toLowerCase();
+      if(r.indexOf('indeed')>=0) return 'indeed';
+      if(r.indexOf('facebook')>=0||r.indexOf('fb.')>=0||r.indexOf('fb.me')>=0) return 'facebook';
+      if(r.indexOf('craigslist')>=0) return 'craigslist'; }
+    return 'direct';
+  };
+  ((srcRes&&srcRes.data)||[]).forEach(function(r){ srcCounts[classifySrc(r.source,r.referrer)]++; });
+  const srcLabels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+  var _topKey='direct', _topN=-1;
+  Object.keys(srcCounts).forEach(function(k){ if(srcCounts[k]>_topN){ _topN=srcCounts[k]; _topKey=k; } });
+  const topSrcStr = _topN>0 ? ('Top: '+srcLabels[_topKey]) : 'by utm_source';
+
   let html='<div class="v2-region">';
   html+='<div class="v2-page-head"><h1>Driver Leads</h1><p>Callback requests from the recruiting site, and how many people are visiting it.</p></div>';
 
@@ -1018,6 +1038,15 @@ async function renderLeadsAsync(){
     +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+avgStr+'</span><span class="v2-pulse-label">Avg. time on page</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(bounces)+'</span><span class="v2-pulse-label">Bounces (&lt;10s)</span></div>'
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+bounceRate+'</span><span class="v2-pulse-label">Bounce rate</span></div>'
+    +'</div></div></article>'
+    +'<article class="v2-console v2-accent-amber"><div class="v2-console-head">'
+    +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><circle cx="12" cy="12" r="2"/></svg></span>'
+    +'<h2>Traffic sources</h2><span class="v2-console-note">'+topSrcStr+'</span></div>'
+    +'<div class="v2-console-body"><div class="v2-pulse-grid">'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(srcCounts.indeed)+'</span><span class="v2-pulse-label">Indeed</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(srcCounts.facebook)+'</span><span class="v2-pulse-label">Facebook</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(srcCounts.craigslist)+'</span><span class="v2-pulse-label">Craigslist</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(srcCounts.direct)+'</span><span class="v2-pulse-label">Direct / other</span></div>'
     +'</div></div></article></section>';
 
   // Leads table — same shell as Drivers / Inspections.
