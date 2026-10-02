@@ -948,11 +948,15 @@ async function renderLeadsAsync(){
   const IC_CHART='<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>';
   c.innerHTML='<div class="v2-region"><div class="v2-page-head"><h1>Driver Leads</h1><p>Loading…</p></div></div>';
 
-  const [leadsRes, stats, leadsCountRes, dwellRes] = await Promise.all([
+  const DAY=86400000, CHART_DAYS=30;
+  const chartStart=new Date(); chartStart.setHours(0,0,0,0); chartStart.setDate(chartStart.getDate()-(CHART_DAYS-1));
+
+  const [leadsRes, stats, leadsCountRes, dwellRes, dailyRes] = await Promise.all([
     sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
     loadViewStats(),
     sb.from('driver_leads').select('id',{count:'exact',head:true}),
-    sb.from('page_views').select('dwell_ms').not('dwell_ms','is',null).limit(10000)
+    sb.from('page_views').select('dwell_ms').not('dwell_ms','is',null).limit(10000),
+    sb.from('page_views').select('created_at').gte('created_at', chartStart.toISOString()).limit(50000)
   ]);
   const leads=leadsRes.data||[];
   // Engagement: average time on page + bounces (under 10s) from measured visits.
@@ -972,6 +976,19 @@ async function renderLeadsAsync(){
   const digits=(p)=>String(p||'').replace(/[^0-9+]/g,'');
   const dt=(s)=>{ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); };
 
+  // Daily visits bar chart (last 30 days), Supabase style.
+  const dayKey=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const buckets={};
+  for(var _i=0;_i<CHART_DAYS;_i++){ var _dd=new Date(chartStart.getTime()+_i*DAY); buckets[dayKey(_dd)]={d:_dd,n:0}; }
+  ((dailyRes&&dailyRes.data)||[]).forEach(function(r){ var d=new Date(r.created_at); d.setHours(0,0,0,0); var k=dayKey(d); if(buckets[k]) buckets[k].n++; });
+  const series=Object.keys(buckets).sort().map(function(k){return buckets[k];});
+  const maxN=Math.max.apply(null,[1].concat(series.map(function(s){return s.n;})));
+  const shortDay=function(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+  const chartCss='<style>.pv-chart{margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px}.pv-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.pv-head b{font-size:12px;color:#8796a9;font-weight:700;letter-spacing:.05em;text-transform:uppercase}.pv-head span{font-size:11px;color:#8796a9}.pv-bars{display:flex;align-items:flex-end;gap:2px;height:90px}.pv-bar{flex:1 1 0;min-width:2px;background:#3ecf8e;border-radius:2px 2px 0 0;opacity:.85}.pv-bar:hover{opacity:1}.pv-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:#8796a9}</style>';
+  let chartHtml=chartCss+'<div class="pv-chart"><div class="pv-head"><b>Daily visits</b><span>last 30 days &middot; peak '+maxN+'/day</span></div><div class="pv-bars">';
+  series.forEach(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; chartHtml+='<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; });
+  chartHtml+='</div><div class="pv-axis"><span>'+shortDay(series[0].d)+'</span><span>'+shortDay(series[series.length-1].d)+'</span></div></div>';
+
   let html='<div class="v2-region">';
   html+='<div class="v2-page-head"><h1>Driver Leads</h1><p>Callback requests from the recruiting site, and how many people are visiting it.</p></div>';
 
@@ -985,7 +1002,7 @@ async function renderLeadsAsync(){
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(stats.thisWeek)+'</span><span class="v2-pulse-label">This week</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(stats.month)+'</span><span class="v2-pulse-label">This month</span></div>'
     +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.total)+'</span><span class="v2-pulse-label">Total</span></div>'
-    +'</div></div></article>'
+    +'</div>'+chartHtml+'</div></article>'
     +'<article class="v2-console v2-accent-green"><div class="v2-console-head">'
     +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>'
     +'<h2>Conversion</h2><span class="v2-console-note">visits &rarr; leads (all time)</span></div>'
