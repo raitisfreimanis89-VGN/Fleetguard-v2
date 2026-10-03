@@ -118,7 +118,7 @@
   }
   function show(view){ loginEl.style.display=(view==='login')?'block':'none'; appEl.style.display=(view==='app')?'block':'none'; }
 
-  function renderDash(pv, leadsTotal){
+  function renderDash(pv, leadsTotal, leads){
     var now=new Date();
     var dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
     var dow=(dayStart.getDay()+6)%7; var weekStart=new Date(dayStart); weekStart.setDate(dayStart.getDate()-dow);
@@ -145,6 +145,10 @@
     var labels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
     var topKey='direct',topN=-1; Object.keys(src).forEach(function(k){ if(src[k]>topN){topN=src[k];topKey=k;} });
     var topStr=topN>0?('Top: '+labels[topKey]):'by utm_source';
+    var leadSrc={indeed:0,facebook:0,craigslist:0,direct:0};
+    (leads||[]).forEach(function(l){ var ls=(l.source||'').toLowerCase(); leadSrc[(ls==='indeed'||ls==='facebook'||ls==='craigslist')?ls:'direct']++; });
+    var ltopKey='direct',ltopN=-1; Object.keys(leadSrc).forEach(function(k){ if(leadSrc[k]>ltopN){ltopN=leadSrc[k];ltopKey=k;} });
+    var topLeadStr=ltopN>0?('Top: '+labels[ltopKey]):'from tagged links';
     var bars=series.map(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; return '<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; }).join('');
     var st=function(cls,n,l){ return '<div class="stat"><div class="n '+cls+'">'+num(n)+'</div><div class="l">'+l+'</div></div>'; };
     document.getElementById('dash').innerHTML=
@@ -156,6 +160,7 @@
         '<div class="statcard"><div class="cardtitle">Conversion <span class="note">visits &rarr; leads</span></div><div class="stats">'+st('c-cyan',leadsTotal,'Leads received')+st('c-amber',ratioStr,'Visits per lead')+st('c-green',rateStr,'Conversion rate')+'</div></div>'+
         '<div class="statcard"><div class="cardtitle">Engagement <span class="note">'+measured+' measured</span></div><div class="stats">'+st('c-cyan',fmtDwell(avgMs),'Avg. time on page')+st('c-amber',bounces,'Bounces (&lt;10s)')+st('c-green',bounceRate,'Bounce rate')+'</div></div>'+
         '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">'+topStr+'</span></div><div class="stats">'+st('c-cyan',src.indeed,'Indeed')+st('c-blue',src.facebook,'Facebook')+st('c-green',src.craigslist,'Craigslist')+st('c-amber',src.direct,'Direct / other')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Leads by source <span class="note">'+topLeadStr+'</span></div><div class="stats">'+st('c-cyan',leadSrc.indeed,'Indeed')+st('c-blue',leadSrc.facebook,'Facebook')+st('c-green',leadSrc.craigslist,'Craigslist')+st('c-amber',leadSrc.direct,'Direct / other')+'</div></div>'+
       '</div>';
   }
 
@@ -182,12 +187,12 @@
     document.getElementById('dash').innerHTML='<div class="muted" style="padding:20px 0">Loading…</div>';
     var r=await Promise.all([
       sb.from('page_views').select('created_at,dwell_ms,source,referrer').limit(50000),
-      sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status').order('created_at',{ascending:false}).limit(500),
+      sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status,source').order('created_at',{ascending:false}).limit(500),
       sb.from('driver_leads').select('id',{count:'exact',head:true})
     ]);
     var pvRes=r[0], leadsRes=r[1], leadsCountRes=r[2];
     var leadsTotal=(leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null)?leadsCountRes.count:((leadsRes.data||[]).length);
-    renderDash(pvRes.data||[], leadsTotal);
+    renderDash(pvRes.data||[], leadsTotal, leadsRes.data||[]);
     renderTable(leadsRes);
   }
 
