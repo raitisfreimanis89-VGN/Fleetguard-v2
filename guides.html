@@ -31,6 +31,7 @@
     --shadow-hover:0 6px 16px rgba(0,0,0,.55), 0 30px 60px -18px rgba(0,0,0,.72);
   }
   *{box-sizing:border-box;}
+  [hidden]{display:none !important;}
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font-family:'Inter',-apple-system,'Segoe UI',Arial,sans-serif;
@@ -38,7 +39,24 @@
   }
   a{text-decoration:none; color:inherit;}
 
-  /* masthead */
+  /* Colour by CATEGORY, not per card — led by the FleetGuard orange.
+     --ca = accent on the page surface, --cs = its soft tint,
+     --cd = accent on the fixed-dark photo chips (same in both themes).
+     Dispatch is red rather than a second orange so it stays distinct
+     beside "Your truck" in both themes. */
+  [data-cat="truck"]   { --ca:#e2711d; --cs:rgba(226,113,29,.13); --cd:#f59e4b; }
+  [data-cat="road"]    { --ca:#0e9aa7; --cs:rgba(14,154,167,.13); --cd:#3fc7d4; }
+  [data-cat="dispatch"]{ --ca:#dc2626; --cs:rgba(220,38,38,.11); --cd:#f2726f; }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]) [data-cat="truck"]   { --ca:#f59e4b; --cs:rgba(245,158,75,.15); }
+    :root:not([data-theme="light"]) [data-cat="road"]    { --ca:#3fc7d4; --cs:rgba(63,199,212,.15); }
+    :root:not([data-theme="light"]) [data-cat="dispatch"]{ --ca:#f2726f; --cs:rgba(242,114,111,.15); }
+  }
+  :root[data-theme="dark"] [data-cat="truck"]   { --ca:#f59e4b; --cs:rgba(245,158,75,.15); }
+  :root[data-theme="dark"] [data-cat="road"]    { --ca:#3fc7d4; --cs:rgba(63,199,212,.15); }
+  :root[data-theme="dark"] [data-cat="dispatch"]{ --ca:#f2726f; --cs:rgba(242,114,111,.15); }
+
+  /* ---------- masthead ---------- */
   .hero{
     background:
       radial-gradient(1100px 320px at 12% -10%, rgba(226,113,29,.26), transparent 60%),
@@ -53,24 +71,23 @@
   .hero h1{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.35rem; line-height:1.06; letter-spacing:-.02em; margin:1rem 0 0;}
   .hero p{color:#adbdd6; font-size:1.06rem; margin:.7rem 0 0; max-width:58ch;}
   .hero .count{display:inline-flex; align-items:center; gap:.5rem; margin-top:1.2rem; font-size:.82rem; color:#9fb0c9; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); padding:.4rem .8rem; border-radius:999px; font-weight:600;}
+  .hero .count svg{width:15px; height:15px; color:#f0a868;}
 
-  /* 511 road-feed strip.
-     Deliberately says it is NOT connected. Wiring a real feed happens via
-     setRoadFeed() at the bottom of this file; until then it must never
-     assert that a road or pass is clear. */
+  /* NWS alerts strip.
+     Never asserts a road or pass is clear on no evidence — see the script. */
   .feed{
     display:flex; align-items:center; gap:.7rem; flex-wrap:wrap;
     margin-top:1.3rem; padding:.6rem .85rem; border-radius:12px;
     background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09);
   }
-  .feed .f-tag{
+  .f-tag{
     display:inline-flex; align-items:center; gap:.4rem; flex-shrink:0;
     font-family:'IBM Plex Mono',monospace; font-size:.66rem; font-weight:600;
     letter-spacing:.1em; text-transform:uppercase;
     color:#9fb0c9; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
     padding:.22rem .5rem; border-radius:6px;
   }
-  .feed .f-dot{width:6px; height:6px; border-radius:50%; background:#8b97a8;}
+  .f-dot{width:6px; height:6px; border-radius:50%; background:#8b97a8;}
   .feed[data-state="live"] .f-dot{background:#34d399; box-shadow:0 0 6px #34d399;}
   .feed[data-state="alert"] .f-dot{background:#f2726f; box-shadow:0 0 6px #f2726f;}
   .feed .f-msg{font-size:.83rem; color:#adbdd6; flex:1; min-width:12rem;}
@@ -78,7 +95,6 @@
   .feed a:hover, .feed .f-btn:hover{text-decoration:underline;}
   .feed .f-btn{background:none; border:0; padding:0; cursor:pointer; font-family:inherit;}
 
-  /* Active NWS alerts, grouped by event type. */
   .alerts{margin-top:.5rem; display:flex; flex-direction:column; gap:.3rem;}
   .alerts .a-row{
     display:flex; align-items:center; gap:.6rem; flex-wrap:wrap;
@@ -98,20 +114,66 @@
   .alerts .a-when{margin-left:auto; font-size:.72rem; color:#8797ad; white-space:nowrap;}
   .alerts .a-src{font-size:.7rem; color:#66788f; padding:.2rem .2rem 0;}
 
-  /* filter / search bar */
-  .bar{
-    position:sticky; top:0; z-index:20;
-    background:var(--bg); border-bottom:1px solid var(--line);
+  /* I-80 Wyoming corridor — ported from the dispatcher Guides page.
+     Closed by default; the header chip always carries the live summary,
+     so a folded panel never hides an active alert. */
+  .i80{margin-top:.6rem; border-radius:12px; background:rgba(255,255,255,.045); border:1px solid rgba(255,255,255,.09);}
+  .i80-head{display:flex; align-items:center; gap:.6rem .8rem; flex-wrap:wrap; padding:.55rem .85rem;}
+  .i80-toggle{
+    display:flex; align-items:center; gap:.7rem; flex:1 1 auto; min-width:0;
+    background:none; border:0; padding:.15rem 0; color:inherit; font:inherit; cursor:pointer; text-align:left;
   }
+  .i80-toggle:focus-visible, .i80-dir:focus-visible{outline:2px solid #f0a868; outline-offset:3px; border-radius:6px;}
+  .i80-status{
+    font-size:.78rem; font-weight:600; padding:.12rem .6rem; border-radius:999px; white-space:nowrap;
+    color:#9fb0c9; border:1px solid rgba(255,255,255,.14);
+  }
+  .i80-status.is-clear{color:#5ee0a8; background:rgba(52,211,153,.1); border-color:rgba(52,211,153,.35);}
+  .i80-status.is-alert{color:#f7b77a; background:rgba(245,158,75,.12); border-color:rgba(245,158,75,.4);}
+  .i80-chev{width:16px; height:16px; flex-shrink:0; color:#8797ad; transition:transform .18s;}
+  .i80.is-open .i80-chev{transform:rotate(180deg);}
+  .i80-dirs{display:flex; gap:2px; padding:2px; border-radius:9px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.09);}
+  .i80-dir{
+    font-family:'IBM Plex Mono',monospace; font-size:.7rem; font-weight:600; letter-spacing:.04em;
+    padding:.3rem .55rem; border-radius:7px; border:1px solid transparent; background:none; color:#9fb0c9; cursor:pointer;
+  }
+  .i80-dir:hover{color:#f0f5ff;}
+  .i80-dir.is-active{background:rgba(245,158,75,.16); border-color:rgba(245,158,75,.45); color:#f7b77a;}
+  .i80-body{padding:0 .85rem .8rem;}
+  .i80-segs{display:flex; flex-direction:column; gap:.35rem;}
+  .i80-seg{
+    display:flex; align-items:center; justify-content:space-between; gap:.4rem .8rem; flex-wrap:wrap;
+    padding:.5rem .7rem; border-radius:9px; background:rgba(255,255,255,.035);
+    border:1px solid rgba(255,255,255,.07); border-left:3px solid #8b97a8;
+  }
+  .i80-seg.is-clear{border-left-color:#34d399;}
+  .i80-seg.is-watch{border-left-color:#f5b14b;}
+  .i80-seg.is-alert{border-left-color:#f2726f;}
+  .i80-towns{display:block; font-size:.86rem; font-weight:600; color:#eef3fb;}
+  .i80-county{display:block; font-family:'IBM Plex Mono',monospace; font-size:.64rem; letter-spacing:.06em; text-transform:uppercase; color:#8797ad;}
+  .i80-chips{display:flex; gap:.35rem; flex-wrap:wrap;}
+  .i80-chip{font-size:.72rem; font-weight:600; padding:.12rem .5rem; border-radius:999px; border:1px solid; white-space:nowrap;}
+  .i80-chip.is-clear{color:#5ee0a8; background:rgba(52,211,153,.1);  border-color:rgba(52,211,153,.32);}
+  .i80-chip.is-wind {color:#f7b77a; background:rgba(245,158,75,.12); border-color:rgba(245,158,75,.4);}
+  .i80-chip.is-snow {color:#67d4e0; background:rgba(63,199,212,.12); border-color:rgba(63,199,212,.38);}
+  .i80-chip.is-ice  {color:#9ec0ff; background:rgba(120,160,255,.12); border-color:rgba(120,160,255,.38);}
+  .i80-chip.is-other{color:#b6c3d6; background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.14);}
+  .i80-note{font-size:.82rem; color:#adbdd6; padding:.3rem 0;}
+  .i80-note a, .i80-foot a{color:#f0a868; font-weight:600;}
+  .i80-foot{font-size:.74rem; color:#8797ad; margin-top:.55rem; line-height:1.45;}
+  .i80-foot b{color:#cdd9ea;}
+  @media (prefers-reduced-motion:reduce){ .i80-chev{transition:none;} }
+
+  /* ---------- filter / search bar ---------- */
+  .bar{position:sticky; top:0; z-index:20; background:var(--bg); border-bottom:1px solid var(--line);}
   .bar-inner{
     max-width:1080px; margin:0 auto; padding:.8rem 1.5rem;
-    display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap;
+    display:flex; align-items:center; justify-content:space-between; gap:.7rem 1rem; flex-wrap:wrap;
   }
-  .tabs{display:flex; gap:.4rem; overflow-x:auto; scrollbar-width:none;}
-  .tabs::-webkit-scrollbar{display:none;}
+  .tabs{display:flex; flex-wrap:wrap; gap:.4rem;}
   .tab{
-    display:inline-flex; align-items:center; gap:.45rem; flex-shrink:0;
-    padding:.45rem .8rem; border-radius:10px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:.45rem;
+    padding:.5rem .8rem; border-radius:10px; cursor:pointer;
     background:transparent; border:1px solid transparent; color:var(--ink2);
     font-family:'Inter',sans-serif; font-size:.86rem; font-weight:600;
     transition:background .15s, color .15s, border-color .15s;
@@ -124,11 +186,12 @@
     padding:.05rem .38rem; border-radius:999px;
   }
   .tab.active .n{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .tab .short{display:none;}
   .search{position:relative; flex:0 1 300px; min-width:200px;}
   .search input{
     width:100%; background:var(--surface); border:1.5px solid var(--line); border-radius:10px;
-    padding:.55rem 2rem .55rem .8rem; color:var(--ink); font-family:'Inter',sans-serif;
-    font-size:.88rem; outline:none; transition:border-color .15s;
+    padding:.6rem 2rem .6rem .8rem; color:var(--ink); font-family:'Inter',sans-serif;
+    font-size:.9rem; outline:none; transition:border-color .15s;
   }
   .search input:focus{border-color:var(--accent);}
   .search input::placeholder{color:var(--ink3);}
@@ -139,78 +202,90 @@
     pointer-events:none;
   }
   .search input:not(:placeholder-shown) ~ .key{display:none;}
+  /* The "/" shortcut means nothing without a keyboard. */
+  @media (hover:none){ .search .key{display:none;} }
 
-  /* grid + sections */
+  /* ---------- sections ---------- */
   main{max-width:1080px; margin:0 auto; padding:1.8rem 1.5rem 3rem;}
-  .grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:1.15rem;}
-  .sec-head{display:flex; align-items:center; gap:.7rem; margin:2.3rem 0 1.05rem;}
-  .sec:first-child .sec-head{margin-top:.2rem;}
+  .sec + .sec{margin-top:2.4rem;}
+  .sec-head{display:flex; align-items:center; gap:.7rem; margin:0 0 1rem;}
   .sec-head .s-ic{
-    width:30px; height:30px; border-radius:9px; flex-shrink:0;
+    width:32px; height:32px; border-radius:9px; flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
-    background:var(--surface2); border:1px solid var(--line); color:var(--accent);
+    background:var(--cs); border:1px solid var(--line); color:var(--ca);
   }
-  .sec-head .s-ic svg{width:17px; height:17px;}
+  .sec-head .s-ic svg{width:18px; height:18px;}
   .sec-head h2{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.18rem; letter-spacing:-.01em; margin:0; white-space:nowrap;}
-  .sec-head .s-rule{flex:1; height:1px; background:var(--line);}
+  .sec-head .s-sub{font-size:.85rem; color:var(--ink3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .sec-head .s-rule{flex:1; height:1px; background:var(--line); min-width:1rem;}
   .sec-head .s-cnt{font-size:.72rem; font-weight:700; color:var(--ink3); background:var(--surface); border:1px solid var(--line); border-radius:999px; padding:.2rem .62rem; white-space:nowrap;}
 
-  .card{
+  /* One big photo card leads each section; the rest are compact rows. */
+  .sec-body{display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:1rem; align-items:start;}
+  .sec-body.solo{grid-template-columns:minmax(0,1fr);}
+  .sec-body.solo .lead{max-width:520px;}
+
+  .lead{
     position:relative; display:flex; flex-direction:column;
-    background:var(--surface); border:1px solid var(--line); border-radius:18px;
-    padding:1.35rem 1.35rem 1.25rem; box-shadow:var(--shadow);
-    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    overflow:hidden; min-height:200px;
+    background:var(--surface); border:1px solid var(--line); border-radius:18px; overflow:hidden;
+    box-shadow:var(--shadow); transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   }
-  .card::after{
-    content:""; position:absolute; inset:0 0 auto 0; height:3px; border-radius:18px 18px 0 0;
-    background:var(--card-accent, var(--accent)); opacity:.9;
-  }
-  .card:hover{ transform:translateY(-5px); box-shadow:var(--shadow-hover); border-color:var(--card-accent, var(--accent)); }
-  .badge{
-    width:54px; height:54px; border-radius:15px; display:flex; align-items:center; justify-content:center;
-    background:var(--card-soft, var(--surface2)); border:1px solid var(--line);
-    color:var(--card-accent, var(--accent)); transition:transform .18s ease;
-  }
-  .card:hover .badge{transform:scale(1.06);}
-  .badge svg{width:28px; height:28px;}
-  .tag{
-    align-self:flex-start; margin-top:1.05rem; font-size:.68rem; font-weight:700; letter-spacing:.06em;
-    text-transform:uppercase; color:var(--card-accent, var(--accent));
-    background:var(--card-soft, var(--surface2)); border:1px solid var(--line);
+  .lead:hover{transform:translateY(-4px); box-shadow:var(--shadow-hover); border-color:var(--ca);}
+  .lead-pic{position:relative; height:168px; overflow:hidden; background:#0b1220;}
+  .lead-pic img{width:100%; height:100%; object-fit:cover; display:block; transition:transform .45s ease;}
+  .lead:hover .lead-pic img{transform:scale(1.05);}
+  .lead-pic::after{content:""; position:absolute; left:0; right:0; bottom:0; height:3px; background:var(--ca);}
+  /* Copy never sits on the photograph — only this small chip does, on its own dark ground. */
+  .lead-tag{
+    position:absolute; top:.8rem; left:.8rem; z-index:1;
+    font-size:.66rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--cd); background:rgba(8,13,24,.8); border:1px solid rgba(255,255,255,.14);
     padding:.28rem .6rem; border-radius:999px;
   }
-  .card h2{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.24rem; letter-spacing:-.01em; margin:.55rem 0 0; color:var(--ink);}
-  .card p{color:var(--ink2); font-size:.95rem; line-height:1.5; margin:.5rem 0 0;}
+  .lead-body{display:flex; flex-direction:column; flex:1; padding:1.05rem 1.2rem 1.15rem;}
+  .lead h3{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.28rem; letter-spacing:-.01em; margin:0; color:var(--ink);}
+  .lead p{color:var(--ink2); font-size:.95rem; line-height:1.5; margin:.45rem 0 0;}
   .meta{
-    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.75rem;
+    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-top:.65rem;
     font-family:'IBM Plex Mono',monospace; font-size:.68rem; font-weight:600; color:var(--ink3);
   }
   .meta .sep{opacity:.5;}
   .open{
-    margin-top:auto; padding-top:1.05rem; display:inline-flex; align-items:center; gap:.4rem;
-    font-weight:700; font-size:.9rem; color:var(--card-accent, var(--accent));
+    margin-top:.95rem; display:inline-flex; align-items:center; gap:.4rem; align-self:flex-start;
+    font-weight:700; font-size:.92rem; color:var(--ca);
   }
   .open .arrow{transition:transform .18s ease;}
-  .card:hover .open .arrow{transform:translateX(4px);}
+  .lead:hover .open .arrow{transform:translateX(4px);}
 
-  /* Card accent by SECTION, not per card — colour means "which category",
-     led by the FleetGuard orange. Compliance is red rather than a second
-     orange so it stays legible next to Guides in both themes. */
-  [data-section="tools"]     .card{ --card-accent:#e2711d; --card-soft:rgba(226,113,29,.13); }
-  [data-section="maps"]       .card{ --card-accent:#0e9aa7; --card-soft:rgba(14,154,167,.13); }
-  [data-section="reference"] .card{ --card-accent:#dc2626; --card-soft:rgba(220,38,38,.12); }
-  @media (prefers-color-scheme:dark){
-    :root:not([data-theme="light"]) [data-section="tools"]     .card{ --card-accent:#f59e4b; --card-soft:rgba(245,158,75,.15); }
-    :root:not([data-theme="light"]) [data-section="maps"]       .card{ --card-accent:#3fc7d4; --card-soft:rgba(63,199,212,.15); }
-    :root:not([data-theme="light"]) [data-section="reference"] .card{ --card-accent:#f2726f; --card-soft:rgba(242,114,111,.15); }
+  .rows{display:flex; flex-direction:column; gap:.6rem;}
+  .row{
+    display:flex; align-items:center; gap:.9rem; min-height:86px;
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:.75rem .9rem; box-shadow:var(--shadow);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
   }
-  :root[data-theme="dark"] [data-section="tools"]     .card{ --card-accent:#f59e4b; --card-soft:rgba(245,158,75,.15); }
-  :root[data-theme="dark"] [data-section="maps"]       .card{ --card-accent:#3fc7d4; --card-soft:rgba(63,199,212,.15); }
-  :root[data-theme="dark"] [data-section="reference"] .card{ --card-accent:#f2726f; --card-soft:rgba(242,114,111,.15); }
-  /* Reference holds 4 cards — tighten its columns so they sit on one line
-     instead of wrapping a lone orphan onto a second row. */
-  [data-section="reference"] .grid{ grid-template-columns:repeat(auto-fill, minmax(228px, 1fr)); }
+  .row:hover{transform:translateY(-2px); box-shadow:var(--shadow-hover); border-color:var(--ca);}
+  .thumb{
+    width:62px; height:62px; flex:0 0 auto; border-radius:12px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--cs); border:1px solid var(--line); color:var(--ca);
+  }
+  .thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .thumb svg{width:34px; height:34px;}
+  .thumb svg.sign{width:46px; height:46px;}
+  .row-body{flex:1; min-width:0;}
+  .row-tag{display:block; font-size:.64rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--ca);}
+  .row h3{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.02rem; letter-spacing:-.005em; margin:.12rem 0 0; color:var(--ink);}
+  .row p{
+    color:var(--ink2); font-size:.86rem; line-height:1.42; margin:.18rem 0 0;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .row .meta{margin-top:.35rem;}
+  .go{flex:0 0 auto; width:20px; height:20px; color:var(--ink3); transition:transform .18s ease, color .18s ease;}
+  .row:hover .go{color:var(--ca); transform:translateX(3px);}
+  .row:hover .go.ext{transform:translate(2px,-2px);}
+
+  .lead:focus-visible, .row:focus-visible, .tab:focus-visible{outline:2px solid var(--accent); outline-offset:3px;}
 
   /* request callout */
   .callout{
@@ -241,10 +316,31 @@
   footer{ max-width:1080px; margin:0 auto; padding:0 1.5rem 3rem; color:var(--ink3); font-size:.85rem; }
   footer .rule{ height:1px; background:var(--line); margin-bottom:1.2rem; }
 
+  @media (max-width:820px){
+    .sec-body{grid-template-columns:minmax(0,1fr);}
+    .sec-body .lead, .sec-body.solo .lead{max-width:none;}
+    .sec-head .s-sub{display:none;}
+  }
+  @media (max-width:640px){
+    /* On a phone a sticky bar would eat a fifth of the screen. */
+    .bar{position:static;}
+    .tab .long{display:none;} .tab .short{display:inline;}
+    .tabs{gap:.2rem; flex-wrap:nowrap; width:100%; justify-content:space-between;}
+    .tab{padding:.65rem .42rem; gap:.3rem; font-size:.84rem;}
+    .search{flex:1 1 100%;}
+    .lead-pic{height:120px;}
+    /* Direction only matters once the corridor list is open. */
+    .i80:not(.is-open) .i80-dirs{display:none;}
+    /* Rows stay scannable: tag, title, two lines. The spec pills live on the guide itself. */
+    .row .meta{display:none;}
+    .row p{-webkit-line-clamp:2;}
+  }
   @media (max-width:520px){
     .hero h1{font-size:1.9rem;} .hero{padding:2.1rem 1.2rem 1.8rem;}
     main{padding:1.4rem 1.2rem 2.4rem;} .bar-inner{padding:.7rem 1.2rem;}
-    .search{flex:1 1 100%;}
+    .i80-head{padding:.55rem .7rem;} .i80-body{padding:0 .7rem .7rem;}
+    .row{gap:.75rem; padding:.7rem .75rem;}
+    .thumb{width:56px; height:56px;}
   }
 </style>
 </head>
@@ -253,8 +349,8 @@
     <div class="hero-inner">
       <div class="brand"><img src="img/fleetguard-icon.png?v=1" alt=""> FleetGuard <span class="dot"></span></div>
       <h1>Guides &amp; Playbooks</h1>
-      <p>Everything dispatch and drivers need, one tap away &mdash; inspections, load maths, toll costs and DOT compliance.</p>
-      <span class="count">&#x1F4DA; 10 guides available</span>
+      <p>Everything drivers and dispatch need, one tap away &mdash; pre-trip, weights, road conditions and DOT rules.</p>
+      <span class="count"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3Z"/></svg> 11 guides &amp; tools</span>
 
       <div class="feed" id="road-feed" data-state="offline">
         <span class="f-tag"><span class="f-dot"></span> NWS Alerts</span>
@@ -263,146 +359,189 @@
         <a href="https://map.road511.com/" target="_blank" rel="noopener">Open 511 map &#x2197;</a>
       </div>
       <div class="alerts" id="alerts" hidden></div>
+
+      <section class="i80" id="i80" aria-label="I-80 Wyoming corridor">
+        <div class="i80-head">
+          <button type="button" class="i80-toggle" id="i80-toggle" aria-expanded="false" aria-controls="i80-body">
+            <span class="f-tag">I-80 Wyoming</span>
+            <span class="i80-status" id="i80-status">Checking&hellip;</span>
+            <svg class="i80-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="i80-dirs" role="group" aria-label="Travel direction">
+            <button type="button" class="i80-dir is-active" data-dir="ut-ne">UT &rarr; NE</button>
+            <button type="button" class="i80-dir" data-dir="ne-ut">NE &rarr; UT</button>
+          </div>
+        </div>
+        <div class="i80-body" id="i80-body" hidden>
+          <div class="i80-segs" id="i80-segs"><div class="i80-note">Checking the corridor&hellip;</div></div>
+          <div class="i80-foot">Wind, snow and ice from the National Weather Service, by county along the route.
+            <b>Closures are not included</b> &mdash; WYDOT does not publish a feed this page can read.
+            <a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Check WYDOT for closures &#x2197;</a></div>
+        </div>
+      </section>
     </div>
   </header>
 
   <div class="bar">
     <div class="bar-inner">
       <div class="tabs" id="tabs">
-        <button class="tab active" data-cat="all">All <span class="n">10</span></button>
-        <button class="tab" data-cat="tools">Tools <span class="n">3</span></button>
-        <button class="tab" data-cat="maps">Live Maps <span class="n">3</span></button>
-        <button class="tab" data-cat="reference">Reference &amp; Compliance <span class="n">4</span></button>
+        <button class="tab active" data-cat="all">All <span class="n">11</span></button>
+        <button class="tab" data-cat="truck"><span class="long">Your truck</span><span class="short">Truck</span> <span class="n">3</span></button>
+        <button class="tab" data-cat="road"><span class="long">On the road</span><span class="short">Road</span> <span class="n">5</span></button>
+        <button class="tab" data-cat="dispatch"><span class="long">Dispatch &amp; compliance</span><span class="short">Dispatch</span> <span class="n">3</span></button>
       </div>
       <div class="search">
-        <input id="q" type="text" placeholder="Search guides, laws, axle limits..." autocomplete="off" spellcheck="false">
+        <input id="q" type="text" placeholder="Search guides, states, axle limits..." autocomplete="off" spellcheck="false" aria-label="Search guides">
         <span class="key">/</span>
       </div>
     </div>
   </div>
 
   <main>
-    <section class="sec" data-section="tools">
+    <!-- ── Your truck ─────────────────────────────────────────────────── -->
+    <section class="sec" data-cat="truck">
       <div class="sec-head">
-        <span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2.5"/><path d="M8 6h8"/><path d="M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h8"/></svg></span>
-        <h2>Tools</h2><span class="s-rule"></span><span class="s-cnt">3</span>
+        <span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></span>
+        <h2>Your truck</h2><span class="s-sub">Pre-trip, weights and the trailer</span><span class="s-rule"></span><span class="s-cnt">3</span>
       </div>
-      <div class="grid">
-
-<a class="card" data-cat="tools" data-title="pti driver guide pre trip inspection tyres photos dot part 396" href="PTI-driver-guide.html?dispatch=1" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="17" rx="2.5" opacity=".55"/><path d="M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z" fill="currentColor" fill-opacity=".15"/><path d="M8 11h3M8 15h2"/><path d="m13 14 2 2 4.5-4.5"/></svg></div>
-          <span class="tag">Inspections</span>
-          <h2>PTI Driver Guide</h2>
-          <p>Step-by-step pre-trip inspection &mdash; how a driver completes every PTI, tyres and photos included.</p>
-          <div class="meta"><span>DOT PART 396</span></div>
-          <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
+      <div class="sec-body">
+        <a class="lead item" data-cat="truck" data-title="pti driver guide pre trip inspection tyres tires photos dot part 396" href="PTI-driver-guide.html" target="_blank" rel="noopener">
+          <div class="lead-pic"><img src="v2/img/card-pti-truck.jpg" alt="" loading="lazy" style="object-position:30% 62%"><span class="lead-tag">Inspections</span></div>
+          <div class="lead-body">
+            <h3>PTI Driver Guide</h3>
+            <p>Step-by-step pre-trip inspection &mdash; how to complete every PTI, tyres and photos included.</p>
+            <div class="meta"><span>DOT PART 396</span></div>
+            <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
+          </div>
         </a>
-
-<a class="card" data-cat="tools" data-title="toll route console zip code toll cost fuel cost ipass 80k 5 axle calculator turnpike" href="toll-console.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M4 21V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v15"/><path d="M7 9h10" opacity=".45"/><circle cx="12" cy="13" r="3" fill="currentColor" fill-opacity=".15"/><path d="m8 3 4-2 4 2"/></svg></div>
-          <span class="tag">Calculator</span>
-          <h2>Toll &amp; Route Console</h2>
-          <p>Two ZIP codes in &mdash; toll cost, fuel cost, and whether going around the toll road actually pays.</p>
-          <div class="meta"><span>80K / 5-AXLE</span><span class="sep">&middot;</span><span>I-PASS</span></div>
-          <span class="open">Open console <span class="arrow">&#x2192;</span></span>
-        </a>
-
-<a class="card" data-cat="tools" data-title="weight axle limits federal gross tandem 5th wheel slide scale ticket kingpin kp-40" href="weight-axle-limits.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13h20" stroke-width="2"/><circle cx="6.5" cy="17.5" r="2.5" fill="currentColor" fill-opacity=".2"/><circle cx="17.5" cy="17.5" r="2.5" fill="currentColor" fill-opacity=".2"/><path d="M6.5 13v2M17.5 13v2"/><path d="M9 9h6M12 6v6"/><path d="m10 7 2-2 2 2"/></svg></div>
-          <span class="tag">Reference &middot; Tool</span>
-          <h2>Weight &amp; Axle Limits</h2>
-          <p>Federal limits + a live load checker &mdash; type your scale ticket and it says which way to slide the tandems / 5th wheel.</p>
-          <div class="meta"><span>12K / 34K / 34K</span><span class="sep">&middot;</span><span>KP-40</span></div>
-          <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
-        </a>
-
+        <div class="rows">
+          <a class="row item" data-cat="truck" data-title="weight axle limits federal gross tandem 5th wheel slide scale ticket kingpin kp-40" href="weight-axle-limits.html" target="_blank" rel="noopener">
+            <span class="thumb"><img src="v2/img/card-axle-limits.jpg" alt="" loading="lazy"></span>
+            <span class="row-body">
+              <span class="row-tag">Reference &middot; Tool</span>
+              <h3>Weight &amp; Axle Limits</h3>
+              <p>Type your scale ticket &mdash; it says which way to slide the tandems or 5th wheel.</p>
+              <span class="meta"><span>12K / 34K / 34K</span><span class="sep">&middot;</span><span>KP-40</span></span>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+          <a class="row item" data-cat="truck" data-title="trailer dimensions 53 dry van exterior interior cubic capacity tare weight pallets" href="trailer-dimensions.html" target="_blank" rel="noopener">
+            <span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="15" height="11" rx="1.5" fill="currentColor" fill-opacity=".14"/><path d="M17 9h3.5a1.5 1.5 0 0 1 1.5 1.5V16h-5V9Z"/><circle cx="6" cy="18" r="2"/><circle cx="14" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M3.5 3h12M3.5 2v2M15.5 2v2" stroke-width="1.3"/></svg></span>
+            <span class="row-body">
+              <span class="row-tag">Reference</span>
+              <h3>Trailer Dimensions</h3>
+              <p>Our 53&#39; dry van &mdash; exterior and interior dimensions, weight and cubic capacity.</p>
+              <span class="meta"><span>53&#39; &times; 102&quot;</span><span class="sep">&middot;</span><span>4,070 FT&sup3;</span></span>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+        </div>
       </div>
     </section>
 
-    <section class="sec" data-section="maps">
+    <!-- ── On the road ────────────────────────────────────────────────── -->
+    <section class="sec" data-cat="road">
       <div class="sec-head">
-        <span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></span>
-        <h2>Live Maps</h2><span class="s-rule"></span><span class="s-cnt">3</span>
+        <span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19 8 5"/><path d="m16 5 4 14"/><path d="M12 6v2M12 11v2M12 16v2"/></svg></span>
+        <h2>On the road</h2><span class="s-sub">Conditions, scales and paperwork</span><span class="s-rule"></span><span class="s-cnt">5</span>
       </div>
-      <div class="grid">
-
-<a class="card" data-cat="maps" data-title="cat scale locator weigh load nearest certified scale catscale" href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2 19h20" stroke-width="2.1"/><rect x="4" y="15" width="16" height="4" rx="1" fill="currentColor" fill-opacity=".18"/><path d="M12 15V4"/><circle cx="12" cy="7" r="4" fill="currentColor" fill-opacity=".12"/><path d="M7 11 3 15M17 11l4 4"/></svg></div>
-          <span class="tag">Locator &middot; External</span>
-          <h2>CAT Scale Locator</h2>
-          <p>Find the nearest CAT Scale to weigh your load &mdash; opens the live locator map on catscale.com.</p>
-          <span class="open">Open locator <span class="arrow">&#x2197;</span></span>
+      <div class="sec-body">
+        <a class="lead item" data-cat="road" data-title="road conditions traffic 511 map weather accidents construction live national" href="https://map.road511.com/" target="_blank" rel="noopener">
+          <div class="lead-pic"><img src="v2/img/card-traffic.jpg" alt="" loading="lazy" style="object-position:center 74%"><span class="lead-tag">Live map &middot; External</span></div>
+          <div class="lead-body">
+            <h3>Road Conditions &amp; Traffic</h3>
+            <p>Live weather, traffic, accidents and construction across the country &mdash; opens the 511 map.</p>
+            <span class="open">Open map <span class="arrow">&#x2197;</span></span>
+          </div>
         </a>
-
-<a class="card" data-cat="maps" data-title="road conditions traffic 511 map weather accidents construction live national" href="https://map.road511.com/" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19 8 5h8l4 14"/><line x1="12" y1="7" x2="12" y2="9"/><line x1="12" y1="12" x2="12" y2="14"/><line x1="12" y1="17" x2="12" y2="19"/><circle cx="17.5" cy="9.5" r="2.5" fill="currentColor" fill-opacity=".2"/></svg></div>
-          <span class="tag">Live map &middot; External</span>
-          <h2>Road Conditions &amp; Traffic</h2>
-          <p>Live weather, traffic, accidents &amp; construction across the country &mdash; opens the 511 map.</p>
-          <span class="open">Open map <span class="arrow">&#x2197;</span></span>
-        </a>
-
-<a class="card" data-cat="maps" data-title="state dot 511 maps by state road weather winter pass cameras closures" href="dot-state-maps.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21" fill="currentColor" fill-opacity=".12"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></div>
-          <span class="tag">By state</span>
-          <h2>State DOT / 511 Maps</h2>
-          <p>Official live road, weather &amp; traffic map for every state &mdash; tap your state. Great in winter.</p>
-          <div class="meta"><span>50 STATES</span></div>
-          <span class="open">Open list <span class="arrow">&#x2192;</span></span>
-        </a>
-
+        <div class="rows">
+          <a class="row item" data-cat="road" data-title="state dot 511 maps by state road weather winter pass cameras closures" href="dot-state-maps.html" target="_blank" rel="noopener">
+            <span class="thumb"><img src="v2/img/card-states.jpg" alt="" loading="lazy" style="object-position:40% 60%"></span>
+            <span class="row-body">
+              <span class="row-tag">By state</span>
+              <h3>State DOT / 511 Maps</h3>
+              <p>Official live road, weather and traffic map for every state &mdash; tap your state.</p>
+              <span class="meta"><span>50 STATES</span></span>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+          <a class="row item" data-cat="road" data-title="cat scale locator weigh load nearest certified scale catscale" href="https://catscale.com/cat-scale-locator/?postalcode=77003&amp;city=&amp;state=&amp;miles=2&amp;cmdSearch=" target="_blank" rel="noopener">
+            <span class="thumb"><img src="v2/img/card-cat-scale.jpg" alt="" loading="lazy" style="object-position:48% 30%"></span>
+            <span class="row-body">
+              <span class="row-tag">Locator &middot; External</span>
+              <h3>CAT Scale Locator</h3>
+              <p>Find the nearest CAT Scale to weigh your load.</p>
+            </span>
+            <svg class="go ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+          </a>
+          <a class="row item" data-cat="road" data-title="transflo trippak trippack trip pak scanning locations dropbox drop box paperwork bol pod proof of delivery truckstop nearest scan envelope express" href="https://www.transflo.com/for-customers/service-locations/" target="_blank" rel="noopener">
+            <span class="thumb"><svg viewBox="186 18 108 136" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path stroke-width="7" d="M240 23c-27 0-49 22-49 49 0 36 49 78 49 78s49-42 49-78c0-27-22-49-49-49z" fill="currentColor" fill-opacity=".12"/><path stroke-width="5" d="M226 50h20l12 12v26a4 4 0 0 1-4 4h-28a4 4 0 0 1-4-4V54a4 4 0 0 1 4-4z"/><path stroke-width="5" d="M246 50v8a4 4 0 0 0 4 4h8"/><path stroke-width="5" d="M231 74h18M231 84h12"/></svg></span>
+            <span class="row-body">
+              <span class="row-tag">Locator &middot; External</span>
+              <h3>Transflo TripPak Locations</h3>
+              <p>Truckstop scanning and drop-box shipping &mdash; find the nearest place to send your paperwork in.</p>
+              <span class="meta"><span>1,400+ LOCATIONS</span></span>
+            </span>
+            <svg class="go ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>
+          </a>
+          <a class="row item" data-cat="road" data-title="winter chain law snow chains required states bags tyres tires traction" href="winter-chain-law.html" target="_blank" rel="noopener">
+            <span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5" fill="currentColor" fill-opacity=".1"/><circle cx="12" cy="12" r="4.5" opacity=".55"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><path d="m5.5 5.5 3.5 3.5M15 15l3.5 3.5M18.5 5.5 15 9M9 15l-3.5 3.5" stroke-dasharray="2 2"/></svg></span>
+            <span class="row-body">
+              <span class="row-tag">Winter</span>
+              <h3>Winter Chain Law</h3>
+              <p>When chains are required, how many to carry (our 2-per-bag setup), and the 15 states that enforce it.</p>
+              <span class="meta"><span>15 STATES</span><span class="sep">&middot;</span><span>6 CHAINS / 3 BAGS</span></span>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+        </div>
       </div>
     </section>
 
-    <section class="sec" data-section="reference">
+    <!-- ── Dispatch & compliance ──────────────────────────────────────── -->
+    <section class="sec" data-cat="dispatch">
       <div class="sec-head">
         <span class="s-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg></span>
-        <h2>Reference &amp; Compliance</h2><span class="s-rule"></span><span class="s-cnt">4</span>
+        <h2>Dispatch &amp; compliance</h2><span class="s-sub">Routing, tolls and enforcement dates</span><span class="s-rule"></span><span class="s-cnt">3</span>
       </div>
-      <div class="grid">
-
-<a class="card" data-cat="reference" data-title="low clearance playbook bridge strike height avoid strike" href="low-clearance-playbook.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18" opacity=".6"/><path d="M5 5v14M19 5v14"/><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" fill-opacity=".15"/><path d="m10 9 2-2 2 2M12 7v4"/><path d="m10 15 2 2 2-2M12 13v4"/><line x1="2" y1="20" x2="22" y2="20"/></svg></div>
-          <span class="tag">Safety</span>
-          <h2>Low Clearance Playbook</h2>
-          <p>What to do at a low bridge &mdash; spot it early, stop safely, and avoid a strike. Step by step.</p>
-          <div class="meta"><span>13&#39;6&quot; RULE</span></div>
-          <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
+      <div class="sec-body">
+        <a class="lead item" data-cat="dispatch" data-title="toll route console zip code toll cost fuel cost ipass 80k 5 axle calculator turnpike" href="toll-console.html" target="_blank" rel="noopener">
+          <div class="lead-pic"><img src="v2/img/card-toll.jpg" alt="" loading="lazy" style="object-position:center 66%"><span class="lead-tag">Calculator</span></div>
+          <div class="lead-body">
+            <h3>Toll &amp; Route Console</h3>
+            <p>Two ZIP codes in &mdash; toll cost, fuel cost, and whether going around the toll road actually pays.</p>
+            <div class="meta"><span>80K / 5-AXLE</span><span class="sep">&middot;</span><span>I-PASS</span></div>
+            <span class="open">Open console <span class="arrow">&#x2192;</span></span>
+          </div>
         </a>
-
-<a class="card" data-cat="reference" data-title="winter chain law snow chains required states bags tyres traction" href="winter-chain-law.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5" fill="currentColor" fill-opacity=".08"/><circle cx="12" cy="12" r="4.5" opacity=".5"/><path d="M12 2.5v5M12 16.5v5M2.5 12h5M16.5 12h5"/><path d="m5.5 5.5 3.5 3.5M15 15l3.5 3.5M18.5 5.5 15 9M9 15l-3.5 3.5" stroke-dasharray="2 2"/></svg></div>
-          <span class="tag">Winter</span>
-          <h2>Winter Chain Law</h2>
-          <p>When chains are required, how many to carry (our 2-per-bag setup), and the 15 states that enforce it.</p>
-          <div class="meta"><span>15 STATES</span><span class="sep">&middot;</span><span>6 CHAINS / 3 BAGS</span></div>
-          <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
-        </a>
-
-<a class="card" data-cat="reference" data-title="dot enforcement calendar cvsa inspection blitz roadcheck safe driver brake safety week" href="dot-enforcement-calendar.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" fill="currentColor" fill-opacity=".12"/><line x1="16" y1="2" x2="16" y2="5"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="3" y1="9" x2="21" y2="9" opacity=".5"/><path d="m12 12.5 1.5 2.5 2.5.5-2 1.8.5 2.7-2.5-1.4-2.5 1.4.5-2.7-2-1.8 2.5-.5Z" fill="currentColor" fill-opacity=".25"/></svg></div>
-          <span class="tag">Compliance &middot; CVSA</span>
-          <h2>DOT Enforcement Calendar</h2>
-          <p>CVSA inspection blitz dates &mdash; Roadcheck, Safe Driver &amp; Brake Safety Week. Auto-shows what&#39;s active or next.</p>
-          <span class="open">Open calendar <span class="arrow">&#x2192;</span></span>
-        </a>
-
-<a class="card" data-cat="reference" data-title="trailer dimensions 53 dry van exterior interior cubic capacity tare weight pallets" href="trailer-dimensions.html" target="_blank" rel="noopener">
-          <div class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="15" height="12" rx="1.5" fill="currentColor" fill-opacity=".12"/><path d="M17 9h3.5a1.5 1.5 0 0 1 1.5 1.5V16h-5V9Z"/><circle cx="6" cy="18" r="2"/><circle cx="14" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M5 8h4M7 6v4"/></svg></div>
-          <span class="tag">Reference</span>
-          <h2>Trailer Dimensions</h2>
-          <p>Our 53&#39; dry van &mdash; exterior &amp; interior dimensions, weight and cubic capacity, at a glance.</p>
-          <div class="meta"><span>53&#39; &times; 102&quot;</span><span class="sep">&middot;</span><span>4,070 FT&sup3;</span></div>
-          <span class="open">Open guide <span class="arrow">&#x2192;</span></span>
-        </a>
-
+        <div class="rows">
+          <a class="row item" data-cat="dispatch" data-title="low clearance playbook bridge strike height avoid fleetspy route calculator 14 feet dispatch sop" href="low-clearance-playbook.html" target="_blank" rel="noopener">
+            <span class="thumb"><svg class="sign" viewBox="0 0 48 48" aria-hidden="true"><rect x="10.5" y="10.5" width="27" height="27" rx="4" transform="rotate(45 24 24)" fill="#F6C01E" stroke="#17140A" stroke-width="1.6"/><rect x="13" y="13" width="22" height="22" rx="2.5" transform="rotate(45 24 24)" fill="none" stroke="#17140A" stroke-width="1.4"/><path d="M24 10.5 21 15h6Z M24 37.5 21 33h6Z" fill="#17140A"/><path d="M24 15v4M24 29v4" stroke="#17140A" stroke-width="1.6"/><text x="24" y="26.6" text-anchor="middle" font-family="Manrope, Arial, sans-serif" font-weight="800" font-size="8" fill="#17140A">14&prime;</text></svg></span>
+            <span class="row-body">
+              <span class="row-tag">Dispatch SOP</span>
+              <h3>Low Clearance Playbook</h3>
+              <p>How dispatch checks your route for low bridges &mdash; and makes the go / verify / no-go call.</p>
+              <span class="meta"><span>ENTER 14&prime;-0&Prime;</span></span>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+          <a class="row item" data-cat="dispatch" data-title="dot enforcement calendar cvsa inspection blitz roadcheck safe driver brake safety week" href="dot-enforcement-calendar.html" target="_blank" rel="noopener">
+            <span class="thumb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5" fill="currentColor" fill-opacity=".12"/><line x1="16" y1="2" x2="16" y2="5"/><line x1="8" y1="2" x2="8" y2="5"/><line x1="3" y1="9" x2="21" y2="9" opacity=".5"/><path d="m12 12.5 1.5 2.5 2.5.5-2 1.8.5 2.7-2.5-1.4-2.5 1.4.5-2.7-2-1.8 2.5-.5Z" fill="currentColor" fill-opacity=".25"/></svg></span>
+            <span class="row-body">
+              <span class="row-tag">Compliance &middot; CVSA</span>
+              <h3>DOT Enforcement Calendar</h3>
+              <p>CVSA blitz dates &mdash; Roadcheck, Safe Driver and Brake Safety Week. Shows what&#39;s active or next.</p>
+            </span>
+            <svg class="go" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+          </a>
+        </div>
       </div>
     </section>
 
     <div id="empty">
       <div class="e-ic"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
       <h3>Nothing matches that</h3>
-      <p>Try &ldquo;PTI&rdquo;, &ldquo;bridge&rdquo;, &ldquo;weight&rdquo;, &ldquo;chain&rdquo;, &ldquo;toll&rdquo; or &ldquo;scale&rdquo;.</p>
+      <p>Try &ldquo;PTI&rdquo;, &ldquo;weight&rdquo;, &ldquo;chain&rdquo;, &ldquo;scale&rdquo;, &ldquo;Transflo&rdquo; or &ldquo;bridge&rdquo;.</p>
       <button id="reset">Clear search</button>
     </div>
 
@@ -417,13 +556,13 @@
 
   <footer>
     <div class="rule"></div>
-    FleetGuard &middot; VGN Trucking &mdash; Guides &amp; Playbooks for dispatch and drivers.
+    FleetGuard &middot; VGN Trucking &mdash; Guides &amp; Playbooks for drivers and dispatch.
   </footer>
 
 <script>
 (function(){
   'use strict';
-  var cards = [].slice.call(document.querySelectorAll('.card'));
+  var items = [].slice.call(document.querySelectorAll('.item'));
   var secs  = [].slice.call(document.querySelectorAll('.sec'));
   var tabs  = [].slice.call(document.querySelectorAll('.tab'));
   var q     = document.getElementById('q');
@@ -433,18 +572,24 @@
 
   function apply(){
     var shown = 0;
-    cards.forEach(function(c){
+    items.forEach(function(c){
       var okCat  = (cat === 'all' || c.getAttribute('data-cat') === cat);
-      var hay    = (c.getAttribute('data-title') || '') + ' ' + c.querySelector('h2').textContent.toLowerCase();
-      var okTerm = !term || hay.indexOf(term) > -1;
-      var show   = okCat && okTerm;
-      c.style.display = show ? 'flex' : 'none';
+      var hay    = (c.getAttribute('data-title') || '') + ' ' + c.querySelector('h3').textContent.toLowerCase();
+      var show   = okCat && (!term || hay.indexOf(term) > -1);
+      c.hidden = !show;
       if (show) shown++;
     });
-    // Drop a section header once nothing under it survives the filter.
+    // Each section is one lead card + a column of rows. Drop the section once
+    // nothing in it survives the filter, and fall back to a single column
+    // when only one side has anything left, so no empty half sits beside it.
     secs.forEach(function(s){
-      var any = [].slice.call(s.querySelectorAll('.card')).some(function(c){ return c.style.display !== 'none'; });
-      s.style.display = any ? '' : 'none';
+      var lead = s.querySelector('.lead');
+      var rows = [].slice.call(s.querySelectorAll('.row'));
+      var leadOn = !!lead && !lead.hidden;
+      var nRows  = rows.filter(function(r){ return !r.hidden; }).length;
+      s.hidden = !(leadOn || nRows);
+      s.querySelector('.sec-body').classList.toggle('solo', !(leadOn && nRows));
+      s.querySelector('.rows').hidden = !nRows;
     });
     empty.style.display   = shown ? 'none' : 'flex';
     callout.style.display = shown ? 'flex' : 'none';
@@ -639,8 +784,130 @@
     renderAlerts();
   });
 
+  /* ── I-80 Wyoming corridor ──────────────────────────────────────────────
+     Same logic as the dispatcher Guides page (js/app.js, GUIDE_I80): the
+     five counties I-80 crosses, in order from the Utah line to Nebraska.
+     Ordering is the point — a driver reads what is ahead of them, so the
+     list reverses for the other direction rather than re-sorting.
+
+     One request per county, on purpose: an alert returned by a county-zone
+     query does NOT carry that county in its own payload, so a combined
+     ?zone=A,B,C query could not be attributed back to a segment.
+
+     NOT road closures. WYDOT publishes no feed a browser can read, so the
+     panel links out for closures rather than pretending to know. */
+  var I80 = [
+    { zone:'WYC041', county:'Uinta',      towns:'Evanston → Fort Bridger' },
+    { zone:'WYC037', county:'Sweetwater', towns:'Green River → Wamsutter' },
+    { zone:'WYC007', county:'Carbon',     towns:'Rawlins → Elk Mountain' },
+    { zone:'WYC001', county:'Albany',     towns:'Laramie → Summit' },
+    { zone:'WYC021', county:'Laramie',    towns:'Cheyenne → Pine Bluffs' }
+  ];
+  var i80Data = null;          // null = loading, 'error' = failed, [] = segments
+  var i80Dir = 'ut-ne', i80Open = false;
+  var i80El = document.getElementById('i80');
+  var i80Body = document.getElementById('i80-body');
+  var i80Btn = document.getElementById('i80-toggle');
+  var i80Stat = document.getElementById('i80-status');
+  var i80Segs = document.getElementById('i80-segs');
+
+  function escH(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  // The three things that change how a truck drives. "Black ice" is absent on
+  // purpose: the NWS issues no such product; freezing fog / rain / ice storm
+  // are the honest nearest signals.
+  function i80Kind(ev){
+    if (/Wind/i.test(ev)) return 'wind';
+    if (/Snow|Blizzard|Winter Storm|Winter Weather/i.test(ev)) return 'snow';
+    if (/Ice|Freezing|Frost|Freeze/i.test(ev)) return 'ice';
+    return 'other';
+  }
+
+  async function loadI80(){
+    try {
+      i80Data = await Promise.all(I80.map(async function(seg){
+        var r = await fetch('https://api.weather.gov/alerts/active?zone=' + seg.zone,
+                            { headers: { 'Accept':'application/geo+json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        var j = await r.json(), seen = {};
+        (j.features || []).forEach(function(f){
+          var p = f.properties || {};
+          if (!p.event) return;
+          // One entry per event type per segment.
+          if (!seen[p.event]) seen[p.event] = { event:p.event, sev:p.severity || 'Unknown' };
+          else if ((SEV_RANK[p.severity] ?? 4) < (SEV_RANK[seen[p.event].sev] ?? 4)) seen[p.event].sev = p.severity;
+        });
+        var alerts = Object.keys(seen).map(function(k){ return seen[k]; })
+          .sort(function(a,b){ return (SEV_RANK[a.sev] ?? 4) - (SEV_RANK[b.sev] ?? 4); });
+        return { zone:seg.zone, county:seg.county, towns:seg.towns, alerts:alerts };
+      }));
+    } catch (e){
+      i80Data = 'error';
+    }
+    renderI80();
+  }
+
+  function renderI80(){
+    if (i80Data === null){
+      i80Stat.className = 'i80-status'; i80Stat.textContent = 'Checking…';
+      return;
+    }
+    if (i80Data === 'error'){
+      i80Stat.className = 'i80-status'; i80Stat.textContent = 'Unavailable';
+      i80Segs.innerHTML = '<div class="i80-note">Could not reach the National Weather Service. '
+        + '<a href="https://map.wyoroad.info/511-map/" target="_blank" rel="noopener">Open WYDOT &#x2197;</a></div>';
+      return;
+    }
+    // Counts SEGMENTS with a driving alert: "2 of 5" is what a driver needs
+    // off a closed panel.
+    var hit = i80Data.filter(function(sg){
+      return sg.alerts.some(function(a){ return i80Kind(a.event) !== 'other'; });
+    });
+    i80Stat.className = 'i80-status ' + (hit.length ? 'is-alert' : 'is-clear');
+    i80Stat.textContent = hit.length ? (hit.length + ' of ' + i80Data.length + ' segments') : 'Corridor clear';
+
+    var segs = i80Dir === 'ne-ut' ? i80Data.slice().reverse() : i80Data;
+    i80Segs.innerHTML = segs.map(function(sg){
+      // Only wind, snow and ice colour a segment. A Red Flag Warning is a FIRE
+      // product that comes back Severe — it still shows, as a neutral chip.
+      var driving = sg.alerts.filter(function(a){ return i80Kind(a.event) !== 'other'; });
+      var worst = driving[0];
+      var cls = !driving.length ? 'is-clear'
+              : (worst.sev === 'Extreme' || worst.sev === 'Severe') ? 'is-alert' : 'is-watch';
+      var chips = (driving.length ? '' : '<span class="i80-chip is-clear">No wind, snow or ice</span>')
+        + sg.alerts.map(function(a){
+            return '<span class="i80-chip is-' + i80Kind(a.event) + '">' + escH(a.event) + '</span>';
+          }).join('');
+      return '<div class="i80-seg ' + cls + '">'
+        + '<div><span class="i80-towns">' + escH(sg.towns) + '</span>'
+        + '<span class="i80-county">' + escH(sg.county) + ' County</span></div>'
+        + '<div class="i80-chips">' + chips + '</div></div>';
+    }).join('');
+  }
+
+  i80Btn.addEventListener('click', function(){
+    i80Open = !i80Open;
+    i80El.classList.toggle('is-open', i80Open);
+    i80Body.hidden = !i80Open;
+    i80Btn.setAttribute('aria-expanded', String(i80Open));
+  });
+  [].slice.call(document.querySelectorAll('.i80-dir')).forEach(function(b){
+    b.addEventListener('click', function(){
+      i80Dir = b.getAttribute('data-dir') === 'ne-ut' ? 'ne-ut' : 'ut-ne';
+      [].slice.call(document.querySelectorAll('.i80-dir')).forEach(function(x){
+        x.classList.toggle('is-active', x === b);
+      });
+      renderI80();
+    });
+  });
+
   loadAlerts();
+  loadI80();
   setInterval(loadAlerts, 5 * 60 * 1000);   // refresh every 5 minutes
+  setInterval(loadI80, 10 * 60 * 1000);     // corridor every 10
 
   apply();
 })();
