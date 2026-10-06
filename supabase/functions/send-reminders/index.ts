@@ -208,6 +208,8 @@ serve(async (req) => {
   let   sent            = 0;
   let   skipped         = 0;
   let   vacationSkipped = 0;
+  let   retried         = 0;   // today's failed row re-used and sent again
+  let   pendingSkipped  = 0;   // left alone: delivery genuinely unknown
   const errors: string[] = [];
 
   // Batch cap: each GV send takes ~25s and the whole call must finish
@@ -263,39 +265,77 @@ serve(async (req) => {
         const shouldSend = daysUntilDue <= sched.warning_days_before;
         if (!shouldSend) continue;
 
-        // Avoid duplicate: skip if we already sent this type today
-        const { data: existing } = await sb
+        // TODAY'S ROW, whatever its outcome. ux_sms_reminder_dedup is UNIQUE on
+        // (vehicle_id, reminder_type, cst_day(created_at)): at most one row per
+        // truck per type per CST day, so a FAILED attempt holds that slot for the
+        // rest of the day. This check used to look only at "sent"/"acknowledged",
+        // concluded there was nothing to skip, and then the insert below died on
+        // the unique index — so a reminder that failed could never be retried.
+        // 6 Oct 2026: Google Voice was down through the 07:30 tyre wave, all 33
+        // reminders failed, and every later wave that day logged 33 duplicate-key
+        // errors and sent nothing. Silent, because the run still returned ok:true.
+        const { data: prior } = await sb
           .from("sms_notifications")
-          .select("id")
+          .select("id, status")
           .eq("vehicle_id", v.id)
           .eq("reminder_type", type)
           .gte("created_at", `${todayStr}T00:00:00Z`)
-          .in("status", ["sent", "acknowledged"])
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (existing) { skipped++; continue; }
+        if (prior && (prior.status === "sent" || prior.status === "acknowledged")) { skipped++; continue; }
+
+        // "pending" means an earlier run called Google Voice and was killed before
+        // it could record the outcome (the isolate stops at ~150s). That text may
+        // well have gone out, so it is NOT retried: a driver getting the same
+        // reminder twice is worse than the row staying visibly unresolved.
+        if (prior && prior.status === "pending") { skipped++; pendingSkipped++; continue; }
 
         const msg = buildMessage(v.truck_number, v.trailer_number ?? "—", type, daysUntilDue);
 
-        // Log notification row first (status = pending)
-        const { data: notif, error: nErr } = await sb
-          .from("sms_notifications")
-          .insert({
-            vehicle_id:    v.id,
-            driver_id:     v.assigned_driver_id,
-            reminder_type: type,
-            phone_number:  phoneRow.phone_number,
-            message_body:  msg,
-            status:        "pending",
-          })
-          .select("id")
-          .single();
-
-        if (nErr || !notif) {
-          errors.push(`Insert notif failed for ${v.truck_number}/${type}: ${nErr?.message}`);
-          continue;
+        // Re-use the row the index already reserved for a failed attempt; insert
+        // only when today holds no row for this truck and type at all.
+        let notif: { id: string } | null = null;
+        if (prior) {
+          const { data: reused, error: rErr } = await sb
+            .from("sms_notifications")
+            .update({
+              phone_number:  phoneRow.phone_number,
+              message_body:  msg,
+              status:        "pending",
+              error_message: null,
+              sent_at:       null,
+            })
+            .eq("id", prior.id)
+            .select("id")
+            .single();
+          if (rErr || !reused) {
+            errors.push(`Retry notif failed for ${v.truck_number}/${type}: ${rErr?.message}`);
+            continue;
+          }
+          notif = reused;
+          retried++;
+        } else {
+          const { data: fresh, error: nErr } = await sb
+            .from("sms_notifications")
+            .insert({
+              vehicle_id:    v.id,
+              driver_id:     v.assigned_driver_id,
+              reminder_type: type,
+              phone_number:  phoneRow.phone_number,
+              message_body:  msg,
+              status:        "pending",
+            })
+            .select("id")
+            .single();
+          if (nErr || !fresh) {
+            errors.push(`Insert notif failed for ${v.truck_number}/${type}: ${nErr?.message}`);
+            continue;
+          }
+          notif = fresh;
         }
+        if (!notif) continue;
 
         // Call Google Voice service
         const gvRes = await fetch(`${GV_SERVICE_URL}/send`, {
@@ -336,7 +376,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ ok: true, sent, skipped, vacationSkipped, errors }),
+    JSON.stringify({ ok: true, sent, retried, skipped, vacationSkipped, pendingSkipped, errors }),
     { headers: { "Content-Type": "application/json" } }
   );
 });
