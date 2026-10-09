@@ -948,134 +948,200 @@ async function renderLeadsAsync(){
   const IC_CHART='<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="4" width="3" height="14"/>';
   c.innerHTML='<div class="v2-region"><div class="v2-page-head"><h1>Driver Leads</h1><p>Loading…</p></div></div>';
 
-  const DAY=86400000, CHART_DAYS=30;
+  const DAY=86400000, WIN_DAYS=90, CHART_DAYS=30;
+  const now=new Date();
+  const winStart=new Date(now.getTime()-WIN_DAYS*DAY);
   const chartStart=new Date(); chartStart.setHours(0,0,0,0); chartStart.setDate(chartStart.getDate()-(CHART_DAYS-1));
 
-  const [leadsRes, stats, leadsCountRes, dwellRes, dailyRes, srcRes] = await Promise.all([
-    sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status,source').order('created_at',{ascending:false}).limit(500),
-    loadViewStats(),
-    sb.from('driver_leads').select('id',{count:'exact',head:true}),
-    sb.from('page_views').select('dwell_ms').not('dwell_ms','is',null).limit(10000),
-    sb.from('page_views').select('created_at').gte('created_at', chartStart.toISOString()).limit(50000),
-    sb.from('page_views').select('source,referrer').limit(50000)
-  ]);
-  const leads=leadsRes.data||[];
-  // Engagement: average time on page + bounces (under 10s) from measured visits.
-  const dwells=((dwellRes&&dwellRes.data)||[]).map(function(r){return r.dwell_ms;}).filter(function(v){return v!=null;});
-  const measured=dwells.length;
-  const avgMs= measured ? dwells.reduce(function(a,b){return a+b;},0)/measured : null;
-  const bounces= dwells.filter(function(v){return v<10000;}).length;
-  const bounceRate= measured ? Math.round((bounces/measured)*100)+'%' : '—';
-  const fmtDwell=function(ms){ if(ms==null) return '—'; var s=Math.round(ms/1000); if(s<60) return s+'s'; return Math.floor(s/60)+'m '+(s%60)+'s'; };
-  const avgStr= fmtDwell(avgMs);
-  // Conversion: all-time visits vs all-time leads received.
-  const leadsTotal = (leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null) ? leadsCountRes.count : leads.length;
-  const visitsTotal = (stats.total==null) ? 0 : stats.total;
-  const ratioStr = (leadsTotal>0) ? (visitsTotal/leadsTotal).toFixed(1) : '—';       // visits per lead
-  const rateStr  = (visitsTotal>0) ? ((leadsTotal/visitsTotal)*100).toFixed(1)+'%' : '—';
+  let sessRes, evRes, leadsRes, leadsCountRes, sessTotalRes;
+  try{
+    [sessRes, evRes, leadsRes, leadsCountRes, sessTotalRes] = await Promise.all([
+      sb.from('va_sessions').select('started_at,source,utm_campaign,posting_city,active_ms,submitted,pre_submit_active_ms,device,session_id').eq('is_bot',false).gte('started_at',winStart.toISOString()).limit(50000),
+      sb.from('va_events').select('type').gte('ts',winStart.toISOString()).limit(50000),
+      sb.from('driver_leads').select('created_at,full_name,phone,recruiter,program,best_time,sms_status,source,session_id').order('created_at',{ascending:false}).limit(500),
+      sb.from('driver_leads').select('id',{count:'exact',head:true}),
+      sb.from('va_sessions').select('session_id',{count:'exact',head:true}).eq('is_bot',false)
+    ]);
+  }catch(e){ sessRes={data:[],error:e}; }
+
+  const sessions=(sessRes&&sessRes.data)||[];
+  const events=(evRes&&evRes.data)||[];
+  const leads=(leadsRes&&leadsRes.data)||[];
+  const sessTotal=(sessTotalRes&&!sessTotalRes.error&&sessTotalRes.count!=null)?sessTotalRes.count:sessions.length;
+  const leadsTotal=(leadsCountRes&&!leadsCountRes.error&&leadsCountRes.count!=null)?leadsCountRes.count:leads.length;
+
+  // Central-time helpers (DST-aware via Intl).
+  const cfDay=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'});
+  const cfHour=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',hour:'2-digit',hour12:false});
+  const cfMonth=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit'});
+  const dayKey=(d)=>cfDay.format(d);
+  const hourOf=(d)=>{ let h=parseInt(cfHour.format(d),10); return isNaN(h)?0:(h%24); };
+  const todayKey=dayKey(now), monthKey=cfMonth.format(now);
+  const weekKeys={}; for(let i=0;i<7;i++){ weekKeys[dayKey(new Date(now.getTime()-i*DAY))]=1; }
   const num=(v)=>v==null?'—':String(v);
   const digits=(p)=>String(p||'').replace(/[^0-9+]/g,'');
-  const dt=(s)=>{ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); };
+  const dt=(s)=>{ if(!s) return '—'; const d=new Date(s); return d.toLocaleString('en-US',{timeZone:'America/Chicago',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); };
+  const fmtT=(ms)=>{ if(ms==null) return '—'; var s=Math.round(ms/1000); if(s<60) return s+'s'; return Math.floor(s/60)+'m '+(s%60)+'s'; };
+  const med=(arr)=>{ if(!arr.length) return null; const a=arr.slice().sort((x,y)=>x-y); const m=Math.floor(a.length/2); return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2); };
+  const pct=(n,d)=> d>0 ? ((n/d)*100).toFixed(1)+'%' : '—';
 
-  // Daily visits bar chart (last 30 days), Supabase style.
-  const dayKey=function(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
-  const buckets={};
-  for(var _i=0;_i<CHART_DAYS;_i++){ var _dd=new Date(chartStart.getTime()+_i*DAY); buckets[dayKey(_dd)]={d:_dd,n:0}; }
-  ((dailyRes&&dailyRes.data)||[]).forEach(function(r){ var d=new Date(r.created_at); d.setHours(0,0,0,0); var k=dayKey(d); if(buckets[k]) buckets[k].n++; });
-  const series=Object.keys(buckets).sort().map(function(k){return buckets[k];});
-  const maxN=Math.max.apply(null,[1].concat(series.map(function(s){return s.n;})));
-  const shortDay=function(d){ return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
-  const chartCss='<style>.pv-chart{margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px}.pv-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.pv-head b{font-size:12px;color:#8796a9;font-weight:700;letter-spacing:.05em;text-transform:uppercase}.pv-head span{font-size:11px;color:#8796a9}.pv-bars{display:flex;align-items:flex-end;gap:2px;height:90px}.pv-bar{flex:1 1 0;min-width:2px;background:#3ecf8e;border-radius:2px 2px 0 0;opacity:.85}.pv-bar:hover{opacity:1}.pv-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:#8796a9}</style>';
-  let chartHtml=chartCss+'<div class="pv-chart"><div class="pv-head"><b>Daily visits</b><span>last 30 days &middot; peak '+maxN+'/day</span></div><div class="pv-bars">';
-  series.forEach(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; chartHtml+='<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; });
+  // ---- aggregate the sessions (window = last 90 days, bots excluded) ----
+  let cToday=0,cWeek=0,cMonth=0, actSum=0, preSum=0, preN=0, shortN=0;
+  const dayBuckets={}; for(let i=0;i<CHART_DAYS;i++){ const dd=new Date(chartStart.getTime()+i*DAY); dayBuckets[dayKey(dd)]={d:dd,n:0,c:0}; }
+  const hourBuckets=new Array(24).fill(0);
+  const srcAgg={};
+  const preBySession={};
+  const subPre=[], nonSubActive=[];
+  const SRC=['indeed','facebook','craigslist'];
+  sessions.forEach(s=>{
+    const d=new Date(s.started_at); const k=dayKey(d);
+    if(k===todayKey) cToday++; if(weekKeys[k]) cWeek++; if(cfMonth.format(d)===monthKey) cMonth++;
+    if(dayBuckets[k]){ dayBuckets[k].n++; if(s.submitted) dayBuckets[k].c++; }
+    if(d>=chartStart) hourBuckets[hourOf(d)]++;
+    const act=s.active_ms||0; actSum+=act;
+    if(s.submitted){ const pre=s.pre_submit_active_ms!=null?s.pre_submit_active_ms:act; preSum+=pre; preN++; subPre.push(pre); }
+    else { nonSubActive.push(act); if(act<=10000) shortN++; }
+    if(s.session_id) preBySession[s.session_id]=(s.pre_submit_active_ms!=null?s.pre_submit_active_ms:(s.submitted?act:null));
+    const src=(SRC.indexOf((s.source||'').toLowerCase())>=0)?s.source.toLowerCase():'direct';
+    const a=srcAgg[src]||(srcAgg[src]={visits:0,contacts:0,act:0,pre:0,preN:0,camp:{}});
+    a.visits++; a.act+=act; if(s.submitted){ a.contacts++; a.pre+=(s.pre_submit_active_ms!=null?s.pre_submit_active_ms:act); a.preN++; }
+    const cn=(s.utm_campaign||s.posting_city||'').toString().slice(0,60);
+    if(cn) a.camp[cn]=(a.camp[cn]||0)+1;
+  });
+  const visits90=sessions.length;
+  const convRate = visits90>0 ? pct(preN,visits90) : '—';
+  const ratioStr = preN>0 ? (visits90/preN).toFixed(1) : '—';
+  const avgActive = visits90>0 ? fmtT(actSum/visits90) : '—';
+  const avgPre = preN>0 ? fmtT(preSum/preN) : '—';
+  const shortRate = visits90>0 ? pct(shortN,visits90) : '—';
+  const subMed = fmtT(med(subPre)); const nonMed = fmtT(med(nonSubActive));
+
+  // interaction counts
+  const evCount={}; events.forEach(e=>{ evCount[e.type]=(evCount[e.type]||0)+1; });
+  const ev=(t)=>evCount[t]||0;
+
+  // daily chart
+  const series=Object.keys(dayBuckets).sort().map(k=>dayBuckets[k]);
+  const maxN=Math.max.apply(null,[1].concat(series.map(s=>s.n)));
+  const shortDay=(d)=>d.toLocaleDateString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric'});
+  // hourly chart
+  const maxH=Math.max.apply(null,[1].concat(hourBuckets));
+
+  // source list (ordered by visits)
+  const srcOrder=Object.keys(srcAgg).sort((x,y)=>srcAgg[y].visits-srcAgg[x].visits);
+  const srcLabels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+
+  // stash aggregate for CSV export (no PII)
+  window._vgnAgg={ generatedAt:new Date().toISOString(), tz:'America/Chicago', version:'phase1-v1', windowDays:WIN_DAYS,
+    daily:series.map(s=>({date:dayKey(s.d),visits:s.n,contacts:s.c})),
+    hourly:hourBuckets.map((v,h)=>({hour:h,visits:v})),
+    sources:srcOrder.map(k=>({source:k,visits:srcAgg[k].visits,contacts:srcAgg[k].contacts,
+      conversion_pct:srcAgg[k].contacts>=5?((srcAgg[k].contacts/srcAgg[k].visits)*100).toFixed(1):'',
+      avg_active_s:Math.round((srcAgg[k].act/Math.max(1,srcAgg[k].visits))/1000),
+      pre_submit_s:srcAgg[k].contacts>=5?Math.round((srcAgg[k].pre/Math.max(1,srcAgg[k].preN))/1000):''})),
+    summary:{visits_90d:visits90,visits_total:sessTotal,saved_contacts_total:leadsTotal,submitted_90d:preN,
+      conversion_pct_90d:visits90>0?((preN/visits90)*100).toFixed(1):'',avg_active_s:Math.round((actSum/Math.max(1,visits90))/1000),
+      avg_pre_submit_s:preN>0?Math.round((preSum/preN)/1000):'',short_visit_pct:visits90>0?((shortN/visits90)*100).toFixed(1):''} };
+
+  const chartCss='<style>.pv-chart{margin-top:20px;border-top:1px solid rgba(255,255,255,0.06);padding-top:16px}.pv-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}.pv-head b{font-size:12px;color:#8796a9;font-weight:700;letter-spacing:.05em;text-transform:uppercase}.pv-head span{font-size:11px;color:#8796a9}.pv-bars{display:flex;align-items:flex-end;gap:2px;height:90px}.pv-bar{flex:1 1 0;min-width:2px;background:#3ecf8e;border-radius:2px 2px 0 0;opacity:.85}.pv-bar:hover{opacity:1}.pv-axis{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:#8796a9}.vgn-srctbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}.vgn-srctbl th,.vgn-srctbl td{text-align:right;padding:7px 10px;border-bottom:1px solid rgba(255,255,255,0.06);white-space:nowrap}.vgn-srctbl th:first-child,.vgn-srctbl td:first-child{text-align:left}.vgn-srctbl th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#8796a9;font-weight:700}.vgn-srctbl .sub td:first-child{padding-left:22px;color:#8796a9;font-size:12px}.vgn-defs{font-size:11px;color:#8796a9;line-height:1.6;margin-top:14px;max-width:900px}.vgn-defs b{color:#c3d0dd}</style>';
+  let chartHtml=chartCss+'<div class="pv-chart"><div class="pv-head"><b>Daily visits</b><span>last 30 days &middot; peak '+maxN+'/day (CST)</span></div><div class="pv-bars">';
+  series.forEach(s=>{ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; chartHtml+='<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+(s.c?' · '+s.c+' contact'+(s.c===1?'':'s'):'')+'"></div>'; });
   chartHtml+='</div><div class="pv-axis"><span>'+shortDay(series[0].d)+'</span><span>'+shortDay(series[series.length-1].d)+'</span></div></div>';
 
-  // Traffic sources: utm_source first, else infer from referrer.
-  const srcCounts={indeed:0,facebook:0,craigslist:0,direct:0};
-  const classifySrc=function(utm,ref){
-    var s=(utm||'').toLowerCase();
-    if(s.indexOf('indeed')>=0) return 'indeed';
-    if(s.indexOf('facebook')>=0||s==='fb'||s==='meta') return 'facebook';
-    if(s.indexOf('craigslist')>=0||s==='cl') return 'craigslist';
-    if(!s){ var r=(ref||'').toLowerCase();
-      if(r.indexOf('indeed')>=0) return 'indeed';
-      if(r.indexOf('facebook')>=0||r.indexOf('fb.')>=0||r.indexOf('fb.me')>=0) return 'facebook';
-      if(r.indexOf('craigslist')>=0) return 'craigslist'; }
-    return 'direct';
-  };
-  ((srcRes&&srcRes.data)||[]).forEach(function(r){ srcCounts[classifySrc(r.source,r.referrer)]++; });
-  const srcLabels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
-  var _topKey='direct', _topN=-1;
-  Object.keys(srcCounts).forEach(function(k){ if(srcCounts[k]>_topN){ _topN=srcCounts[k]; _topKey=k; } });
-  const topSrcStr = _topN>0 ? ('Top: '+srcLabels[_topKey]) : 'by utm_source';
-  // Leads by source (from the lead's stored source).
-  const leadSrc={indeed:0,facebook:0,craigslist:0,direct:0};
-  leads.forEach(function(l){ var s=(l.source||'').toLowerCase(); leadSrc[(s==='indeed'||s==='facebook'||s==='craigslist')?s:'direct']++; });
-  var _ltopKey='direct', _ltopN=-1;
-  Object.keys(leadSrc).forEach(function(k){ if(leadSrc[k]>_ltopN){ _ltopN=leadSrc[k]; _ltopKey=k; } });
-  const topLeadStr = _ltopN>0 ? ('Top: '+srcLabels[_ltopKey]) : 'from tagged links';
+  let hourHtml='<div class="pv-chart"><div class="pv-head"><b>Busiest hours</b><span>last 30 days &middot; Central time</span></div><div class="pv-bars">';
+  hourBuckets.forEach((v,h)=>{ var hh=v>0?Math.max(5,Math.round(v/maxH*100)):2; hourHtml+='<div class="pv-bar" style="height:'+hh+'%" title="'+(h<10?'0'+h:h)+':00 — '+v+' visit'+(v===1?'':'s')+'"></div>'; });
+  hourHtml+='</div><div class="pv-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>';
 
   let html='<div class="v2-region">';
-  html+='<div class="v2-page-head"><h1>Driver Leads</h1><p>Callback requests from the recruiting site, and how many people are visiting it.</p></div>';
+  html+='<div class="v2-page-head"><h1>Driver Leads</h1><p>Callback requests from the recruiting site, with cookieless, aggregate visit analytics (Central time). No names or phone numbers are ever stored in analytics.</p></div>';
 
-  // Website visits — stat console (the corner window), matching other pages.
-  html+='<section class="v2-console-row" aria-label="Website traffic">'
+  html+='<section class="v2-console-row" aria-label="Recruiting analytics">'
     +'<article class="v2-console v2-accent-blue"><div class="v2-console-head">'
     +'<span class="v2-console-ic">'+_sv(IC_CHART)+'</span><h2>Website visits</h2>'
     +'<span class="v2-console-note">fleetguards.app/vgn/</span></div>'
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
-    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(stats.today)+'</span><span class="v2-pulse-label">Today</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(stats.thisWeek)+'</span><span class="v2-pulse-label">This week</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(stats.month)+'</span><span class="v2-pulse-label">This month</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(stats.total)+'</span><span class="v2-pulse-label">Total</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(cToday)+'</span><span class="v2-pulse-label">Today</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(cWeek)+'</span><span class="v2-pulse-label">Last 7 days</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(cMonth)+'</span><span class="v2-pulse-label">This month</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(sessTotal)+'</span><span class="v2-pulse-label">Total sessions</span></div>'
     +'</div>'+chartHtml+'</div></article>'
     +'<article class="v2-console v2-accent-green"><div class="v2-console-head">'
     +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg></span>'
-    +'<h2>Conversion</h2><span class="v2-console-note">visits &rarr; leads (all time)</span></div>'
+    +'<h2>Conversion</h2><span class="v2-console-note">measured · last 90 days</span></div>'
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
-    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(leadsTotal)+'</span><span class="v2-pulse-label">Leads received</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+ratioStr+'</span><span class="v2-pulse-label">Visits per lead</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+rateStr+'</span><span class="v2-pulse-label">Conversion rate</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(leadsTotal)+'</span><span class="v2-pulse-label">Saved contacts (all time)</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+convRate+'</span><span class="v2-pulse-label">Conversion rate</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+ratioStr+'</span><span class="v2-pulse-label">Visits per contact</span></div>'
     +'</div></div></article>'
     +'<article class="v2-console v2-accent-cyan"><div class="v2-console-head">'
     +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>'
-    +'<h2>Engagement</h2><span class="v2-console-note">'+measured+' measured</span></div>'
+    +'<h2>Engagement</h2><span class="v2-console-note">active time · estimate</span></div>'
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
-    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+avgStr+'</span><span class="v2-pulse-label">Avg. time on page</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(bounces)+'</span><span class="v2-pulse-label">Bounces (&lt;10s)</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+bounceRate+'</span><span class="v2-pulse-label">Bounce rate</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+avgActive+'</span><span class="v2-pulse-label">Avg active time</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+avgPre+'</span><span class="v2-pulse-label">Avg before submit</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+shortRate+'</span><span class="v2-pulse-label">Short visits (&le;10s)</span></div>'
     +'</div></div></article>'
     +'<article class="v2-console v2-accent-amber"><div class="v2-console-head">'
     +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.93 19.07a10 10 0 0 1 0-14.14"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M7.76 16.24a6 6 0 0 1 0-8.49"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49"/><circle cx="12" cy="12" r="2"/></svg></span>'
-    +'<h2>Traffic sources</h2><span class="v2-console-note">'+topSrcStr+'</span></div>'
+    +'<h2>Traffic sources</h2><span class="v2-console-note">last 90 days</span></div>'
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
-    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(srcCounts.indeed)+'</span><span class="v2-pulse-label">Indeed</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(srcCounts.facebook)+'</span><span class="v2-pulse-label">Facebook</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(srcCounts.craigslist)+'</span><span class="v2-pulse-label">Craigslist</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(srcCounts.direct)+'</span><span class="v2-pulse-label">Direct / other</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num((srcAgg.indeed||{}).visits||0)+'</span><span class="v2-pulse-label">Indeed</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num((srcAgg.facebook||{}).visits||0)+'</span><span class="v2-pulse-label">Facebook</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num((srcAgg.craigslist||{}).visits||0)+'</span><span class="v2-pulse-label">Craigslist</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num((srcAgg.direct||{}).visits||0)+'</span><span class="v2-pulse-label">Direct / other</span></div>'
     +'</div></div></article>'
+    +'<article class="v2-console v2-accent-blue"><div class="v2-console-head">'
+    +'<span class="v2-console-ic">'+_sv(IC_CHART)+'</span><h2>Busiest hours</h2>'
+    +'<span class="v2-console-note">when drivers look (CST)</span></div>'
+    +'<div class="v2-console-body">'+hourHtml+'</div></article>'
     +'<article class="v2-console v2-accent-green"><div class="v2-console-head">'
-    +'<span class="v2-console-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg></span>'
-    +'<h2>Leads by source</h2><span class="v2-console-note">'+topLeadStr+'</span></div>'
+    +'<span class="v2-console-ic">'+_sv(IC_INBOX)+'</span><h2>Interactions &amp; intent</h2>'
+    +'<span class="v2-console-note">clicks, not completed actions</span></div>'
     +'<div class="v2-console-body"><div class="v2-pulse-grid">'
-    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(leadSrc.indeed)+'</span><span class="v2-pulse-label">Indeed</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(leadSrc.facebook)+'</span><span class="v2-pulse-label">Facebook</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(leadSrc.craigslist)+'</span><span class="v2-pulse-label">Craigslist</span></div>'
-    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(leadSrc.direct)+'</span><span class="v2-pulse-label">Direct / other</span></div>'
-    +'</div></div></article></section>';
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(ev('statement_open'))+'</span><span class="v2-pulse-label">Statement opens</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(ev('program_cta'))+'</span><span class="v2-pulse-label">Program CTA</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num(ev('call_click'))+'</span><span class="v2-pulse-label">Call clicks</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num(ev('text_click'))+'</span><span class="v2-pulse-label">Text clicks</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num(ev('intelliapp_click'))+'</span><span class="v2-pulse-label">IntelliApp clicks</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num(ev('faq_open'))+'</span><span class="v2-pulse-label">FAQ opens</span></div>'
+    +'</div></div></article>'
+    +'</section>';
 
-  // Leads table — same shell as Drivers / Inspections.
+  // Source & campaign table
+  html+='<section class="v2-table-card" aria-label="Source and campaign">'
+    +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(IC_CHART)+'</span>'
+    +'<h2>Source &amp; campaign</h2><span class="v2-console-note">last 90 days · rates hidden under 5 contacts</span>'
+    +'<button class="v2-btn-ghost" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px" onclick="downloadVgnAnalyticsCsv(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button></div>'
+    +'<div class="v2-table-wrap"><table class="vgn-srctbl"><thead><tr><th>Source / campaign</th><th>Visits</th><th>Share</th><th>Contacts</th><th>Conv.</th><th>Avg active</th><th>Pre-submit</th></tr></thead><tbody>';
+  if(srcOrder.length===0){
+    html+='<tr><td colspan="7" style="text-align:center;color:#8796a9;padding:18px">No measured sessions yet — data appears as visits come in.</td></tr>';
+  } else {
+    srcOrder.forEach(k=>{ const a=srcAgg[k]; const small=a.contacts<5;
+      html+='<tr><td>'+esc(srcLabels[k]||k)+'</td><td>'+a.visits+'</td><td>'+pct(a.visits,visits90)+'</td><td>'+a.contacts+'</td><td>'+(small?'—':pct(a.contacts,a.visits))+'</td><td>'+fmtT(a.act/Math.max(1,a.visits))+'</td><td>'+(small?'—':fmtT(a.pre/Math.max(1,a.preN)))+'</td></tr>';
+      Object.keys(a.camp).sort((x,y)=>a.camp[y]-a.camp[x]).slice(0,6).forEach(cn=>{
+        html+='<tr class="sub"><td>&#8627; '+esc(cn)+'</td><td>'+a.camp[cn]+'</td><td></td><td></td><td></td><td></td><td></td></tr>';
+      });
+    });
+  }
+  html+='</tbody></table></div>'
+    +'<div class="vgn-defs"><b>Submitted vs not (active viewing):</b> submitters median '+subMed+' before submitting ('+preN+') · non-submitters median '+nonMed+' whole-session ('+nonSubActive.length+'). '
+    +'<b>Visit</b> = session (30-min timeout, reloads merged, bots excluded). <b>Active time</b> is a foreground estimate, paused when hidden and cut off after 60s idle — not proven attention. <b>Saved contact</b> = a callback request the backend confirmed; a Call/Text/IntelliApp click is intent, not a completed call or application. Tagged links win and are not overwritten by a later direct visit. Session IDs are visits/browsers, not verified people.</div>'
+    +'</section>';
+
+  // Leads table
+  const preForLead=(l)=>{ if(l.session_id && preBySession[l.session_id]!=null) return fmtT(preBySession[l.session_id]); return '—'; };
+  const srcChip=(s)=>{ s=(s||'').toLowerCase(); const lbl=srcLabels[(SRC.indexOf(s)>=0)?s:'direct']; return esc(lbl); };
   html+='<section class="v2-table-card" aria-label="Driver leads">'
     +'<div class="v2-console-head"><span class="v2-console-ic">'+_sv(IC_INBOX)+'</span>'
-    +'<h2>All leads</h2><span class="v2-console-note">'+leads.length+' total</span>'
+    +'<h2>All leads</h2><span class="v2-console-note">'+leads.length+' shown · '+leadsTotal+' total</span>'
     +'<button class="v2-btn-ghost" style="margin-left:auto;display:inline-flex;align-items:center;gap:6px" onclick="downloadLeadsExcel(this)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Excel</button></div>'
     +'<div class="v2-table-wrap"><table class="v2-table"><thead><tr>'
-    +'<th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th>'
+    +'<th>Received (CST)</th><th>Name</th><th>Phone</th><th>Source</th><th>Program</th><th>Prefers</th><th>Viewed before submit</th><th>Text</th>'
     +'</tr></thead><tbody>';
-  if(leadsRes.error){
-    html+='<tr><td colspan="7" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">Could not load leads: '+esc(leadsRes.error.message)+'</td></tr>';
+  if(leadsRes&&leadsRes.error){
+    html+='<tr><td colspan="8" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">Could not load leads: '+esc(leadsRes.error.message)+'</td></tr>';
   } else if(leads.length===0){
-    html+='<tr><td colspan="7" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No leads yet — they’ll appear here when drivers submit the form.</td></tr>';
+    html+='<tr><td colspan="8" style="padding:var(--v2-s8);text-align:center;color:var(--v2-ink-3)">No leads yet — they’ll appear here when drivers submit the form.</td></tr>';
   } else {
     leads.forEach(l=>{
       const pill=l.sms_status==='sent'?'<span class="v2-truck-chip">sent</span>':(l.sms_status==='failed'?'<span class="v2-truck-chip" style="color:#ff8a4a">not sent</span>':'—');
@@ -1083,15 +1149,49 @@ async function renderLeadsAsync(){
         +'<td style="color:var(--v2-ink-3);white-space:nowrap">'+esc(dt(l.created_at))+'</td>'
         +'<td><strong>'+esc(l.full_name)+'</strong></td>'
         +'<td><a href="tel:'+esc(digits(l.phone))+'">'+esc(l.phone)+'</a></td>'
-        +'<td>'+esc(l.cdl_experience||'—')+'</td>'
-        +'<td>'+esc(l.sap||'—')+'</td>'
-        +'<td>'+esc(l.best_time||'—')+'</td>'
+        +'<td>'+srcChip(l.source)+'</td>'
+        +'<td>'+esc(l.program||'—')+'</td>'
+        +'<td>'+esc(l.recruiter||'—')+'</td>'
+        +'<td style="white-space:nowrap">'+preForLead(l)+'</td>'
         +'<td>'+pill+'</td>'
         +'</tr>';
     });
   }
   html+='</tbody></table></div></section></div>';
   c.innerHTML=html;
+}
+
+// Export the aggregate analytics (no PII) as a CSV with definitions + timezone + version.
+function downloadVgnAnalyticsCsv(btn){
+  const a=window._vgnAgg;
+  if(!a){ if(btn){ const o=btn.innerHTML; btn.textContent='No data'; setTimeout(()=>{btn.innerHTML=o;},1500); } return; }
+  const q=(v)=>{ v=(v==null?'':String(v)); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; };
+  const rows=[];
+  rows.push(['VGN /vgn/ aggregate analytics — NO personal data']);
+  rows.push(['Generated',a.generatedAt]); rows.push(['Timezone',a.tz]); rows.push(['Version',a.version]); rows.push(['Window (days)',a.windowDays]);
+  rows.push([]);
+  rows.push(['SUMMARY']);
+  rows.push(['metric','value']);
+  rows.push(['visits_90d',a.summary.visits_90d]); rows.push(['visits_total',a.summary.visits_total]);
+  rows.push(['saved_contacts_total',a.summary.saved_contacts_total]); rows.push(['submitted_90d',a.summary.submitted_90d]);
+  rows.push(['conversion_pct_90d',a.summary.conversion_pct_90d]); rows.push(['avg_active_seconds',a.summary.avg_active_s]);
+  rows.push(['avg_pre_submit_seconds',a.summary.avg_pre_submit_s]); rows.push(['short_visit_pct',a.summary.short_visit_pct]);
+  rows.push([]);
+  rows.push(['DAILY (CST)']); rows.push(['date','visits','contacts']);
+  a.daily.forEach(d=>rows.push([d.date,d.visits,d.contacts]));
+  rows.push([]);
+  rows.push(['BY HOUR (CST)']); rows.push(['hour','visits']);
+  a.hourly.forEach(h=>rows.push([h.hour,h.visits]));
+  rows.push([]);
+  rows.push(['BY SOURCE (90d)']); rows.push(['source','visits','contacts','conversion_pct','avg_active_seconds','pre_submit_seconds']);
+  a.sources.forEach(s=>rows.push([s.source,s.visits,s.contacts,s.conversion_pct,s.avg_active_s,s.pre_submit_s]));
+  rows.push([]);
+  rows.push(['Definitions: Visit=session (30-min timeout, reloads merged, bots excluded). Active time=foreground estimate (hidden/idle>60s excluded), not proven attention. Saved contact=backend-confirmed callback request; clicks are intent, not completed calls/applications. Rates for cohorts under 5 contacts are omitted.']);
+  const csv=rows.map(r=>r.map(q).join(',')).join('\r\n');
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob); const a2=document.createElement('a');
+  a2.href=url; a2.download='vgn-analytics-'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a2); a2.click(); document.body.removeChild(a2); setTimeout(()=>URL.revokeObjectURL(url),2000);
 }
 
 // Lazy-load a same-origin script once (used for the heavy SheetJS lib).

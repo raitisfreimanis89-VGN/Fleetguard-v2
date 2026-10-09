@@ -82,7 +82,7 @@
     <div class="count" id="count"></div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th>Received</th><th>Name</th><th>Phone</th><th>CDL-A exp.</th><th>SAP</th><th>Best time</th><th>Text</th></tr></thead>
+        <thead><tr><th>Received (CST)</th><th>Name</th><th>Phone</th><th>Source</th><th>Program</th><th>Prefers</th><th>Viewed before submit</th><th>Text</th></tr></thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
@@ -118,54 +118,100 @@
   }
   function show(view){ loginEl.style.display=(view==='login')?'block':'none'; appEl.style.display=(view==='app')?'block':'none'; }
 
-  function renderDash(pv, leadsTotal, leads){
-    var now=new Date();
-    var dayStart=new Date(now.getFullYear(),now.getMonth(),now.getDate());
-    var dow=(dayStart.getDay()+6)%7; var weekStart=new Date(dayStart); weekStart.setDate(dayStart.getDate()-dow);
-    var monthStart=new Date(now.getFullYear(),now.getMonth(),1);
+  var cfDay=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit',day:'2-digit'});
+  var cfHour=new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',hour:'2-digit',hour12:false});
+  var cfMonth=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Chicago',year:'numeric',month:'2-digit'});
+  function chiDay(d){ return cfDay.format(d); }
+  function chiHour(d){ var h=parseInt(cfHour.format(d),10); return isNaN(h)?0:(h%24); }
+  function med(arr){ if(!arr.length) return null; var a=arr.slice().sort(function(x,y){return x-y;}); var m=Math.floor(a.length/2); return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2); }
+  function pctf(n,d){ return d>0?((n/d)*100).toFixed(1)+'%':'—'; }
+  function fmtCst(ts){ try{ return new Date(ts).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ts; } }
+  var SRC=['indeed','facebook','craigslist'];
+  var LABELS={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+
+  function renderDash(sessions, events, leads, leadsTotal, sessTotal){
     var DAY=86400000, CHART_DAYS=30;
-    var chartStart=new Date(dayStart); chartStart.setDate(dayStart.getDate()-(CHART_DAYS-1));
-    var buckets={}; for(var i=0;i<CHART_DAYS;i++){ var dd=new Date(chartStart.getTime()+i*DAY); buckets[dayKey(dd)]={d:dd,n:0}; }
-    var total=pv.length, today=0, week=0, month=0, dwells=[], src={indeed:0,facebook:0,craigslist:0,direct:0};
-    pv.forEach(function(r){
-      var t=new Date(r.created_at);
-      if(t>=dayStart) today++; if(t>=weekStart) week++; if(t>=monthStart) month++;
-      var dk=dayKey(new Date(t.getFullYear(),t.getMonth(),t.getDate())); if(buckets[dk]) buckets[dk].n++;
-      if(r.dwell_ms!=null) dwells.push(r.dwell_ms);
-      src[classifySrc(r.source,r.referrer)]++;
+    var now=new Date();
+    var chartStart=new Date(); chartStart.setHours(0,0,0,0); chartStart.setDate(chartStart.getDate()-(CHART_DAYS-1));
+    var todayKey=chiDay(now), monthKey=cfMonth.format(now), weekKeys={};
+    for(var w=0;w<7;w++){ weekKeys[chiDay(new Date(now.getTime()-w*DAY))]=1; }
+    var cToday=0,cWeek=0,cMonth=0, actSum=0, preSum=0, preN=0, shortN=0;
+    var buckets={}; for(var i=0;i<CHART_DAYS;i++){ var dd=new Date(chartStart.getTime()+i*DAY); buckets[chiDay(dd)]={d:dd,n:0,c:0}; }
+    var hours=new Array(24).fill(0);
+    var srcAgg={}, preBySession={}, subPre=[], nonSubActive=[];
+    sessions.forEach(function(s){
+      var d=new Date(s.started_at), k=chiDay(d);
+      if(k===todayKey) cToday++; if(weekKeys[k]) cWeek++; if(cfMonth.format(d)===monthKey) cMonth++;
+      if(buckets[k]){ buckets[k].n++; if(s.submitted) buckets[k].c++; }
+      if(d>=chartStart) hours[chiHour(d)]++;
+      var act=s.active_ms||0; actSum+=act;
+      if(s.submitted){ var pre=s.pre_submit_active_ms!=null?s.pre_submit_active_ms:act; preSum+=pre; preN++; subPre.push(pre); }
+      else { nonSubActive.push(act); if(act<=10000) shortN++; }
+      if(s.session_id) preBySession[s.session_id]=(s.pre_submit_active_ms!=null?s.pre_submit_active_ms:(s.submitted?act:null));
+      var src=(SRC.indexOf((s.source||'').toLowerCase())>=0)?s.source.toLowerCase():'direct';
+      var a=srcAgg[src]||(srcAgg[src]={visits:0,contacts:0,act:0,pre:0,preN:0,camp:{}});
+      a.visits++; a.act+=act; if(s.submitted){ a.contacts++; a.pre+=(s.pre_submit_active_ms!=null?s.pre_submit_active_ms:act); a.preN++; }
+      var cn=(s.utm_campaign||s.posting_city||'').toString().slice(0,60); if(cn) a.camp[cn]=(a.camp[cn]||0)+1;
     });
+    var visits=sessions.length;
+    var evc={}; events.forEach(function(e){ evc[e.type]=(evc[e.type]||0)+1; }); var ev=function(t){return evc[t]||0;};
     var series=Object.keys(buckets).sort().map(function(k){return buckets[k];});
     var maxN=Math.max.apply(null,[1].concat(series.map(function(s){return s.n;})));
-    var measured=dwells.length;
-    var avgMs=measured?dwells.reduce(function(a,b){return a+b;},0)/measured:null;
-    var bounces=dwells.filter(function(v){return v<10000;}).length;
-    var bounceRate=measured?Math.round(bounces/measured*100)+'%':'—';
-    var ratioStr=leadsTotal>0?(total/leadsTotal).toFixed(1):'—';
-    var rateStr=total>0?((leadsTotal/total)*100).toFixed(1)+'%':'—';
-    var labels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
-    var topKey='direct',topN=-1; Object.keys(src).forEach(function(k){ if(src[k]>topN){topN=src[k];topKey=k;} });
-    var topStr=topN>0?('Top: '+labels[topKey]):'by utm_source';
-    var leadSrc={indeed:0,facebook:0,craigslist:0,direct:0};
-    (leads||[]).forEach(function(l){ var ls=(l.source||'').toLowerCase(); leadSrc[(ls==='indeed'||ls==='facebook'||ls==='craigslist')?ls:'direct']++; });
-    var ltopKey='direct',ltopN=-1; Object.keys(leadSrc).forEach(function(k){ if(leadSrc[k]>ltopN){ltopN=leadSrc[k];ltopKey=k;} });
-    var topLeadStr=ltopN>0?('Top: '+labels[ltopKey]):'from tagged links';
-    var bars=series.map(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; return '<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+'"></div>'; }).join('');
+    var maxH=Math.max.apply(null,[1].concat(hours));
+    var srcOrder=Object.keys(srcAgg).sort(function(x,y){return srcAgg[y].visits-srcAgg[x].visits;});
+    window.__vgnPre=preBySession;
+
+    // stash aggregate for CSV
+    window._vgnAgg={ generatedAt:new Date().toISOString(), tz:'America/Chicago', version:'phase1-v1', windowDays:90,
+      daily:series.map(function(s){return {date:chiDay(s.d),visits:s.n,contacts:s.c};}),
+      hourly:hours.map(function(v,h){return {hour:h,visits:v};}),
+      sources:srcOrder.map(function(k){return {source:k,visits:srcAgg[k].visits,contacts:srcAgg[k].contacts,
+        conversion_pct:srcAgg[k].contacts>=5?((srcAgg[k].contacts/srcAgg[k].visits)*100).toFixed(1):'',
+        avg_active_s:Math.round((srcAgg[k].act/Math.max(1,srcAgg[k].visits))/1000),
+        pre_submit_s:srcAgg[k].contacts>=5?Math.round((srcAgg[k].pre/Math.max(1,srcAgg[k].preN))/1000):''};}),
+      summary:{visits_90d:visits,visits_total:sessTotal,saved_contacts_total:leadsTotal,submitted_90d:preN,
+        conversion_pct_90d:visits>0?((preN/visits)*100).toFixed(1):'',avg_active_s:Math.round((actSum/Math.max(1,visits))/1000),
+        avg_pre_submit_s:preN>0?Math.round((preSum/preN)/1000):'',short_visit_pct:visits>0?((shortN/visits)*100).toFixed(1):''} };
+
     var st=function(cls,n,l){ return '<div class="stat"><div class="n '+cls+'">'+num(n)+'</div><div class="l">'+l+'</div></div>'; };
+    var bars=series.map(function(s){ var h=s.n>0?Math.max(6,Math.round(s.n/maxN*100)):2; return '<div class="pv-bar" style="height:'+h+'%" title="'+shortDay(s.d)+' — '+s.n+' visit'+(s.n===1?'':'s')+(s.c?' · '+s.c+' contact'+(s.c===1?'':'s'):'')+'"></div>'; }).join('');
+    var hbars=hours.map(function(v,h){ var hh=v>0?Math.max(5,Math.round(v/maxH*100)):2; return '<div class="pv-bar" style="height:'+hh+'%" title="'+(h<10?'0'+h:h)+':00 — '+v+' visit'+(v===1?'':'s')+'"></div>'; }).join('');
+    var convRate=visits>0?pctf(preN,visits):'—';
+    var ratioStr=preN>0?(visits/preN).toFixed(1):'—';
+    var avgActive=visits>0?fmtDwell(actSum/visits):'—';
+    var avgPre=preN>0?fmtDwell(preSum/preN):'—';
+    var shortRate=visits>0?pctf(shortN,visits):'—';
+
+    var srcRows='';
+    if(srcOrder.length===0){ srcRows='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:16px">No measured sessions yet.</td></tr>'; }
+    else { srcOrder.forEach(function(k){ var a=srcAgg[k], small=a.contacts<5;
+      srcRows+='<tr><td style="text-align:left">'+esc(LABELS[k]||k)+'</td><td>'+a.visits+'</td><td>'+pctf(a.visits,visits)+'</td><td>'+a.contacts+'</td><td>'+(small?'—':pctf(a.contacts,a.visits))+'</td><td>'+fmtDwell(a.act/Math.max(1,a.visits))+'</td><td>'+(small?'—':fmtDwell(a.pre/Math.max(1,a.preN)))+'</td></tr>';
+      Object.keys(a.camp).sort(function(x,y){return a.camp[y]-a.camp[x];}).slice(0,6).forEach(function(cn){
+        srcRows+='<tr><td style="text-align:left;padding-left:22px;color:var(--muted);font-size:12px">&#8627; '+esc(cn)+'</td><td style="color:var(--muted)">'+a.camp[cn]+'</td><td></td><td></td><td></td><td></td><td></td></tr>'; });
+    }); }
+
     document.getElementById('dash').innerHTML=
-      '<div class="chartcard"><div class="cardtitle">Website visits <span class="note">fleetguards.app/vgn/</span></div>'+
-        '<div class="stats">'+st('c-cyan',today,'Today')+st('c-green',week,'This week')+st('c-amber',month,'This month')+st('c-blue',total,'Total')+'</div>'+
+      '<div class="chartcard"><div class="cardtitle">Website visits <span class="note">fleetguards.app/vgn/ · Central time</span></div>'+
+        '<div class="stats">'+st('c-cyan',cToday,'Today')+st('c-green',cWeek,'Last 7 days')+st('c-amber',cMonth,'This month')+st('c-blue',sessTotal,'Total sessions')+'</div>'+
         '<div class="pv-chart"><div class="chart-head"><b>Daily visits</b><span>last 30 days · peak '+maxN+'/day</span></div><div class="pv-bars">'+bars+'</div><div class="pv-axis"><span>'+shortDay(series[0].d)+'</span><span>'+shortDay(series[series.length-1].d)+'</span></div></div>'+
+        '<div class="pv-chart"><div class="chart-head"><b>Busiest hours</b><span>last 30 days · Central</span></div><div class="pv-bars">'+hbars+'</div><div class="pv-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>23</span></div></div>'+
       '</div>'+
       '<div class="statgrid">'+
-        '<div class="statcard"><div class="cardtitle">Conversion <span class="note">visits &rarr; leads</span></div><div class="stats">'+st('c-cyan',leadsTotal,'Leads received')+st('c-amber',ratioStr,'Visits per lead')+st('c-green',rateStr,'Conversion rate')+'</div></div>'+
-        '<div class="statcard"><div class="cardtitle">Engagement <span class="note">'+measured+' measured</span></div><div class="stats">'+st('c-cyan',fmtDwell(avgMs),'Avg. time on page')+st('c-amber',bounces,'Bounces (&lt;10s)')+st('c-green',bounceRate,'Bounce rate')+'</div></div>'+
-        '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">'+topStr+'</span></div><div class="stats">'+st('c-cyan',src.indeed,'Indeed')+st('c-blue',src.facebook,'Facebook')+st('c-green',src.craigslist,'Craigslist')+st('c-amber',src.direct,'Direct / other')+'</div></div>'+
-        '<div class="statcard"><div class="cardtitle">Leads by source <span class="note">'+topLeadStr+'</span></div><div class="stats">'+st('c-cyan',leadSrc.indeed,'Indeed')+st('c-blue',leadSrc.facebook,'Facebook')+st('c-green',leadSrc.craigslist,'Craigslist')+st('c-amber',leadSrc.direct,'Direct / other')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Conversion <span class="note">measured · 90 days</span></div><div class="stats">'+st('c-cyan',leadsTotal,'Saved contacts')+st('c-green',convRate,'Conversion rate')+st('c-amber',ratioStr,'Visits per contact')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Engagement <span class="note">active time · estimate</span></div><div class="stats">'+st('c-cyan',avgActive,'Avg active time')+st('c-green',avgPre,'Avg before submit')+st('c-amber',shortRate,'Short visits (&le;10s)')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">last 90 days</span></div><div class="stats">'+st('c-cyan',(srcAgg.indeed||{}).visits||0,'Indeed')+st('c-blue',(srcAgg.facebook||{}).visits||0,'Facebook')+st('c-green',(srcAgg.craigslist||{}).visits||0,'Craigslist')+st('c-amber',(srcAgg.direct||{}).visits||0,'Direct / other')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Interactions &amp; intent <span class="note">clicks, not completed</span></div><div class="stats">'+st('c-cyan',ev('statement_open'),'Statement opens')+st('c-amber',ev('program_cta'),'Program CTA')+st('c-green',ev('call_click'),'Call clicks')+st('c-blue',ev('text_click'),'Text clicks')+st('c-cyan',ev('intelliapp_click'),'IntelliApp')+st('c-amber',ev('faq_open'),'FAQ opens')+'</div></div>'+
+      '</div>'+
+      '<div class="chartcard"><div class="cardtitle">Source &amp; campaign <span class="note">90 days · rates hidden under 5 contacts</span>'+
+        '<button class="btn ghost" style="margin-left:auto;padding:6px 12px;font-size:12px" onclick="window.__vgnCsv&&window.__vgnCsv()">Export CSV</button></div>'+
+        '<div class="tablewrap" style="border:none"><table style="min-width:620px"><thead><tr><th style="text-align:left">Source / campaign</th><th style="text-align:right">Visits</th><th style="text-align:right">Share</th><th style="text-align:right">Contacts</th><th style="text-align:right">Conv.</th><th style="text-align:right">Avg active</th><th style="text-align:right">Pre-submit</th></tr></thead><tbody style="text-align:right">'+srcRows+'</tbody></table></div>'+
+        '<div class="muted" style="font-size:11px;line-height:1.6;margin-top:12px">Submitters median '+fmtDwell(med(subPre))+' before submitting ('+preN+') · non-submitters median '+fmtDwell(med(nonSubActive))+' whole-session ('+nonSubActive.length+'). Visit=session (30-min timeout, reloads merged, bots excluded). Active time is a foreground estimate (hidden/idle&gt;60s excluded), not proven attention. A Call/Text/IntelliApp click is intent, not a completed call or application.</div>'+
       '</div>';
   }
 
   function renderTable(res){
     var rows=document.getElementById('rows'), empty=document.getElementById('empty'), count=document.getElementById('count');
+    var pre=window.__vgnPre||{};
     rows.innerHTML=''; empty.style.display='none';
     if(res.error){ empty.textContent='Could not load leads: '+res.error.message; empty.style.display='block'; count.innerHTML=''; return; }
     var data=res.data||[];
@@ -173,26 +219,49 @@
     if(!data.length){ empty.style.display='block'; return; }
     rows.innerHTML=data.map(function(r){
       var pill=r.sms_status==='sent'?'<span class="pill sent">sent</span>':(r.sms_status==='failed'?'<span class="pill failed">not sent</span>':'<span class="muted">—</span>');
-      return '<tr><td class="muted">'+esc(fmt(r.created_at))+'</td>'+
+      var ls=(r.source||'').toLowerCase(); var srcLbl=LABELS[(SRC.indexOf(ls)>=0)?ls:'direct'];
+      var pv=(r.session_id && pre[r.session_id]!=null)?fmtDwell(pre[r.session_id]):'—';
+      return '<tr><td class="muted">'+esc(fmtCst(r.created_at))+'</td>'+
         '<td class="name">'+esc(r.full_name)+'</td>'+
         '<td><a class="tel" href="tel:'+esc(digits(r.phone))+'">'+esc(r.phone)+'</a></td>'+
-        '<td>'+esc(r.cdl_experience||'—')+'</td>'+
-        '<td>'+esc(r.sap||'—')+'</td>'+
-        '<td>'+esc(r.best_time||'—')+'</td>'+
+        '<td>'+esc(srcLbl)+'</td>'+
+        '<td>'+esc(r.program||'—')+'</td>'+
+        '<td>'+esc(r.recruiter||'—')+'</td>'+
+        '<td>'+pv+'</td>'+
         '<td>'+pill+'</td></tr>';
     }).join('');
   }
 
+  window.__vgnCsv=function(){
+    var a=window._vgnAgg; if(!a) return;
+    var q=function(v){ v=(v==null?'':String(v)); return /[",\n]/.test(v)?('"'+v.replace(/"/g,'""')+'"'):v; };
+    var rows=[['VGN /vgn/ aggregate analytics — NO personal data'],['Generated',a.generatedAt],['Timezone',a.tz],['Version',a.version],['Window (days)',a.windowDays],[],
+      ['SUMMARY'],['metric','value'],['visits_90d',a.summary.visits_90d],['visits_total',a.summary.visits_total],['saved_contacts_total',a.summary.saved_contacts_total],['submitted_90d',a.summary.submitted_90d],['conversion_pct_90d',a.summary.conversion_pct_90d],['avg_active_seconds',a.summary.avg_active_s],['avg_pre_submit_seconds',a.summary.avg_pre_submit_s],['short_visit_pct',a.summary.short_visit_pct],[],
+      ['DAILY (CST)'],['date','visits','contacts']];
+    a.daily.forEach(function(d){rows.push([d.date,d.visits,d.contacts]);});
+    rows.push([],['BY HOUR (CST)'],['hour','visits']); a.hourly.forEach(function(h){rows.push([h.hour,h.visits]);});
+    rows.push([],['BY SOURCE (90d)'],['source','visits','contacts','conversion_pct','avg_active_seconds','pre_submit_seconds']); a.sources.forEach(function(s){rows.push([s.source,s.visits,s.contacts,s.conversion_pct,s.avg_active_s,s.pre_submit_s]);});
+    rows.push([],['Definitions: Visit=session (30-min timeout, reloads merged, bots excluded). Active time=foreground estimate (hidden/idle>60s excluded), not proven attention. Saved contact=backend-confirmed callback request; clicks are intent, not completed calls/applications. Rates for cohorts under 5 contacts omitted.']);
+    var csv=rows.map(function(r){return r.map(q).join(',');}).join('\r\n');
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8'}), url=window.URL.createObjectURL(blob), el=document.createElement('a');
+    el.href=url; el.download='vgn-analytics-'+new Date().toISOString().slice(0,10)+'.csv';
+    document.body.appendChild(el); el.click(); document.body.removeChild(el); setTimeout(function(){window.URL.revokeObjectURL(url);},2000);
+  };
+
   async function loadAll(){
     document.getElementById('dash').innerHTML='<div class="muted" style="padding:20px 0">Loading…</div>';
+    var DAY=86400000, winStart=new Date(Date.now()-90*DAY);
     var r=await Promise.all([
-      sb.from('page_views').select('created_at,dwell_ms,source,referrer').limit(50000),
-      sb.from('driver_leads').select('created_at,full_name,phone,cdl_experience,sap,best_time,sms_status,source').order('created_at',{ascending:false}).limit(500),
-      sb.from('driver_leads').select('id',{count:'exact',head:true})
+      sb.from('va_sessions').select('started_at,source,utm_campaign,posting_city,active_ms,submitted,pre_submit_active_ms,device,session_id').eq('is_bot',false).gte('started_at',winStart.toISOString()).limit(50000),
+      sb.from('va_events').select('type').gte('ts',winStart.toISOString()).limit(50000),
+      sb.from('driver_leads').select('created_at,full_name,phone,recruiter,program,best_time,sms_status,source,session_id').order('created_at',{ascending:false}).limit(500),
+      sb.from('driver_leads').select('id',{count:'exact',head:true}),
+      sb.from('va_sessions').select('session_id',{count:'exact',head:true}).eq('is_bot',false)
     ]);
-    var pvRes=r[0], leadsRes=r[1], leadsCountRes=r[2];
+    var sessRes=r[0], evRes=r[1], leadsRes=r[2], leadsCountRes=r[3], sessTotalRes=r[4];
     var leadsTotal=(leadsCountRes && !leadsCountRes.error && leadsCountRes.count!=null)?leadsCountRes.count:((leadsRes.data||[]).length);
-    renderDash(pvRes.data||[], leadsTotal, leadsRes.data||[]);
+    var sessTotal=(sessTotalRes && !sessTotalRes.error && sessTotalRes.count!=null)?sessTotalRes.count:((sessRes.data||[]).length);
+    renderDash(sessRes.data||[], evRes.data||[], leadsRes.data||[], leadsTotal, sessTotal);
     renderTable(leadsRes);
   }
 

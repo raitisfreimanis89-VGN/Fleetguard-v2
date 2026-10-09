@@ -400,28 +400,61 @@ body{background:#faf8f3}
     root.querySelectorAll('[data-lift]').forEach(function(el){ if(el.getBoundingClientRect().top>window.innerHeight){ el.classList.add('vgn-coming'); io.observe(el); } });
   }
 
-  // ---- Attribution: capture UTM + classified source (kept out of the URL/log) ----
-  var utmSource=''; try{ utmSource=(new URLSearchParams(location.search).get('utm_source')||'').slice(0,60); }catch(e){}
-  var leadSrc=(function(u,r){u=(u||'').toLowerCase();if(u.indexOf('indeed')>=0)return'indeed';if(u.indexOf('facebook')>=0||u==='fb'||u==='meta')return'facebook';if(u.indexOf('craigslist')>=0||u==='cl')return'craigslist';if(!u){r=(r||'').toLowerCase();if(r.indexOf('indeed')>=0)return'indeed';if(r.indexOf('facebook')>=0||r.indexOf('fb.')>=0)return'facebook';if(r.indexOf('craigslist')>=0)return'craigslist';}return'direct';})(utmSource,document.referrer);
+  // ---- Attribution (allowlisted UTMs + classified source; kept out of the URL/log) ----
+  function qp(k){ try{ return (new URLSearchParams(location.search).get(k)||'').slice(0,120); }catch(e){ return ''; } }
+  var utmSource=qp('utm_source').slice(0,60);
+  var attribution={ utm_source:utmSource, utm_medium:qp('utm_medium'), utm_campaign:qp('utm_campaign'), utm_content:qp('utm_content'), utm_term:qp('utm_term'), posting_city:qp('posting_city'), creative_id:qp('creative_id') };
+  var referrerHost=''; try{ referrerHost=document.referrer?new URL(document.referrer).hostname.slice(0,120):''; }catch(e){}
+  var leadSrc=(function(u,r){u=(u||'').toLowerCase();if(u.indexOf('indeed')>=0)return'indeed';if(u.indexOf('facebook')>=0||u==='fb'||u==='meta')return'facebook';if(u.indexOf('craigslist')>=0||u==='cl')return'craigslist';if(!u){r=(r||'').toLowerCase();if(r.indexOf('indeed')>=0)return'indeed';if(r.indexOf('facebook')>=0||r.indexOf('fb.')>=0)return'facebook';if(r.indexOf('craigslist')>=0)return'craigslist';}return'direct';})(utmSource,referrerHost);
+  var device=(function(){ var w=Math.min(screen.width||window.innerWidth||1024, window.innerWidth||screen.width||1024); var touch=('ontouchstart' in window)||(navigator.maxTouchPoints>0); if(w<768) return 'mobile'; if(w<=1024&&touch) return 'tablet'; return 'desktop'; })();
 
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
   var API='https://tmpdsiuadafbkmldvlki.supabase.co/functions/v1';
-  var isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname) || /\.localhost$/.test(location.hostname);
+  var hdrs={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
+  // Only send analytics from the real site; skip local/dev hosts so previews don't pollute.
+  var trackOK = !/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(location.hostname) && !/\.localhost$/.test(location.hostname);
 
-  // ---- First-party visit + dwell tracking (skipped on local preview) ----
-  if(!isLocal){
-    try{
-      var hdrs={'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON};
-      var vid=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():(Date.now()+'-'+Math.random().toString(16).slice(2));
-      var t0=Date.now();
-      fetch(API+'/track-view',{method:'POST',keepalive:true,headers:hdrs,body:JSON.stringify({path:location.pathname,ref:document.referrer,vid:vid,source:utmSource})}).catch(function(){});
-      var sent=false;
-      function leave(){ if(sent) return; sent=true; var dwell=Math.min(Date.now()-t0,1800000);
-        try{ fetch(API+'/track-view',{method:'POST',keepalive:true,headers:hdrs,body:JSON.stringify({vid:vid,dwell_ms:dwell})}).catch(function(){}); }catch(e){} }
-      window.addEventListener('pagehide', leave);
-      document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') leave(); });
-    }catch(e){}
+  // ---- Phase 1 first-party analytics: cookieless session + foreground active time ----
+  var SESSION_GAP=30*60*1000, IDLE_CUTOFF=60*1000;
+  function newId(){ return (window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0,v=c==='x'?r:(r&0x3|0x8);return v.toString(16);}); }
+  var sessionId, activeMs=0;
+  try{ var saved=JSON.parse(sessionStorage.getItem('vgn_va')||'null'); if(saved&&saved.sid&&(Date.now()-(saved.last||0))<SESSION_GAP){ sessionId=saved.sid; activeMs=saved.activeMs||0; } }catch(e){}
+  if(!sessionId){ sessionId=newId(); activeMs=0; }
+  function persist(){ try{ sessionStorage.setItem('vgn_va', JSON.stringify({sid:sessionId, activeMs:Math.round(activeMs), last:Date.now()})); }catch(e){} }
+
+  var lastTick=performance.now(), lastInteraction=performance.now(), visible=(document.visibilityState==='visible');
+  function isActive(){ return visible && (performance.now()-lastInteraction)<IDLE_CUTOFF; }
+  function accumulate(){ var now=performance.now(), d=now-lastTick; lastTick=now; if(d<0)d=0; if(d>65000)d=65000; if(isActive()) activeMs+=d; persist(); }
+  function getActiveMs(){ accumulate(); return Math.round(activeMs); }
+  ['scroll','click','keydown','pointerdown','pointermove','touchstart','wheel'].forEach(function(ev){ window.addEventListener(ev,function(){ lastInteraction=performance.now(); },{passive:true,capture:true}); });
+
+  var evQueue=[];
+  function markEvent(type, detail){ evQueue.push({type:type, detail:detail||null}); }
+  function sendVA(keepalive){
+    if(!trackOK){ return; }
+    accumulate();
+    var body={ session_id:sessionId, active_ms:Math.round(activeMs), path:location.pathname, source:leadSrc,
+      utm_source:attribution.utm_source, utm_medium:attribution.utm_medium, utm_campaign:attribution.utm_campaign,
+      utm_content:attribution.utm_content, utm_term:attribution.utm_term, posting_city:attribution.posting_city,
+      creative_id:attribution.creative_id, referrer_host:referrerHost, device:device };
+    if(evQueue.length){ body.events=evQueue.splice(0,40); }
+    try{ fetch(API+'/va-collect',{method:'POST',keepalive:!!keepalive,headers:hdrs,body:JSON.stringify(body)}).catch(function(){}); }catch(e){}
   }
+  sendVA(false); // initial session beacon
+  setInterval(function(){ accumulate(); if(evQueue.length||isActive()) sendVA(false); }, 15000);
+  document.addEventListener('visibilitychange', function(){ accumulate(); visible=(document.visibilityState==='visible'); if(visible){ lastTick=performance.now(); lastInteraction=performance.now(); } else { sendVA(true); } });
+  window.addEventListener('pagehide', function(){ accumulate(); sendVA(true); });
+
+  // ---- interaction events (types only, no form values) ----
+  var formStarted=false;
+  if(form){ form.addEventListener('focusin', function(){ if(!formStarted){ formStarted=true; markEvent('form_start'); sendVA(false); } }); }
+  root.querySelectorAll('#vgn-statements details').forEach(function(d,i){ d.addEventListener('toggle', function(){ if(d.open){ markEvent('statement_open','stmt'+(i+1)); } }); });
+  root.querySelectorAll('#vgn-faq details').forEach(function(d,i){ d.addEventListener('toggle', function(){ if(d.open){ markEvent('faq_open','faq'+(i+1)); } }); });
+  root.querySelectorAll('[data-program]').forEach(function(b){ b.addEventListener('click', function(){ markEvent('program_cta', b.getAttribute('data-program')); }); });
+  root.querySelectorAll('[data-callback]').forEach(function(b){ b.addEventListener('click', function(){ markEvent('callback_cta'); }); });
+  root.querySelectorAll('a[href^="tel:"]').forEach(function(a){ a.addEventListener('click', function(){ markEvent('call_click', /515/.test(a.getAttribute('href'))?'carl':'ray'); sendVA(true); }); });
+  root.querySelectorAll('a[href^="sms:"]').forEach(function(a){ a.addEventListener('click', function(){ markEvent('text_click', /515/.test(a.getAttribute('href'))?'carl':'ray'); sendVA(true); }); });
+  root.querySelectorAll('[data-intelliapp]').forEach(function(a){ a.addEventListener('click', function(){ markEvent('intelliapp_click'); sendVA(true); }); });
 
   // ---- Real callback request ----
   var status=document.getElementById('vgn-form-status');
@@ -442,15 +475,18 @@ body{background:#faf8f3}
     var program=select?select.value:'';
     var bestTime=form.bestTime?(form.bestTime.value||'').trim():'';
     submitting=true; submitBtn.disabled=true; var old=submitBtn.textContent; submitBtn.textContent='Sending…';
+    markEvent('submit_attempt'); sendVA(false);
     fetch(API+'/driver-apply',{ method:'POST', headers:{'Content-Type':'application/json','apikey':ANON,'Authorization':'Bearer '+ANON},
-      body:JSON.stringify({ full_name:name, phone:phoneRaw, recruiter:recruiter, program:program, best_time:bestTime, consent:true, source:leadSrc, utm_source:utmSource }) })
+      body:JSON.stringify({ full_name:name, phone:phoneRaw, recruiter:recruiter, program:program, best_time:bestTime, consent:true, source:leadSrc, utm_source:utmSource, session_id:sessionId, active_ms:getActiveMs() }) })
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }).catch(function(){ return {ok:r.ok,j:{}}; }); })
       .then(function(res){
         if(res.ok && res.j && res.j.ok){
           var who = recruiter==='Either' ? 'Ray or Carl' : recruiter;
+          markEvent('submit_success'); sendVA(false);
           form.reset(); if(select) select.value=program; markProgram(program);
           setStatus('Thanks, '+name.split(' ')[0]+'. Your request is in — '+who+' will call you'+(bestTime?(' ('+bestTime+')'):'')+'. Prefer to call now? Ray 708-232-8523 · Carl 515-603-0686.', true);
         } else {
+          markEvent('submit_fail','server'); sendVA(false);
           setStatus((res.j&&res.j.error)||'Something went wrong. Please call Ray at 708-232-8523 or Carl at 515-603-0686.', false);
         }
       })
