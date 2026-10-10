@@ -131,8 +131,10 @@ body{background:#faf8f3}
 #vgn-landing-concept .vgn-inspection p{font-size:12px;color:var(--vgn-muted)}
 #vgn-landing-concept .vgn-quotes blockquote{margin:0;padding:0;font-size:15px;line-height:1.6}
 #vgn-landing-concept .vgn-quote-by{font-size:11px;color:var(--vgn-muted);margin-top:15px}
-#vgn-landing-concept .vgn-testimonial-grid{display:grid;grid-template-columns:minmax(0,360px) 1fr;gap:18px;align-items:start}
-#vgn-landing-concept .vgn-quote-stack{display:grid;gap:18px;min-width:0}
+#vgn-landing-concept .vgn-video-row{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:start}
+#vgn-landing-concept .vgn-video-row .vgn-video-card{flex:0 1 330px;max-width:330px;width:100%}
+#vgn-landing-concept .vgn-video-note{font-size:11px;color:var(--vgn-muted);text-align:center;margin:16px auto 2px;max-width:620px}
+#vgn-landing-concept .vgn-quotes .vgn-grid-two{margin-top:22px}
 #vgn-landing-concept .vgn-video-card{padding:0;overflow:hidden}
 #vgn-landing-concept .vgn-video-wrap{position:relative;background:#0d2b26;line-height:0}
 #vgn-landing-concept .vgn-video-wrap video{display:block;width:100%;height:auto;aspect-ratio:9/16;object-fit:cover}
@@ -141,7 +143,7 @@ body{background:#faf8f3}
 #vgn-landing-concept .vgn-video-play::after{content:"";position:absolute;border-style:solid;border-width:12px 0 12px 20px;border-color:transparent transparent transparent #fff;margin-left:6px}
 #vgn-landing-concept .vgn-video-caption{padding:18px 20px}
 #vgn-landing-concept .vgn-video-caption blockquote{margin:0;font-size:15px;line-height:1.6}
-@media(max-width:650px){#vgn-landing-concept .vgn-testimonial-grid{grid-template-columns:1fr}#vgn-landing-concept .vgn-video-card{max-width:340px;width:100%;margin:0 auto}}
+@media(max-width:650px){#vgn-landing-concept .vgn-video-row .vgn-video-card{flex-basis:100%;max-width:340px}}
 #vgn-landing-concept .vgn-lanes{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 #vgn-landing-concept .vgn-lanes span{border:1px solid var(--vgn-line);border-radius:5px;background:#fff;padding:9px 13px;font-size:12px}
 #vgn-landing-concept .vgn-map{margin:26px 0 8px;background:#f2f6f2;border:1px solid var(--vgn-line);border-radius:var(--vgn-radius);padding:20px}
@@ -300,7 +302,7 @@ body{background:#faf8f3}
   </div>
 </section>
 <section class="vgn-section vgn-quotes">
-  <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">The driver’s experience matters</p><h2>Ask a driver.<br>Not just a recruiter.</h2></div><div class="vgn-testimonial-grid"><article class="vgn-card vgn-video-card" data-lift><div class="vgn-video-wrap"><video controls playsinline preload="none" poster="assets/testimonials/pershing-poster.jpg" width="464" height="832" aria-label="Video review from Pershing, VGN driver"><source src="assets/testimonials/pershing-review.mp4" type="video/mp4"></video><button class="vgn-video-play" type="button" aria-label="Play video review from Pershing"></button></div><div class="vgn-video-caption"><p class="vgn-quote-by">Pershing · VGN driver, 2 months<br>Video sent to us by Pershing. Individual experience.</p></div></article><div class="vgn-quote-stack"><article class="vgn-card" data-lift><blockquote>“The numbers are exactly what they told me up front.”</blockquote><p class="vgn-quote-by">Benjamin · VGN driver, 1 year 4 months<br>Excerpt from the current VGN driver testimonial</p></article><article class="vgn-card" data-lift><blockquote>“I can always get home on time.”</blockquote><p class="vgn-quote-by">Larry · VGN driver, 8 months<br>Individual experience; home-time arrangements vary</p></article></div></div><p class="vgn-disclaimer">Ask Ray or Carl to arrange a conversation with a current driver before you sign.</p></div>
+  <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">The driver’s experience matters</p><h2>Ask a driver.<br>Not just a recruiter.</h2></div><div class="vgn-video-row"><article class="vgn-card vgn-video-card" data-lift><div class="vgn-video-wrap"><video controls playsinline preload="none" poster="assets/testimonials/pershing-poster.jpg" width="464" height="832" aria-label="Video review from Pershing, VGN driver"><source src="assets/testimonials/pershing-review.mp4" type="video/mp4"></video><button class="vgn-video-play" type="button" aria-label="Play video review from Pershing"></button></div><div class="vgn-video-caption"><blockquote>“No cameras, 75 mph, home on time — and they keep me moving.”</blockquote><p class="vgn-quote-by">Pershing · VGN driver, 2 months</p></div></article><article class="vgn-card vgn-video-card" data-lift><div class="vgn-video-wrap"><video controls playsinline preload="none" poster="assets/testimonials/henry-poster.jpg" width="464" height="832" aria-label="Video review from Henry, VGN driver"><source src="assets/testimonials/henry-review.mp4" type="video/mp4"></video><button class="vgn-video-play" type="button" aria-label="Play video review from Henry"></button></div><div class="vgn-video-caption"><blockquote>“A team that has your back, maintenance support, home time and good-paying loads.”</blockquote><p class="vgn-quote-by">Henry · VGN driver, 10½ months</p></div></article></div><p class="vgn-video-note">Videos sent to us by our drivers. Individual experiences; results vary.</p><div class="vgn-grid-two"><article class="vgn-card" data-lift><blockquote>“The numbers are exactly what they told me up front.”</blockquote><p class="vgn-quote-by">Benjamin · VGN driver, 1 year 4 months<br>Excerpt from the current VGN driver testimonial</p></article><article class="vgn-card" data-lift><blockquote>“I can always get home on time.”</blockquote><p class="vgn-quote-by">Larry · VGN driver, 8 months<br>Individual experience; home-time arrangements vary</p></article></div><p class="vgn-disclaimer">Ask Ray or Carl to arrange a conversation with a current driver before you sign.</p></div>
 </section>
 <section class="vgn-section vgn-white" id="vgn-faq">
   <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">Know where you’ll run—and what to expect</p><h2>Your route. Your questions.</h2><p>37-state lanes across the Midwest, South and Northeast. No West Coast, no Mountain states, no NYC.</p><div class="vgn-lanes"><span>Midwest</span><span>South &amp; Southeast</span><span>Northeast &amp; Mid-Atlantic</span></div><p class="vgn-small" style="margin-top:18px">Dry van · No-touch freight · No cameras · Pet-friendly · Inverter, microwave &amp; fridge</p></div>
@@ -396,12 +398,13 @@ body{background:#faf8f3}
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   root.classList.toggle('vgn-motion', !reduceMotion);
 
-  // Testimonial video: large play overlay on the poster; hide it once playback starts.
+  // Testimonial videos: large play overlay hides once playback starts; starting one pauses the others.
+  var vgnVideos=[].slice.call(root.querySelectorAll('.vgn-video-card video'));
   root.querySelectorAll('.vgn-video-card').forEach(function(card){
     var v=card.querySelector('video'), btn=card.querySelector('.vgn-video-play');
-    if(!v||!btn) return;
-    btn.addEventListener('click', function(){ var p=v.play(); if(p&&p.catch) p.catch(function(){}); });
-    v.addEventListener('play', function(){ btn.style.display='none'; });
+    if(!v) return;
+    if(btn) btn.addEventListener('click', function(){ var p=v.play(); if(p&&p.catch) p.catch(function(){}); });
+    v.addEventListener('play', function(){ if(btn) btn.style.display='none'; vgnVideos.forEach(function(o){ if(o!==v && !o.paused) o.pause(); }); });
   });
 
   function go(id){ var t=document.getElementById(id); if(t) t.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'}); }
