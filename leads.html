@@ -126,8 +126,8 @@
   function med(arr){ if(!arr.length) return null; var a=arr.slice().sort(function(x,y){return x-y;}); var m=Math.floor(a.length/2); return a.length%2?a[m]:Math.round((a[m-1]+a[m])/2); }
   function pctf(n,d){ return d>0?((n/d)*100).toFixed(1)+'%':'—'; }
   function fmtCst(ts){ try{ return new Date(ts).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ts; } }
-  var SRC=['indeed','facebook','craigslist'];
-  var LABELS={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+  var SRC=['indeed','facebook','craigslist','tiktok','instagram'];
+  var LABELS={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',tiktok:'TikTok',instagram:'Instagram',direct:'Direct / other'};
 
   function renderDash(sessions, events, leads, leadsTotal, sessTotal){
     var DAY=86400000, CHART_DAYS=30;
@@ -199,7 +199,7 @@
       '<div class="statgrid">'+
         '<div class="statcard"><div class="cardtitle">Conversion <span class="note">measured · 90 days</span></div><div class="stats">'+st('c-cyan',leadsTotal,'Saved contacts')+st('c-green',convRate,'Conversion rate')+st('c-amber',ratioStr,'Visits per contact')+'</div></div>'+
         '<div class="statcard"><div class="cardtitle">Engagement <span class="note">active time · estimate</span></div><div class="stats">'+st('c-cyan',avgActive,'Avg active time')+st('c-green',avgPre,'Avg before submit')+st('c-amber',shortRate,'Short visits (&le;10s)')+'</div></div>'+
-        '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">last 90 days</span></div><div class="stats">'+st('c-cyan',(srcAgg.indeed||{}).visits||0,'Indeed')+st('c-blue',(srcAgg.facebook||{}).visits||0,'Facebook')+st('c-green',(srcAgg.craigslist||{}).visits||0,'Craigslist')+st('c-amber',(srcAgg.direct||{}).visits||0,'Direct / other')+'</div></div>'+
+        '<div class="statcard"><div class="cardtitle">Traffic sources <span class="note">last 90 days</span></div><div class="stats">'+st('c-cyan',(srcAgg.indeed||{}).visits||0,'Indeed')+st('c-blue',(srcAgg.facebook||{}).visits||0,'Facebook')+st('c-green',(srcAgg.craigslist||{}).visits||0,'Craigslist')+st('c-cyan',(srcAgg.tiktok||{}).visits||0,'TikTok')+st('c-blue',(srcAgg.instagram||{}).visits||0,'Instagram')+st('c-amber',(srcAgg.direct||{}).visits||0,'Direct / other')+'</div></div>'+
         '<div class="statcard"><div class="cardtitle">Interactions &amp; intent <span class="note">clicks, not completed</span></div><div class="stats">'+st('c-cyan',ev('statement_open'),'Statement opens')+st('c-amber',ev('program_cta'),'Program CTA')+st('c-green',ev('call_click'),'Call clicks')+st('c-blue',ev('text_click'),'Text clicks')+st('c-cyan',ev('intelliapp_click'),'IntelliApp')+st('c-amber',ev('faq_open'),'FAQ opens')+'</div></div>'+
       '</div>'+
       '<div class="chartcard"><div class="cardtitle">Source &amp; campaign <span class="note">90 days · rates hidden under 5 contacts</span>'+

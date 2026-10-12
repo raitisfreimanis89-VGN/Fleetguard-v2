@@ -992,7 +992,7 @@ async function renderLeadsAsync(){
   const srcAgg={};
   const preBySession={};
   const subPre=[], nonSubActive=[];
-  const SRC=['indeed','facebook','craigslist'];
+  const SRC=['indeed','facebook','craigslist','tiktok','instagram'];
   sessions.forEach(s=>{
     const d=new Date(s.started_at); const k=dayKey(d);
     if(k===todayKey) cToday++; if(weekKeys[k]) cWeek++; if(cfMonth.format(d)===monthKey) cMonth++;
@@ -1029,7 +1029,7 @@ async function renderLeadsAsync(){
 
   // source list (ordered by visits)
   const srcOrder=Object.keys(srcAgg).sort((x,y)=>srcAgg[y].visits-srcAgg[x].visits);
-  const srcLabels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',direct:'Direct / other'};
+  const srcLabels={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',tiktok:'TikTok',instagram:'Instagram',direct:'Direct / other'};
 
   // stash aggregate for CSV export (no PII)
   window._vgnAgg={ generatedAt:new Date().toISOString(), tz:'America/Chicago', version:'phase1-v1', windowDays:WIN_DAYS,
@@ -1088,6 +1088,8 @@ async function renderLeadsAsync(){
     +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num((srcAgg.indeed||{}).visits||0)+'</span><span class="v2-pulse-label">Indeed</span></div>'
     +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num((srcAgg.facebook||{}).visits||0)+'</span><span class="v2-pulse-label">Facebook</span></div>'
     +'<div class="v2-pulse-stat v2-accent-green"><span class="v2-pulse-num">'+num((srcAgg.craigslist||{}).visits||0)+'</span><span class="v2-pulse-label">Craigslist</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-cyan"><span class="v2-pulse-num">'+num((srcAgg.tiktok||{}).visits||0)+'</span><span class="v2-pulse-label">TikTok</span></div>'
+    +'<div class="v2-pulse-stat v2-accent-blue"><span class="v2-pulse-num">'+num((srcAgg.instagram||{}).visits||0)+'</span><span class="v2-pulse-label">Instagram</span></div>'
     +'<div class="v2-pulse-stat v2-accent-amber"><span class="v2-pulse-num">'+num((srcAgg.direct||{}).visits||0)+'</span><span class="v2-pulse-label">Direct / other</span></div>'
     +'</div></div></article>'
     +'<article class="v2-console v2-accent-blue"><div class="v2-console-head">'
