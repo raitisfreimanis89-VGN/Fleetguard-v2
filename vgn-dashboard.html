@@ -117,6 +117,8 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
       </div>
       <button class="btn" id="csvBtn">Export CSV</button>
       <button class="btn" id="xlsxBtn" title="Monthly Excel report (90 days)">Monthly Excel</button>
+      <button class="btn" id="authBtn">Sign in</button>
+      <span id="statusMsg" style="font-size:12px;color:var(--muted);align-self:center"></span>
     </div>
   </div>
 </div></header>
@@ -213,11 +215,24 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
   </section>
 </main>
 
+<div id="loginModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(4,20,18,.7);align-items:center;justify-content:center">
+  <form id="loginForm" class="card" style="max-width:340px;width:92%">
+    <h2 style="font-size:18px;margin-bottom:4px">Sign in for live data</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 14px">Admin or Ray. Or close this to view sample data.</p>
+    <label style="font-size:12px;font-weight:700;display:block;margin:8px 0 4px">Email</label><input id="loginEmail" type="email" autocomplete="username" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text)">
+    <label style="font-size:12px;font-weight:700;display:block;margin:10px 0 4px">Password</label><input id="loginPw" type="password" autocomplete="current-password" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text)">
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn pri" type="submit" style="flex:1">Sign in</button><button class="btn" type="button" id="loginCancel">Sample</button></div>
+    <div id="loginErr" style="color:var(--vgn-red);font-size:12px;margin-top:10px;display:none"></div>
+  </form>
+</div>
+<script src="js/supabase.min.js"></script>
 <script src="js/vendor/chart.umd.min.js"></script>
 <script>
 (function(){
   'use strict';
-  var SAMPLE = true; // preview default; set false + sign in for live data
+  var SAMPLE = true; // preview default; an authorized sign-in switches to live data
+  var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
+  var sb=null; try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient('https://tmpdsiuadafbkmldvlki.supabase.co',ANON); }catch(e){}
   var CHANNELS = ['Indeed','Facebook','Craigslist','TikTok','Instagram','Direct / other'];
   var CH_VAR = {'Indeed':'--c-indeed','Facebook':'--c-facebook','Craigslist':'--c-craigslist','TikTok':'--c-tiktok','Instagram':'--c-instagram','Direct / other':'--c-direct','Unattributed':'--c-unattrib'};
   var active = {}; CHANNELS.forEach(function(c){active[c]=true;});
@@ -428,8 +443,13 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
 
   // ---------- range ----------
   function load(){
-    if(SAMPLE){ var days=curRange.key==='today'?1:curRange.key==='yesterday'?1:parseInt(curRange.key,10); renderAll(samplePayload(days)); return; }
-    // live mode would call supabase.rpc('va_dashboard_v3', rangeDates(curRange.key)) and renderAll(result)
+    if(SAMPLE || !sb){ var days=curRange.key==='today'?1:curRange.key==='yesterday'?1:parseInt(curRange.key,10); renderAll(samplePayload(days)); return; }
+    var rd=rangeDates(curRange.key); setStatus('Loading…');
+    sb.rpc('va_dashboard_v3',{p_from:rd.from,p_to:rd.to}).then(function(res){
+      if(res.error){ setStatus('Error: '+(res.error.message||'query failed')); return; }
+      if(!res.data){ setStatus('No data for this range'); return; }
+      setStatus(''); renderAll(res.data);
+    }).catch(function(e){ setStatus('Error: '+((e&&e.message)||e)); });
   }
   document.getElementById('rangeSeg').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b) return;
     [].forEach.call(this.children,function(x){x.setAttribute('aria-pressed',String(x===b));}); curRange.key=b.getAttribute('data-range'); load(); });
@@ -453,9 +473,36 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
   });
   document.getElementById('xlsxBtn').addEventListener('click',function(){ alert('Monthly Excel export (90-day, one tab per month) is wired to the server-side query in live mode.'); });
 
-  // boot
-  if(SAMPLE) document.getElementById('sampleBanner').hidden=false;
-  load();
+  // ---------- auth ----------
+  function setStatus(m){ var s=document.getElementById('statusMsg'); if(s) s.textContent=m||''; }
+  var authBtn=document.getElementById('authBtn');
+  var loginModal=document.getElementById('loginModal');
+  function showLogin(show){ loginModal.style.display=show?'flex':'none'; if(show){ var em=document.getElementById('loginEmail'); if(em) em.focus(); } }
+  function applyAuth(signedIn,email){
+    if(signedIn){ SAMPLE=false; document.getElementById('sampleBanner').hidden=true; authBtn.textContent=email?('Sign out · '+email):'Sign out'; }
+    else { SAMPLE=true; document.getElementById('sampleBanner').hidden=false; authBtn.textContent='Sign in'; }
+  }
+  authBtn.addEventListener('click',function(){
+    if(!sb){ setStatus('Auth unavailable'); return; }
+    if(!SAMPLE){ sb.auth.signOut().then(function(){ applyAuth(false); load(); }); }
+    else showLogin(true);
+  });
+  document.getElementById('loginCancel').addEventListener('click',function(){ showLogin(false); });
+  loginModal.addEventListener('click',function(e){ if(e.target===loginModal) showLogin(false); });
+  document.getElementById('loginForm').addEventListener('submit',function(e){ e.preventDefault();
+    if(!sb) return; var errEl=document.getElementById('loginErr'); errEl.style.display='none';
+    var email=document.getElementById('loginEmail').value.trim(), pw=document.getElementById('loginPw').value;
+    sb.auth.signInWithPassword({email:email,password:pw}).then(function(res){
+      if(res.error){ errEl.textContent=res.error.message||'Sign-in failed'; errEl.style.display='block'; return; }
+      showLogin(false); document.getElementById('loginPw').value=''; applyAuth(true,email); load();
+    }).catch(function(err){ errEl.textContent=(err&&err.message)||'Sign-in failed'; errEl.style.display='block'; });
+  });
+
+  // boot: sample preview unless an authorized user is already signed in
+  (function(){
+    if(sb){ sb.auth.getSession().then(function(s){ var sess=s&&s.data&&s.data.session; applyAuth(!!sess, sess&&sess.user&&sess.user.email); load(); }).catch(function(){ applyAuth(false); load(); }); }
+    else { applyAuth(false); load(); }
+  })();
 })();
 </script>
 </body>
