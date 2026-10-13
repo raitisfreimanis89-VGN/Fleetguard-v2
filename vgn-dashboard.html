@@ -99,6 +99,11 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
 @media(max-width:1000px){.cards6{grid-template-columns:repeat(3,1fr)}.g-2-1,.g-2{grid-template-columns:1fr}}
 @media(max-width:560px){.cards6{grid-template-columns:repeat(2,1fr)}.funnel .step{grid-template-columns:96px 1fr 56px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* embedded inside the FleetGuard app (iframe): the app already provides the
+   session, so hide the sign-in/out control (a sign-out here would share-kill
+   the app's auth), and the sample banner never applies. */
+:root[data-embed="1"] #authBtn{display:none}
+:root[data-embed="1"] .sample-banner{display:none}
 </style>
 </head>
 <body>
@@ -234,6 +239,7 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
   var SAMPLE = true; // preview default; an authorized sign-in switches to live data
   var ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRtcGRzaXVhZGFmYmttbGR2bGtpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2OTA1MzcsImV4cCI6MjA5MTI2NjUzN30.EpALvafgN7q0HAgS1K286IU7B2xGrkQQwpriMOvAr6o';
   var sb=null; try{ if(window.supabase&&window.supabase.createClient) sb=window.supabase.createClient('https://tmpdsiuadafbkmldvlki.supabase.co',ANON); }catch(e){}
+  var EMBED=/[?&]embed=1(&|$)/.test(location.search); if(EMBED) document.documentElement.setAttribute('data-embed','1');
   var CHANNELS = ['Indeed','Facebook','Craigslist','TikTok','Instagram','Direct / other'];
   var CH_VAR = {'Indeed':'--c-indeed','Facebook':'--c-facebook','Craigslist':'--c-craigslist','TikTok':'--c-tiktok','Instagram':'--c-instagram','Direct / other':'--c-direct','Unattributed':'--c-unattrib'};
   var active = {}; CHANNELS.forEach(function(c){active[c]=true;});
