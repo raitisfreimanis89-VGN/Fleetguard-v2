@@ -266,9 +266,12 @@
   }
 
   async function enterApp(session){
-    show('app');
-    document.getElementById('who').textContent=session.user.email||'';
-    await loadAll();
+    // The Driver Leads dashboard is now the v3 analytics page. This page keeps
+    // the sign-in for Ray and hands off to it; same origin, so the session just
+    // established carries over and vgn-dashboard.html loads live data directly.
+    // (show/loadAll/renderDash/renderTable below are the superseded Phase-1
+    // dashboard, no longer reached — kept only until a cleanup pass.)
+    window.location.replace('vgn-dashboard.html');
   }
 
   document.getElementById('loginBtn').addEventListener('click', async function(){
