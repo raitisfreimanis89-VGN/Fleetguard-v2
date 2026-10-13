@@ -227,6 +227,7 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
 </div>
 <script src="js/supabase.min.js"></script>
 <script src="js/vendor/chart.umd.min.js"></script>
+<script src="js/vendor/xlsx.full.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -471,7 +472,50 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
     var csv=rows.map(function(r){return r.map(q).join(',');}).join('\r\n');
     var b=new Blob([csv],{type:'text/csv'}),u=URL.createObjectURL(b),a=document.createElement('a'); a.href=u; a.download='vgn-analytics-'+curRange.key+'.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){URL.revokeObjectURL(u);},2000);
   });
-  document.getElementById('xlsxBtn').addEventListener('click',function(){ alert('Monthly Excel export (90-day, one tab per month) is wired to the server-side query in live mode.'); });
+  document.getElementById('xlsxBtn').addEventListener('click',function(){
+    if(!window.XLSX){ setStatus('Excel library not loaded'); return; }
+    if(SAMPLE || !sb){ alert('Sign in (admin or Ray) to download the live monthly Excel report. Sample mode has no export.'); return; }
+    var btn=this; btn.disabled=true; setStatus('Building Excel…');
+    var to=new Date(), from=new Date(); from.setDate(from.getDate()-89);
+    var pf=from.toISOString().slice(0,10), pt=to.toISOString().slice(0,10);
+    sb.rpc('va_export_range',{p_from:pf,p_to:pt}).then(function(res){
+      btn.disabled=false;
+      if(res.error||!res.data){ setStatus('Export error: '+((res.error&&res.error.message)||'no data')); return; }
+      buildXlsx(res.data); setStatus('');
+    }).catch(function(e){ btn.disabled=false; setStatus('Export error: '+((e&&e.message)||e)); });
+  });
+  function buildXlsx(p){
+    var wb=XLSX.utils.book_new(), q=function(v){return v==null?'':v;}, aoa=XLSX.utils.aoa_to_sheet, add=function(ws,name){XLSX.utils.book_append_sheet(wb,ws,name);};
+    add(aoa([
+      ['VGN driver-recruiting — monthly analytics export'],
+      ['Aggregate only — contains no personal data (no names, phones, messages).'],
+      ['Timezone', p.meta.tz],
+      ['Range', p.meta.from+'  to  '+p.meta.to],
+      ['Generated', new Date(p.meta.generated_at).toLocaleString('en-US',{timeZone:p.meta.tz})+' CT'],
+      [],
+      ['Notes'],
+      ['Visit = session (30-min timeout; bots & test excluded).'],
+      ['Saved contact = backend-confirmed lead (test leads excluded).'],
+      ['Measured conv. = submit-sessions / visits. Months marked "no (pre-analytics)" had no on-site tracking yet, so visits are blank — but their saved contacts are still shown.'],
+      ['Short visit = <=10s active, no meaningful action.']
+    ]),'About');
+    var sh=[['Month','Tracked','Visits','Submit sessions','Conv %','Saved contacts','Measured contacts','Avg active (s)','Median active (s)','Short visits']];
+    p.month_totals.forEach(function(m){ sh.push([m.month, m.tracked?'yes':'no (pre-analytics)', m.visits, m.submit_sessions, q(m.conv_pct), m.saved_contacts, m.measured_contacts, q(m.active_avg_s), q(m.active_median_s), m.short_visits]); });
+    add(aoa(sh),'Summary');
+    var byMonth={}; p.months.forEach(function(r){ (byMonth[r.month]=byMonth[r.month]||[]).push(r); });
+    Object.keys(byMonth).sort().forEach(function(mon){
+      var rows=[['Channel','Visits','Submit sessions','Conv %','Avg active (s)','Median active (s)','Short visits']];
+      byMonth[mon].forEach(function(r){ rows.push([r.channel, r.visits, r.submit_sessions, q(r.conv_pct), q(r.active_avg_s), q(r.active_median_s), r.short_visits]); });
+      add(aoa(rows), mon.replace(/[:\\\/?*\[\]]/g,'-').slice(0,31));
+    });
+    var dr=[['Date','Channel','Visits','Submit sessions']];
+    p.daily.forEach(function(d){ dr.push([d.day,d.channel,d.visits,d.submit_sessions]); });
+    add(aoa(dr),'Daily visits');
+    var dc=[['Date','Saved contacts']];
+    p.daily_contacts.forEach(function(d){ dc.push([d.day,d.contacts]); });
+    add(aoa(dc),'Daily contacts');
+    XLSX.writeFile(wb, 'vgn-analytics-'+p.meta.from+'_to_'+p.meta.to+'.xlsx');
+  }
 
   // ---------- auth ----------
   function setStatus(m){ var s=document.getElementById('statusMsg'); if(s) s.textContent=m||''; }
