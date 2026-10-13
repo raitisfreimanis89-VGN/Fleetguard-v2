@@ -167,7 +167,12 @@ async function loadAll() {
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
     sb.from('brake_tests').select('id,vehicle_id,test_date,result,notes').order('created_at'),
-    sb.from('tyre_records').select('id,vehicle_id,photo_date,readings').order('created_at'),
+    // readings is deliberately NOT selected here. It is a JSON column holding
+    // every tyre measurement, and across the fleet it was 701 kB of the 1,081 kB
+    // this function pulled EVERY 30 SECONDS — 65% of all egress — to render
+    // nothing, since the only place it is read is the Tyres tab of one vehicle.
+    // loadTyreReadings() fetches it for that vehicle on demand instead.
+    sb.from('tyre_records').select('id,vehicle_id,photo_date').order('created_at'),
     sb.from('dot_inspections').select('id,vehicle_id,driver_id,inspection_date,result,notes').order('created_at'),
     sb.from('mileage_records').select('id,vehicle_id,driver_id,mileage,date').order('created_at'),
     sb.from('service_records').select('id,vehicle_id,service_date,result,notes').order('created_at'),
@@ -183,7 +188,9 @@ async function loadAll() {
     // blanking the PTI pills and Inspections page fleet-wide. Split this way,
     // a missing column costs only the defect-tracking feature.
     sb.from('inspections').select('id,repair_status,repaired_at,repair_notes').order('submitted_at',{ascending:false}).limit(500),
-    sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(1000),
+    // 250, not 1000: the only read is "most recent sent link for this vehicle"
+    // (40 trucks), so 1000 rows was 88 kB per refresh of history nothing shows.
+    sb.from('link_sends').select('driver_id,vehicle_id,status,created_at').order('created_at',{ascending:false}).limit(250),
     sb.from('vehicle_effective_schedules').select('vehicle_id,reminder_type,interval_days,warning_days_before,enabled,step_intervals,completed_since_exemption'),
     // Fleet defaults. Guarded like the rest: if this fails, GLOBAL_SCHED stays
     // empty and vehSched falls through to the constants, i.e. today's behaviour.
@@ -202,7 +209,12 @@ async function loadAll() {
   if (!v.error && v.data) VEHICLES = v.data.map(v=>({...v,truckNumber:v.truck_number,trailerNumber:v.trailer_number,assignedDriverId:v.assigned_driver_id,assignedDispatcher:v.assigned_dispatcher||''}));
   if (!m.error && m.data) MAINTENANCE = m.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date,nextInspectionDate:r.next_inspection_date}));
   if (!b.error && b.data) BRAKE_TESTS = b.data.map(r=>({...r,vehicleId:r.vehicle_id,testDate:r.test_date}));
-  if (!t.error && t.data) TYRE_RECORDS = t.data.map(r=>({...r,vehicleId:r.vehicle_id,photoDate:r.photo_date}));
+  if (!t.error && t.data) {
+    // Carry over readings already fetched on demand, so a background refresh
+    // while the Tyres tab is open doesn't blank the dots and re-fetch them.
+    const prevReadings = new Map(TYRE_RECORDS.map(r=>[r.id,r.readings]));
+    TYRE_RECORDS = t.data.map(r=>({...r,vehicleId:r.vehicle_id,photoDate:r.photo_date,readings:prevReadings.get(r.id)}));
+  }
   if (!dot.error && dot.data) DOT_INSPECTIONS = dot.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id,inspectionDate:r.inspection_date}));
   if (!mil.error && mil.data) MILEAGE = mil.data.map(r=>({...r,vehicleId:r.vehicle_id,driverId:r.driver_id}));
   if (!svc.error && svc.data) SERVICE_RECORDS = svc.data.map(r=>({...r,vehicleId:r.vehicle_id,serviceDate:r.service_date}));
@@ -361,6 +373,27 @@ async function addTyreRecord(vehicleId,photoDate,readings) {
   TYRE_RECORDS.push(rec); await sb.from('tyre_records').insert({id:rec.id,vehicle_id:vehicleId,photo_date:photoDate,readings});
 }
 async function deleteTyreRecord(id) { TYRE_RECORDS=TYRE_RECORDS.filter(r=>r.id!==id); await sb.from('tyre_records').delete().eq('id',id); }
+
+// Tyre readings are deliberately left out of loadAll (see the select there).
+// They are fetched for one vehicle the first time its Tyres tab is opened, and
+// kept for the rest of the session. A failed fetch un-marks the vehicle so the
+// next render retries rather than leaving the dots permanently blank.
+// Keyed on tyre_record id, not vehicle id: a record added by someone else while
+// the tab is open is then fetched on the next render instead of showing blank
+// dots until reload. Marking ids as fetched also stops a record whose readings
+// are genuinely null from re-fetching on every render.
+const _tyreReadingsFor = new Set();
+async function loadTyreReadings(vehicleId){
+  if(!sb || !vehicleId) return;
+  const need = TYRE_RECORDS.filter(r=>r.vehicleId===vehicleId && !_tyreReadingsFor.has(r.id));
+  if(!need.length) return;
+  need.forEach(r=>_tyreReadingsFor.add(r.id));
+  const {data,error} = await sb.from('tyre_records').select('id,readings').eq('vehicle_id',vehicleId);
+  if(error || !data){ need.forEach(r=>_tyreReadingsFor.delete(r.id)); return; }
+  const byId = new Map(data.map(r=>[r.id,r.readings]));
+  TYRE_RECORDS.forEach(r=>{ if(byId.has(r.id)) r.readings = byId.get(r.id); });
+  render();
+}
 async function addServiceRecord(vehicleId,serviceDate,result,notes) {
   const rec={id:crypto.randomUUID(),vehicleId,serviceDate,result,notes:notes||null};
   SERVICE_RECORDS.push(rec); await sb.from('service_records').insert({id:rec.id,vehicle_id:vehicleId,service_date:serviceDate,result,notes:notes||null});
@@ -753,8 +786,19 @@ async function openInspection(id){
   }
   renderInspectionModal(d,signed);
 }
+// Tyre photos are removed after PHOTO_RETENTION_DAYS by the prune-photos Edge
+// Function; signatures and defect photos are kept indefinitely. This used to
+// return '' for a missing image, which made a pruned photo indistinguishable
+// from a broken one — so say which it is.
+const PHOTO_RETENTION_DAYS=30;
 function inspThumb(path,signed){
-  if(!path||!signed[path]) return '';
+  if(!path) return '';
+  if(!signed[path]){
+    const muted='style="font-size:11px;color:var(--text-muted);font-style:italic;vertical-align:middle"';
+    return /\/tyre-/i.test(path)
+      ? `<span ${muted} title="Tyre photos are kept for ${PHOTO_RETENTION_DAYS} days to stay within storage limits. The depth readings themselves are kept permanently.">photo expired</span>`
+      : `<span ${muted} title="Image could not be loaded">unavailable</span>`;
+  }
   return `<a href="${signed[path]}" target="_blank" rel="noopener" title="Open full image"><img src="${signed[path]}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid var(--border);vertical-align:middle"/></a>`;
 }
 function renderInspectionModal(d,signed){
@@ -2601,6 +2645,9 @@ function renderVehicleDetail(){
 
   // ── Tyres ─────────────────────────────────────────────────────────────────
   if(currentVehicleTab==='tyres'){
+    // Pull this vehicle's tyre readings if we haven't yet. Fire-and-forget:
+    // it re-renders itself once they arrive, and no-ops on every later render.
+    loadTyreReadings(v.id);
     html+='<div class="v2-rem-grid">';
     if(isAdmin()){
       // The whole grid keeps production markup. updateTyreDot() rewrites
@@ -3625,6 +3672,10 @@ function isUserBusy(){
 }
 async function refreshData(){
   if(!sb||!currentUser||_refreshing) return;
+  // A backgrounded tab pulled the full dataset just as often as one being read.
+  // Nobody is looking, so skip it — the visibilitychange handler below refreshes
+  // the moment the tab comes back, which keeps the data as fresh as it was.
+  if(document.hidden) return;
   if(Date.now()-_lastRefresh<1500) return;   // collapse focus+visibility double-fire
   _refreshing=true;
   try{
@@ -3644,7 +3695,11 @@ async function refreshData(){
 async function init(){
   document.getElementById('loading-overlay').style.display='flex';
   await initAuth();
-  setInterval(refreshData,30000);
+  // 5 minutes, not 30 seconds. Fleet data changes a handful of times a day, and
+  // the visibility/focus handlers below already refresh the instant a dispatcher
+  // comes back to the tab — so this interval only covers someone sitting and
+  // watching one screen. At 30s it was ~1.3 GB of egress per tab per shift.
+  setInterval(refreshData,300000);
   document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') refreshData(); });
   window.addEventListener('focus',refreshData);
   window.addEventListener('online',refreshData);

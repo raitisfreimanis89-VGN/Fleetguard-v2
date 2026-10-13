@@ -15,6 +15,7 @@ const DRAIN_URL     = process.env.SUPABASE_PTI_DRAIN_URL;
 const SECRET        = process.env.GV_SERVICE_SECRET;
 const ANON_KEY      = process.env.SUPABASE_ANON_KEY;
 const DIGEST_URL    = process.env.SUPABASE_DISPATCHER_DIGEST_URL;
+const PRUNE_URL     = process.env.SUPABASE_PRUNE_PHOTOS_URL;
 const PORT          = parseInt(process.env.PORT || '3000', 10);
 
 // Shared browser lock — scan and poll both drive the same GV page,
@@ -173,6 +174,30 @@ async function runDispatcherDigest() {
   }
 }
 
+// ── PTI tyre-photo retention. The inspection-photos bucket hit 984 MB of a 1 GB
+// limit, at which point photo uploads start failing outright. This removes tyre
+// photos older than the retention window; signatures (required by 49 CFR 396.11)
+// and defect photos are never touched, nor is any inspection record. Sends
+// nothing, so it is safe to run unattended overnight.
+async function runPhotoPrune() {
+  if (!PRUNE_URL) return;
+  try {
+    const res = await fetch(PRUNE_URL, {
+      method:  'POST',
+      headers: { 'Authorization': `Bearer ${ANON_KEY}`, 'x-api-key': SECRET, 'Content-Type': 'application/json' },
+      body:    '{}',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { log.warn(`Photo prune returned ${res.status}: ${JSON.stringify(data)}`); return; }
+    if (data.files_deleted) {
+      log.info(`Photo prune: removed ${data.files_deleted} tyre photo(s), ${data.mb_freed} MB freed`);
+    }
+    if (data.failures?.length) log.warn(`Photo prune had ${data.failures.length} failure(s): ${data.failures[0]}`);
+  } catch (err) {
+    log.error(`Photo prune failed: ${err.message}`);
+  }
+}
+
 // ── Start all scheduled jobs ───────────────────────────────────
 function startScheduler() {
   // Reply poll: every N minutes
@@ -202,6 +227,13 @@ function startScheduler() {
   if (DIGEST_URL) {
     cron.schedule('15 7 * * 1-5', runDispatcherDigest, { timezone: 'America/Chicago' });
     log.info('Dispatcher digest scheduled 7:15 AM America/Chicago (Mon-Fri only)');
+  }
+
+  // Photo retention: 3:30 AM daily (weekends too — photos accrue every day).
+  // Deliberately well clear of the morning reminder waves.
+  if (PRUNE_URL) {
+    cron.schedule('30 3 * * *', runPhotoPrune, { timezone: 'America/Chicago' });
+    log.info('PTI photo prune scheduled 3:30 AM America/Chicago (daily)');
   }
 }
 
