@@ -890,7 +890,7 @@ function render(){
   // now; the weather tile fills itself in afterwards, and the filter is
   // re-applied so a category survives leaving the page and coming back.
   else if(currentPage==='guides'){ c.innerHTML=renderGuides(); guidesFilter(); guidesLoadWeather(); guidesLoadI80(); }
-  else if(currentPage==='leads'&&isAdmin()){ renderLeadsAsync(); }
+  else if(currentPage==='leads'&&isAdmin()){ renderLeads(); }
   // Bound after every render: the button lives in markup rebuilt each time.
   // data-* + addEventListener rather than an inline onclick, so ids never reach
   // a JS string context.
@@ -911,6 +911,30 @@ function render(){
   const leadsNav=document.getElementById('nav-leads');
   if(leadsNav) leadsNav.style.display=isAdmin()?'flex':'none';   // Driver Leads: admin only (Ray uses leads.html)
   saveNavState();
+}
+
+// The Driver Leads view IS the standalone, same-origin v3 analytics dashboard
+// (vgn-dashboard.html): 30-day-capped ranges, 7 canonical channels, corrected
+// conversion math, light/dark themes, CSV + monthly Excel export. Embedded here
+// it inherits this app's Supabase session (same origin -> same stored auth
+// token), so it shows live data with no second sign-in; ?embed=1 hides its own
+// sign-in control (a sign-out there would drop this app's session too).
+// NOTE: the former in-app Phase-1 renderer (renderLeadsAsync + loadViewStats +
+// downloadVgnAnalyticsCsv + loadScriptOnce + downloadLeadsExcel, below) is
+// superseded by this and no longer called -- kept only until a cleanup pass.
+function renderLeads(){
+  const c=document.getElementById('content');
+  c.innerHTML='<iframe id="leadsFrame" title="Driver Leads analytics" src="vgn-dashboard.html?embed=1" style="width:100%;border:0;display:block;background:transparent"></iframe>';
+  if(!window.__leadsResizeBound){ window.__leadsResizeBound=true; window.addEventListener('resize',__fitLeadsFrame); }
+  __fitLeadsFrame();
+  const f=document.getElementById('leadsFrame');
+  if(f) f.addEventListener('load',()=>setTimeout(__fitLeadsFrame,60));
+}
+// Fill from the iframe's top to the viewport bottom: no outer gap, no double
+// scrollbar (the dashboard scrolls internally). Re-run on resize and on load.
+function __fitLeadsFrame(){
+  const f=document.getElementById('leadsFrame'); if(!f) return;
+  try{ f.style.height=Math.max(480,(window.innerHeight - f.getBoundingClientRect().top - 8))+'px'; }catch(e){}
 }
 
 async function renderUsersAsync(){
