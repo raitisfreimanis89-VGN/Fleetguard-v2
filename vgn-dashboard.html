@@ -70,6 +70,8 @@ section.block{padding:18px 0}
 table{width:100%;border-collapse:collapse;font-size:13px}
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
 th,td{text-align:right;padding:9px 11px;border-bottom:1px solid var(--line-soft);white-space:nowrap}
+#leadsTable th,#leadsTable td{text-align:left}
+#leadsTable a{color:var(--accent-cyan);text-decoration:none;font-weight:600}
 th:first-child,td:first-child{text-align:left}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:700;background:var(--surface-2);position:sticky;top:0}
 .sharebar{position:relative;height:6px;border-radius:4px;background:var(--line-soft);overflow:hidden;min-width:60px}
@@ -144,6 +146,13 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
   <section class="block">
     <div class="grid cards6" id="kpiStrip"></div>
     <div class="slimline" id="contactsLine"></div>
+  </section>
+
+  <section class="block">
+    <div class="card">
+      <div class="panel-h"><h2>Driver leads — callback requests</h2><span class="note" id="leadsNote">names &amp; numbers</span></div>
+      <div class="tablewrap"><table id="leadsTable"><thead><tr><th>Received (CT)</th><th>Name</th><th>Phone</th><th>Source</th><th>Program</th><th>Prefers</th><th>Best time</th><th>Text</th></tr></thead><tbody></tbody></table></div>
+    </div>
   </section>
 
   <section class="block">
@@ -449,7 +458,34 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
       wrap.appendChild(b); }); })();
 
   // ---------- range ----------
+  function leadDate(s){ if(!s) return '—'; try{ return new Date(s).toLocaleString('en-US',{timeZone:'America/Chicago',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }catch(e){ return String(s); } }
+  function leadSrc(s){ s=(s||'').toLowerCase(); var m={indeed:'Indeed',facebook:'Facebook',craigslist:'Craigslist',tiktok:'TikTok',instagram:'Instagram'}; return m[s]||'Direct / other'; }
+  function renderLeadsList(){
+    var tb=document.querySelector('#leadsTable tbody'), note=document.getElementById('leadsNote'); if(!tb) return;
+    function row1(msg,color){ tb.innerHTML=''; var tr=el('tr'), td=el('td'); td.colSpan=8; td.style.cssText='text-align:center;padding:18px;color:'+(color||'var(--muted)'); td.textContent=msg; tr.appendChild(td); tb.appendChild(tr); }
+    if(SAMPLE || !sb){ row1('Sign in to see the callback list (names & phone numbers).'); if(note)note.textContent='sign in required'; return; }
+    sb.from('driver_leads').select('created_at,full_name,phone,recruiter,program,best_time,sms_status,source,test').eq('test',false).order('created_at',{ascending:false}).limit(500).then(function(res){
+      if(res.error){ row1('Could not load leads: '+(res.error.message||'error'),'#e8705a'); return; }
+      var rows=res.data||[]; tb.innerHTML='';
+      if(note) note.textContent=rows.length+' lead'+(rows.length===1?'':'s')+' · newest first';
+      if(!rows.length){ row1('No leads yet — they appear here when drivers submit the callback form.'); return; }
+      rows.forEach(function(l){
+        var tr=el('tr');
+        function cell(v){ var td=el('td'); td.textContent=(v==null||v==='')?'—':v; return td; }
+        tr.appendChild(cell(leadDate(l.created_at)));
+        var nt=el('td'), stg=el('strong'); stg.textContent=l.full_name||'—'; nt.appendChild(stg); tr.appendChild(nt);
+        var pt=el('td'); if(l.phone){ var a=el('a'); a.href='tel:'+String(l.phone).replace(/[^0-9+]/g,''); a.textContent=l.phone; pt.appendChild(a); } else pt.textContent='—'; tr.appendChild(pt);
+        tr.appendChild(cell(leadSrc(l.source)));
+        tr.appendChild(cell(l.program));
+        tr.appendChild(cell(l.recruiter));
+        tr.appendChild(cell(l.best_time));
+        tr.appendChild(cell(l.sms_status==='sent'?'sent':(l.sms_status==='failed'?'not sent':(l.sms_status||'—'))));
+        tb.appendChild(tr);
+      });
+    }).catch(function(e){ row1('Could not load leads.','#e8705a'); });
+  }
   function load(){
+    renderLeadsList();
     if(SAMPLE || !sb){ var days=curRange.key==='today'?1:curRange.key==='yesterday'?1:parseInt(curRange.key,10); renderAll(samplePayload(days)); return; }
     var rd=rangeDates(curRange.key); setStatus('Loading…');
     sb.rpc('va_dashboard_v3',{p_from:rd.from,p_to:rd.to}).then(function(res){
