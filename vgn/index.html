@@ -144,6 +144,25 @@ body{background:#faf8f3}
 #vgn-landing-concept .vgn-video-caption{padding:18px 20px}
 #vgn-landing-concept .vgn-video-caption blockquote{margin:0;font-size:15px;line-height:1.6}
 @media(max-width:650px){#vgn-landing-concept .vgn-video-row .vgn-video-card{flex-basis:100%;max-width:340px}}
+#vgn-landing-concept .vgn-reviews .vgn-intro{max-width:720px}
+#vgn-landing-concept .vgn-review-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;align-items:stretch}
+#vgn-landing-concept .vgn-review-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;background:#fff;border:1px solid var(--vgn-line);border-radius:var(--vgn-radius);padding:16px;cursor:pointer;font:inherit;color:inherit;width:100%;transition:transform .25s ease,box-shadow .25s ease}
+#vgn-landing-concept.vgn-motion .vgn-review-card:hover,#vgn-landing-concept.vgn-motion .vgn-review-card:focus-visible{transform:translateY(-3px);box-shadow:0 14px 28px #163d3514}
+#vgn-landing-concept .vgn-review-thumb{position:relative;width:100%;max-width:184px;aspect-ratio:9/16;border-radius:12px;overflow:hidden;background:#0d2b26}
+#vgn-landing-concept .vgn-review-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+#vgn-landing-concept .vgn-review-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+#vgn-landing-concept .vgn-review-play::before{content:"";width:54px;height:54px;border-radius:50%;background:rgba(7,75,67,.85);box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#vgn-landing-concept .vgn-review-play::after{content:"";position:absolute;border-style:solid;border-width:10px 0 10px 17px;border-color:transparent transparent transparent #fff;margin-left:5px}
+#vgn-landing-concept .vgn-review-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+#vgn-landing-concept .vgn-review-title{font-weight:700;font-size:15px;color:var(--vgn-ink)}
+#vgn-landing-concept .vgn-review-line{font-size:12px;color:var(--vgn-muted)}
+#vgn-landing-concept .vgn-review-by{font-size:11px;color:var(--vgn-muted);font-weight:600}
+#vgn-landing-concept .vgn-review-cta{text-align:center;margin-top:22px}
+#vgn-landing-concept .vgn-lightbox{position:fixed;inset:0;z-index:1000;background:rgba(4,20,18,.88);display:flex;align-items:center;justify-content:center;padding:20px}
+#vgn-landing-concept .vgn-lightbox[hidden]{display:none}
+#vgn-landing-concept .vgn-lightbox video{max-width:min(92vw,420px);max-height:86vh;width:auto;height:auto;aspect-ratio:9/16;border-radius:14px;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+#vgn-landing-concept .vgn-lightbox-close{position:absolute;top:14px;right:16px;width:44px;height:44px;border-radius:50%;border:0;background:#ffffff26;color:#fff;font-size:26px;line-height:1;cursor:pointer}
+@media(max-width:650px){#vgn-landing-concept .vgn-review-row{grid-template-columns:1fr;gap:12px}#vgn-landing-concept .vgn-review-card{flex-direction:row;text-align:left;align-items:center;gap:14px;padding:12px;max-width:420px;margin:0 auto}#vgn-landing-concept .vgn-review-thumb{flex:0 0 84px;width:84px;max-width:84px}}
 #vgn-landing-concept .vgn-lanes{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
 #vgn-landing-concept .vgn-lanes span{border:1px solid var(--vgn-line);border-radius:5px;background:#fff;padding:9px 13px;font-size:12px}
 #vgn-landing-concept .vgn-map{margin:26px 0 8px;background:#f2f6f2;border:1px solid var(--vgn-line);border-radius:var(--vgn-radius);padding:20px}
@@ -226,6 +245,19 @@ body{background:#faf8f3}
     <div class="vgn-trust"><span><strong>Since 2005</strong> · 20+ years</span><span><strong>Lansing, IL</strong> · truck yard</span><span>MC <strong>529994</strong> · DOT <strong>1348031</strong></span><span><strong>Weekly direct deposit</strong></span></div>
   </div>
 </section>
+<section class="vgn-section vgn-white vgn-reviews" id="vgn-reviews">
+  <div class="vgn-wrap">
+    <div class="vgn-intro"><p class="vgn-eyebrow">Real driver experiences</p><h2>Hear from our drivers.</h2><p>Hear directly from drivers about their week, support and getting home. Then explore how the program could fit your situation.</p></div>
+    <div class="vgn-review-row">
+      <button class="vgn-review-card" type="button" data-video="assets/testimonials/review-1-mitch.mp4" aria-label="Play video review from Mitch, VGN driver"><span class="vgn-review-thumb"><img src="assets/testimonials/review-1-poster.jpg" width="480" height="853" alt="" decoding="async"><span class="vgn-review-play" aria-hidden="true"></span></span><span class="vgn-review-text"><span class="vgn-review-title">My week at VGN</span><span class="vgn-review-line">Mitch on his first ten-plus months.</span><span class="vgn-review-by">Mitch · VGN driver, 10½ months</span></span></button>
+      <button class="vgn-review-card" type="button" data-video="assets/testimonials/review-2-highlights.mp4" aria-label="Play video review from a VGN driver"><span class="vgn-review-thumb"><img src="assets/testimonials/review-2-poster.jpg" width="480" height="853" alt="" decoding="async"><span class="vgn-review-play" aria-hidden="true"></span></span><span class="vgn-review-text"><span class="vgn-review-title">Considering VGN?</span><span class="vgn-review-line">A driver answers the common questions.</span><span class="vgn-review-by">VGN driver · 2 months</span></span></button>
+      <button class="vgn-review-card" type="button" data-video="assets/testimonials/review-3-keeping-it-real.mp4" aria-label="Play video review from a VGN driver"><span class="vgn-review-thumb"><img src="assets/testimonials/review-3-poster.jpg" width="480" height="853" alt="" decoding="async"><span class="vgn-review-play" aria-hidden="true"></span></span><span class="vgn-review-text"><span class="vgn-review-title">Keeping it real</span><span class="vgn-review-line">A driver’s honest, unfiltered take.</span><span class="vgn-review-by">Driver review</span></span></button>
+    </div>
+    <p class="vgn-video-note">Individual experiences. Results vary.</p>
+    <div class="vgn-review-cta"><a class="vgn-action" href="#vgn-callback" data-jump="vgn-callback">Request a callback</a></div>
+  </div>
+  <div class="vgn-lightbox" id="vgn-lightbox" role="dialog" aria-modal="true" aria-label="Driver video review" hidden><button class="vgn-lightbox-close" type="button" aria-label="Close video">×</button><video controls playsinline preload="none"></video></div>
+</section>
 <section class="vgn-section" id="vgn-problems">
   <div class="vgn-wrap">
     <div class="vgn-intro"><p class="vgn-eyebrow">A better plan starts with your problem</p><h2>Are you looking to solve<br>one of these problems?</h2><p>You do your part on the road. Here’s what we do on our side.</p></div>
@@ -302,7 +334,7 @@ body{background:#faf8f3}
   </div>
 </section>
 <section class="vgn-section vgn-quotes">
-  <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">The driver’s experience matters</p><h2>Ask a driver.<br>Not just a recruiter.</h2></div><div class="vgn-video-row"><article class="vgn-card vgn-video-card" data-lift><div class="vgn-video-wrap"><video controls playsinline preload="none" poster="assets/testimonials/pershing-poster.jpg" width="464" height="832" aria-label="Video review from Pershing, VGN driver"><source src="assets/testimonials/pershing-review.mp4" type="video/mp4"></video><button class="vgn-video-play" type="button" aria-label="Play video review from Pershing"></button></div><div class="vgn-video-caption"><blockquote>“No cameras, 75 mph, home on time — and they keep me moving.”</blockquote><p class="vgn-quote-by">Pershing · VGN driver, 2 months</p></div></article><article class="vgn-card vgn-video-card" data-lift><div class="vgn-video-wrap"><video controls playsinline preload="none" poster="assets/testimonials/henry-poster.jpg" width="464" height="832" aria-label="Video review from Henry, VGN driver"><source src="assets/testimonials/henry-review.mp4" type="video/mp4"></video><button class="vgn-video-play" type="button" aria-label="Play video review from Henry"></button></div><div class="vgn-video-caption"><blockquote>“A team that has your back, maintenance support, home time and good-paying loads.”</blockquote><p class="vgn-quote-by">Henry · VGN driver, 10½ months</p></div></article></div><p class="vgn-video-note">Videos sent to us by our drivers. Individual experiences; results vary.</p><div class="vgn-grid-two"><article class="vgn-card" data-lift><blockquote>“The numbers are exactly what they told me up front.”</blockquote><p class="vgn-quote-by">Benjamin · VGN driver, 1 year 4 months<br>Excerpt from the current VGN driver testimonial</p></article><article class="vgn-card" data-lift><blockquote>“I can always get home on time.”</blockquote><p class="vgn-quote-by">Larry · VGN driver, 8 months<br>Individual experience; home-time arrangements vary</p></article></div><p class="vgn-disclaimer">Ask Ray or Carl to arrange a conversation with a current driver before you sign.</p></div>
+  <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">The driver’s experience matters</p><h2>Ask a driver.<br>Not just a recruiter.</h2></div><div class="vgn-grid-two"><article class="vgn-card" data-lift><blockquote>“The numbers are exactly what they told me up front.”</blockquote><p class="vgn-quote-by">Benjamin · VGN driver, 1 year 4 months<br>Excerpt from the current VGN driver testimonial</p></article><article class="vgn-card" data-lift><blockquote>“I can always get home on time.”</blockquote><p class="vgn-quote-by">Larry · VGN driver, 8 months<br>Individual experience; home-time arrangements vary</p></article></div><p class="vgn-disclaimer">Ask Ray or Carl to arrange a conversation with a current driver before you sign.</p></div>
 </section>
 <section class="vgn-section vgn-white" id="vgn-faq">
   <div class="vgn-wrap"><div class="vgn-intro"><p class="vgn-eyebrow">Know where you’ll run—and what to expect</p><h2>Your route. Your questions.</h2><p>37-state lanes across the Midwest, South and Northeast. No West Coast, no Mountain states, no NYC.</p><div class="vgn-lanes"><span>Midwest</span><span>South &amp; Southeast</span><span>Northeast &amp; Mid-Atlantic</span></div><p class="vgn-small" style="margin-top:18px">Dry van · No-touch freight · No cameras · Pet-friendly · Inverter, microwave &amp; fridge</p></div>
@@ -398,14 +430,17 @@ body{background:#faf8f3}
   var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   root.classList.toggle('vgn-motion', !reduceMotion);
 
-  // Testimonial videos: large play overlay hides once playback starts; starting one pauses the others.
-  var vgnVideos=[].slice.call(root.querySelectorAll('.vgn-video-card video'));
-  root.querySelectorAll('.vgn-video-card').forEach(function(card){
-    var v=card.querySelector('video'), btn=card.querySelector('.vgn-video-play');
-    if(!v) return;
-    if(btn) btn.addEventListener('click', function(){ var p=v.play(); if(p&&p.catch) p.catch(function(){}); });
-    v.addEventListener('play', function(){ if(btn) btn.style.display='none'; vgnVideos.forEach(function(o){ if(o!==v && !o.paused) o.pause(); }); });
-  });
+  // Driver review cards open the portrait video in an accessible lightbox (one at a time, lazy).
+  (function(){
+    var lb=document.getElementById('vgn-lightbox'); if(!lb) return;
+    var lbVideo=lb.querySelector('video'), lbClose=lb.querySelector('.vgn-lightbox-close'), lastFocus=null;
+    function openLB(src,label){ lastFocus=document.activeElement; if(label) lbVideo.setAttribute('aria-label',label); lbVideo.src=src; lb.hidden=false; document.body.style.overflow='hidden'; try{ lbClose.focus(); }catch(e){} var p=lbVideo.play(); if(p&&p.catch) p.catch(function(){}); }
+    function closeLB(){ try{ lbVideo.pause(); }catch(e){} lbVideo.removeAttribute('src'); try{ lbVideo.load(); }catch(e){} lb.hidden=true; document.body.style.overflow=''; if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
+    root.querySelectorAll('.vgn-review-card').forEach(function(card){ card.addEventListener('click',function(){ openLB(card.getAttribute('data-video'), card.getAttribute('aria-label')); }); });
+    lbClose.addEventListener('click',closeLB);
+    lb.addEventListener('click',function(e){ if(e.target===lb) closeLB(); });
+    document.addEventListener('keydown',function(e){ if(!lb.hidden && e.key==='Escape') closeLB(); });
+  })();
 
   function go(id){ var t=document.getElementById(id); if(t) t.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'}); }
   root.querySelectorAll('[data-jump]').forEach(function(a){ a.addEventListener('click',function(e){ e.preventDefault(); go(a.dataset.jump); }); });
