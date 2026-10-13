@@ -968,6 +968,12 @@ function render(){
 // superseded by this and no longer called -- kept only until a cleanup pass.
 function renderLeads(){
   const c=document.getElementById('content');
+  // Mount the dashboard iframe ONCE. render() can fire repeatedly (a background
+  // refresh, or a Supabase auth event bubbling up from the embedded dashboard's
+  // own client, which shares this app's session). Rebuilding the iframe each
+  // time reloads it and, via that auth event, retriggers render() in a ~1/sec
+  // loop. If it's already mounted, just refit and bail.
+  if(document.getElementById('leadsFrame')){ __fitLeadsFrame(); return; }
   c.innerHTML='<iframe id="leadsFrame" title="Driver Leads analytics" src="vgn-dashboard.html?embed=1" style="width:100%;border:0;display:block;background:transparent"></iframe>';
   if(!window.__leadsResizeBound){ window.__leadsResizeBound=true; window.addEventListener('resize',__fitLeadsFrame); }
   __fitLeadsFrame();
