@@ -307,7 +307,7 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
       contacts:{total:contacts+6,measured:contacts,unattributed:6},
       daily:daily,daily_contacts:dailyC,daily_active:dailyA,channels:channels,dayparts:dayparts,hours:hours,hours_contacts:hoursC,heatmap:heat,
       funnel:{visit:totV,engaged:Math.round(totV*.4),form_opened:Math.round(totS*4),submit_attempt:Math.round(totS*1.1),saved:totS},
-      interactions:{statement_open:Math.round(totV*.34),program_cta:Math.round(totV*.18),faq_open:Math.round(totV*.15),call_click:Math.round(totV*.08),text_click:Math.round(totV*.05),intelliapp_click:Math.round(totV*.03)},
+      interactions:{statement_open:Math.round(totV*.34),program_cta:Math.round(totV*.18),faq_open:Math.round(totV*.15),video_click:Math.round(totV*.09),call_click:Math.round(totV*.08),text_click:Math.round(totV*.05),intelliapp_click:Math.round(totV*.03)},
       submitted_vs_not:{sub_n:totS,sub_pre_median_s:140,non_n:totV-totS,non_active_median_s:22}};
   }
 
@@ -426,7 +426,7 @@ details.defs summary{cursor:pointer;font-size:12px;color:var(--muted);font-weigh
     document.getElementById('subMed').textContent=fmtSec(s.sub_pre_median_s);
     document.getElementById('nonMed').textContent=fmtSec(s.non_active_median_s);
     document.getElementById('subN').textContent=s.sub_n; document.getElementById('nonN').textContent=s.non_n;
-    var inter=p.interactions||{}, labels={statement_open:'Statement opens',program_cta:'Program CTA',faq_open:'FAQ opens',call_click:'Call clicks',text_click:'Text clicks',intelliapp_click:'IntelliApp clicks',callback_cta:'Callback CTA'};
+    var inter=p.interactions||{}, labels={statement_open:'Statement opens',program_cta:'Program CTA',faq_open:'FAQ opens',video_click:'Video clicks',call_click:'Call clicks',text_click:'Text clicks',intelliapp_click:'IntelliApp clicks',callback_cta:'Callback CTA'};
     var rows=Object.keys(labels).map(function(k){return {l:labels[k],v:inter[k]||0};}).sort(function(a,b){return b.v-a.v;});
     var max=Math.max.apply(null,[1].concat(rows.map(function(r){return r.v;}))), wrap=document.getElementById('interBars'); wrap.innerHTML='';
     rows.forEach(function(r){ var row=el('div','bar-row'); row.appendChild(el('span',null,r.l));

@@ -436,7 +436,7 @@ body{background:#faf8f3}
     var lbVideo=lb.querySelector('video'), lbClose=lb.querySelector('.vgn-lightbox-close'), lastFocus=null;
     function openLB(src,label){ lastFocus=document.activeElement; if(label) lbVideo.setAttribute('aria-label',label); lbVideo.src=src; lb.hidden=false; document.body.style.overflow='hidden'; try{ lbClose.focus(); }catch(e){} var p=lbVideo.play(); if(p&&p.catch) p.catch(function(){}); }
     function closeLB(){ try{ lbVideo.pause(); }catch(e){} lbVideo.removeAttribute('src'); try{ lbVideo.load(); }catch(e){} lb.hidden=true; document.body.style.overflow=''; if(lastFocus&&lastFocus.focus) lastFocus.focus(); }
-    root.querySelectorAll('.vgn-review-card').forEach(function(card){ card.addEventListener('click',function(){ openLB(card.getAttribute('data-video'), card.getAttribute('aria-label')); }); });
+    root.querySelectorAll('.vgn-review-card').forEach(function(card){ card.addEventListener('click',function(){ markEvent('video_click',(card.getAttribute('data-video')||'').replace(/^.*\//,'').replace(/\.[a-z0-9]+$/i,'').slice(0,40)); openLB(card.getAttribute('data-video'), card.getAttribute('aria-label')); }); });
     lbClose.addEventListener('click',closeLB);
     lb.addEventListener('click',function(e){ if(e.target===lb) closeLB(); });
     document.addEventListener('keydown',function(e){ if(!lb.hidden && e.key==='Escape') closeLB(); });
