@@ -859,7 +859,7 @@ function closeInspectionModal(){ const m=document.getElementById('insp-modal'); 
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides',leads:'Driver Leads'};
+const PAGE_TITLES={desk:'Dispatch Desk',dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides',leads:'Driver Leads'};
 
 // ── Navigation state persistence ──
 // Remember where the user was so a manual refresh doesn't dump them back on the
@@ -929,6 +929,9 @@ function render(){
   else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
   else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
+  // Second view of the same fleet, worst first. renderDispatcherBoard() above is
+  // untouched: both call getVehicleStatus(), so they cannot disagree.
+  else if(currentPage==='desk'){ c.innerHTML=renderDesk(); deskAfterRender(); }
   else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
   // Guides was a standalone document opened in a new tab. It renders in-app
   // now; the weather tile fills itself in afterwards, and the filter is
@@ -3711,3 +3714,371 @@ async function init(){
   window.addEventListener('online',refreshData);
 }
 init();
+// ═══════════════════════════════════════════════════════
+// DISPATCH DESK  —  triage view of the same fleet
+// ═══════════════════════════════════════════════════════
+// A SECOND view beside the Dispatch Board, not a replacement. The board groups
+// by dispatcher and shows every truck; this one ranks the whole fleet worst
+// first, says in one line what is wrong, and keeps the clear trucks out of the
+// way. Three layouts over one list: Desk (worst first), Lanes (by dispatcher,
+// problems only), Roster (every clock, sortable).
+//
+// IT DECIDES NOTHING. Every status, threshold and tone comes from
+// getVehicleStatus(), the same call the Dispatch Board makes, so the two views
+// cannot contradict each other about a truck. Adding a rule here would create a
+// second definition of "critical" — put it in getVehicleStatus() instead.
+//
+// Styles: v2-desk.css (every class .v2-desk-*). Deleting that file, this block
+// and the nav entry removes the feature with nothing left behind.
+const DESK={view:'desk',q:'',only:null,open:null,sortKey:'rank',sortDir:'asc',cursor:-1,bound:false};
+
+// Days elapsed vs the interval that applies to THIS truck (vehSched already
+// resolved any per-vehicle schedule). Tone matches the board's strip exactly:
+// brake and service go critical when overdue, tyres stay a warning — that is
+// the fleet's existing policy, not a judgement made here.
+function deskClocks(st){
+  return [
+    {key:'brake',   label:'Brake test',  action:'a brake test',
+     days:st.brakeDays,   limit:st.brakeInterval,
+     level:st.brakeOverdue?'crit':st.brakeDueSoon?'warn':'ok',
+     last:st.lastBrake?st.lastBrake.testDate:null},
+    {key:'tyre',    label:'Tyre check',  action:'a tyre check',
+     days:st.tyreDays,    limit:st.tyreInterval,
+     level:st.tyreOverdue?'warn':'ok',
+     last:st.lastTyre?st.lastTyre.photoDate:null},
+    {key:'service', label:'Yard service',action:'a yard visit',
+     days:st.serviceDays, limit:st.serviceInterval,
+     level:st.serviceOverdue?'crit':st.serviceDueSoon?'warn':'ok',
+     last:st.lastService?st.lastService.serviceDate:(st.maint?st.maint.serviceDate:null)},
+  ];
+}
+
+// Worst-first ordering. Severity decides the band; days past the limit decide
+// the order inside it, so the truck that has been illegal longest sits top.
+function deskScore(st,clocks){
+  const base=st.critical?2:st.warning?1:0;
+  // Days past the limit, which is NEGATIVE while a clock is still in date. Kept
+  // negative on purpose: it orders the clear band by what falls due soonest, so
+  // the bottom of the list is genuinely the quietest truck rather than whichever
+  // one sorts first by number.
+  let worst=-999;
+  clocks.forEach(c=>{
+    if(c.days===null) return;
+    worst=Math.max(worst,c.days-c.limit);
+  });
+  return base*1000000+Math.max(-999,worst)*10+(st.defectCritical?5:st.defectMinor?3:0)+(st.annualExpired?4:0);
+}
+
+// What a dispatcher actually needs to read. One sentence, plain words.
+//
+// Every reason a truck is not clear becomes an entry — the three clocks, an
+// unrepaired defect, an expiring annual certificate — ranked by severity and
+// then by how far past the limit it is. The top entry drives both the headline
+// and the one-line reason on the row, so a truck that is critical because of a
+// reported defect does not lead with a lesser brake warning.
+//
+// Severity here MIRRORS getVehicleStatus(); it never invents one. A missing
+// record scores 0: it does not make a truck critical (the board has never
+// treated it that way) but it is named rather than being quietly reported as
+// 'inside its limits', which is what a blank record used to look like.
+function deskVerdict(st,clocks){
+  const reasons=[];
+  clocks.forEach(c=>{
+    if(c.days===null){
+      reasons.push({sev:0,past:-1,text:'No '+c.label.toLowerCase()+' on file',action:c.action+' is recorded'});
+      return;
+    }
+    if(c.level==='ok') return;
+    const past=c.days-c.limit;
+    reasons.push({sev:c.level==='crit'?2:1,past,
+      text:c.label+' '+c.days+'d'+(past>0?' — '+past+'d past the '+c.limit+'d limit':' — limit '+c.limit+'d'),
+      action:c.action+' is done'});
+  });
+  if(st.defectCritical) reasons.push({sev:2,past:1e6,text:'Defect reported on a pre-trip, not repaired',action:'the defect is repaired'});
+  else if(st.defectMinor) reasons.push({sev:1,past:1e6,text:'Minor defect reported, not repaired',action:'the defect is repaired'});
+  if(st.annualExpired) reasons.push({sev:2,past:9e5,text:'Annual certificate has expired',action:'the certificate is renewed'});
+  else if(st.annualDueSoon) reasons.push({sev:1,past:9e5,text:'Annual certificate expires soon',action:'the certificate is renewed'});
+  if(!st.preTripToday) reasons.push({sev:0,past:-2,text:'No pre-trip filed today',action:'the pre-trip is filed'});
+
+  reasons.sort((a,b)=>b.sev-a.sev||b.past-a.past);
+  const top=reasons[0]||null;
+  const head=st.critical?'Do not dispatch until '+((reasons.find(r=>r.sev===2)||top).action)+'.'
+    :st.warning?(top?top.text+'.':'Needs attention before the next load.')
+    :'Clear to dispatch.';
+  const rest=reasons.length-1;
+  // On a clear truck the top entry is whatever falls due first, so it is labelled
+  // as the next thing rather than left to read like an outstanding problem.
+  const lead=(!st.critical&&!st.warning&&top&&top.sev>0)?'Next: ':'';
+  const why=top?lead+top.text+(rest>0?' · '+rest+' more':''):'All clocks inside their limits';
+  const detail=(top?top.text+'. ':'Brakes, tyres and yard service are all inside their limits. ')
+    +(rest>0?'Also: '+reasons.slice(1).map(r=>r.text.charAt(0).toLowerCase()+r.text.slice(1)).join(', ')+'.':'');
+  return {head,detail:detail.trim(),why};
+}
+
+// One pass over the fleet. Vacation trucks are frozen exactly as the board
+// freezes them — no alerts while a driver is away — and counted separately
+// rather than ranked as if they were clear.
+function deskData(){
+  const vac=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
+  const rated=[],frozen=[];
+  VEHICLES.forEach(v=>{
+    const driver=DRIVERS.find(d=>d.id===v.assignedDriverId)||null;
+    const row={v,driver,dispatcher:(v.assignedDispatcher||'').trim()};
+    if(v.assignedDriverId&&vac.has(v.assignedDriverId)){ frozen.push(row); return; }
+    const st=getVehicleStatus(v.id);
+    const clocks=deskClocks(st);
+    row.st=st; row.clocks=clocks;
+    row.level=st.critical?'crit':st.warning?'warn':'ok';
+    row.score=deskScore(st,clocks);
+    Object.assign(row,deskVerdict(st,clocks));
+    rated.push(row);
+  });
+  rated.sort((a,b)=>b.score-a.score||String(a.v.truckNumber).localeCompare(String(b.v.truckNumber),undefined,{numeric:true}));
+  return {rated,frozen};
+}
+
+function deskMatch(r,q){
+  if(!q) return true;
+  const hay=(r.v.truckNumber+' '+(r.driver?r.driver.name:'')+' '+r.dispatcher+' '+(r.v.trailerNumber||'')).toLowerCase();
+  return hay.includes(q);
+}
+
+const DESK_WORD={crit:'Critical',warn:'Warning',ok:'Clear'};
+
+function deskRowHtml(r,i){
+  return '<button class="v2-desk-row is-'+r.level+(i===DESK.cursor?' is-cursor':'')+'" type="button"'
+    +' data-desk-open="'+esc(r.v.id)+'" data-desk-i="'+i+'">'
+    +'<span>'
+      +'<span class="v2-desk-unit"><span class="v2-desk-no">#'+esc(r.v.truckNumber)+'</span>'
+      +'<span class="v2-desk-driver">'+esc(r.driver?r.driver.name:'No driver assigned')+'</span>'
+      +'<span class="v2-desk-disp">'+esc(r.dispatcher||'Unassigned')+'</span></span>'
+      +'<span class="v2-desk-why">'+esc(r.why)+'</span>'
+    +'</span>'
+    +'<span class="v2-desk-tag is-'+r.level+'">'+DESK_WORD[r.level]+'</span>'
+    +'</button>';
+}
+
+function deskBody(){
+  const {rated,frozen}=deskData();
+  const q=DESK.q.trim().toLowerCase();
+  let list=rated.filter(r=>deskMatch(r,q));
+  if(DESK.only) list=list.filter(r=>r.level===DESK.only);
+  let html='';
+
+  if(DESK.view==='desk'){
+    if(!list.length) return '<div class="v2-desk-empty">Nothing matches that.</div>';
+    let n=0;
+    ['crit','warn','ok'].forEach(lvl=>{
+      const band=list.filter(r=>r.level===lvl);
+      if(!band.length) return;
+      html+='<div class="v2-desk-group">'+DESK_WORD[lvl]+' &middot; '+band.length+'</div><div class="v2-desk-list">';
+      band.forEach(r=>{ html+=deskRowHtml(r,n++); });
+      html+='</div>';
+    });
+    if(frozen.length) html+='<div class="v2-desk-lane-rest" style="margin-top:var(--v2-s5)">'+frozen.length+' truck'+(frozen.length===1?'':'s')+' frozen while the driver is on vacation.</div>';
+    return html;
+  }
+
+  if(DESK.view==='lanes'){
+    const names=[...new Set(rated.map(r=>r.dispatcher||'Unassigned'))].sort();
+    html+='<div class="v2-desk-lanes">';
+    let n=0;
+    names.forEach(name=>{
+      const mine=list.filter(r=>(r.dispatcher||'Unassigned')===name);
+      if(!mine.length) return;
+      const probs=mine.filter(r=>r.level!=='ok');
+      const clear=mine.length-probs.length;
+      const worst=probs.length?probs[0].level:'ok';
+      html+='<section class="v2-desk-lane">'
+        +'<header class="v2-desk-lane-head">'
+          +'<span><span class="v2-desk-lane-name">'+esc(name)+'</span><br>'
+          +'<span class="v2-desk-lane-meta">'+mine.length+' truck'+(mine.length===1?'':'s')+' &middot; '+DESK_WORD[worst]+'</span></span>'
+          +(name!=='Unassigned'?'<button class="v2-desk-lane-open" type="button" data-desk-lane="'+esc(name)+'">Open board &rarr;</button>':'')
+        +'</header>';
+      if(probs.length){ html+='<div class="v2-desk-list">'; probs.forEach(r=>{ html+=deskRowHtml(r,n++); }); html+='</div>'; }
+      // Only when there is something to say: a lane with problems and nothing
+      // clear would otherwise render an empty line under the list.
+      const rest=clear?clear+' clear, kept off this card':(probs.length?'':'Nothing needs attention');
+      if(rest) html+='<div class="v2-desk-lane-rest">'+rest+'</div>';
+      html+='</section>';
+    });
+    html+='</div>';
+    return html||'<div class="v2-desk-empty">Nothing matches that.</div>';
+  }
+
+  // Roster — every clock, sortable.
+  const dir=DESK.sortDir==='asc'?1:-1;
+  const val=(r,k)=>k==='rank'?-r.score:k==='unit'?String(r.v.truckNumber)
+    :k==='driver'?(r.driver?r.driver.name:'')
+    :k==='dispatcher'?(r.dispatcher||'')
+    :k==='pretrip'?(r.st.preTripToday?0:1)
+    :k==='status'?(r.level==='crit'?0:r.level==='warn'?1:2)
+    :(r.clocks.find(c=>c.key===k)||{}).days;
+  const sorted=[...list].sort((a,b)=>{
+    const x=val(a,DESK.sortKey),y=val(b,DESK.sortKey);
+    if(x===null||x===undefined) return 1;
+    if(y===null||y===undefined) return -1;
+    return (typeof x==='string'?x.localeCompare(y,undefined,{numeric:true}):x-y)*dir;
+  });
+  const th=(k,label,cls)=>'<th data-desk-sort="'+k+'"'+(DESK.sortKey===k?' class="is-sorted'+(cls?' '+cls:'')+'"':(cls?' class="'+cls+'"':''))+'>'
+    +label+(DESK.sortKey===k?(DESK.sortDir==='asc'?' &uarr;':' &darr;'):'')+'</th>';
+  html+='<div class="v2-desk-table-wrap"><table class="v2-desk-table"><thead><tr>'
+    +th('unit','Unit')+th('driver','Driver')+th('dispatcher','Dispatcher')+th('status','Status')
+    +th('brake','Brake','v2-desk-num')+th('tyre','Tyres','v2-desk-num')+th('service','Service','v2-desk-num')
+    +th('pretrip','Pre-trip')
+    +'</tr></thead><tbody>';
+  sorted.forEach((r,i)=>{
+    const cell=c=>'<td class="v2-desk-num is-'+c.level+'">'+(c.days===null?'&mdash;':c.days)+'</td>';
+    html+='<tr data-desk-open="'+esc(r.v.id)+'" data-desk-i="'+i+'">'
+      +'<td class="v2-desk-no">#'+esc(r.v.truckNumber)+'</td>'
+      +'<td>'+esc(r.driver?r.driver.name:'&mdash;')+'</td>'
+      +'<td>'+esc(r.dispatcher||'&mdash;')+'</td>'
+      +'<td class="is-'+r.level+'">'+DESK_WORD[r.level]+'</td>'
+      +cell(r.clocks[0])+cell(r.clocks[1])+cell(r.clocks[2])
+      +'<td>'+(r.st.preTripToday?'Logged':'Open')+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div>';
+  if(!sorted.length) html='<div class="v2-desk-empty">Nothing matches that.</div>';
+  return html;
+}
+
+function deskSheet(){
+  if(!DESK.open) return '';
+  const {rated,frozen}=deskData();
+  const r=rated.concat(frozen).find(x=>x.v.id===DESK.open);
+  if(!r) return '';
+  if(!r.st){
+    return '<div class="v2-desk-scrim" data-desk-close="1"></div><aside class="v2-desk-sheet" role="dialog" aria-modal="true" aria-label="Truck detail">'
+      +'<button class="v2-desk-sheet-close" type="button" data-desk-close="1" aria-label="Close">&times;</button>'
+      +'<div class="v2-desk-sheet-head"><span class="v2-desk-disp">#'+esc(r.v.truckNumber)+'</span>'
+      +'<h2>'+esc(r.driver?r.driver.name:'No driver')+'</h2></div>'
+      +'<div class="v2-desk-verdict is-ok"><b>Frozen while on vacation.</b>'
+      +'<span>No alerts are raised for this truck until the driver is back.</span></div></aside>';
+  }
+  const clocks=r.clocks.map(c=>{
+    const pct=c.days===null?0:Math.max(3,Math.min(100,Math.round(c.days/c.limit*100)));
+    const past=c.days===null?null:c.days-c.limit;
+    return '<div class="v2-desk-clock is-'+c.level+'">'
+      +'<div class="v2-desk-clock-top"><span class="v2-desk-clock-name">'+c.label+'</span>'
+      +'<span class="v2-desk-clock-days">'+(c.days===null?'none on file':c.days+'d')+'</span></div>'
+      +'<div class="v2-desk-bar"><i style="width:'+pct+'%"></i></div>'
+      +'<div class="v2-desk-clock-sub">limit '+c.limit+'d'
+        +(past!==null&&past>0?' &middot; '+past+'d past':'')
+        +(c.last?' &middot; last '+esc(fmtDate(c.last)):'')+'</div>'
+      +'</div>';
+  }).join('');
+  return '<div class="v2-desk-scrim" data-desk-close="1"></div>'
+    +'<aside class="v2-desk-sheet" role="dialog" aria-modal="true" aria-label="Truck detail">'
+    +'<button class="v2-desk-sheet-close" type="button" data-desk-close="1" aria-label="Close">&times;</button>'
+    +'<div class="v2-desk-sheet-head">'
+      +'<span class="v2-desk-disp">#'+esc(r.v.truckNumber)+(r.v.trailerNumber?' &middot; trailer '+esc(r.v.trailerNumber):'')+'</span>'
+      +'<h2>'+esc(r.driver?r.driver.name:'No driver assigned')+'</h2>'
+      +'<span class="v2-desk-lane-meta">'+DESK_WORD[r.level]+' &middot; '+esc(r.dispatcher||'Unassigned')+'</span>'
+    +'</div>'
+    +'<div class="v2-desk-verdict is-'+r.level+'"><b>'+esc(r.head)+'</b><span>'+esc(r.detail)+'</span></div>'
+    +clocks
+    +'<div class="v2-desk-note"><div class="v2-desk-note-top"><span>Pre-trip today</span>'
+      +'<span class="is-'+(r.st.preTripToday?'ok':'warn')+'">'+(r.st.preTripToday?'Logged':'Open')+'</span></div>'
+      +'<p>Filed daily by the driver, separate from the clocks. Logging it does not clear an overdue brake, tyre or service.</p></div>'
+    +'<div class="v2-desk-sheet-actions">'
+      +'<button class="v2-btn" type="button" data-desk-vehicle="'+esc(r.v.id)+'">Open full truck record &rarr;</button>'
+    +'</div></aside>';
+}
+
+function renderDesk(){
+  const {rated,frozen}=deskData();
+  const c=rated.filter(r=>r.level==='crit').length;
+  const w=rated.filter(r=>r.level==='warn').length;
+  const k=rated.filter(r=>r.level==='ok').length;
+  const pti=rated.filter(r=>!r.st.preTripToday).length;
+  const cnt=(key,n,label)=>'<button class="v2-desk-count is-'+key+(DESK.only===key?' is-on':'')+'" type="button" data-desk-only="'+key+'"><b>'+n+'</b> '+label+'</button>';
+  const tab=(v,label,sub)=>'<button class="v2-desk-tab'+(DESK.view===v?' is-active':'')+'" type="button" data-desk-view="'+v+'">'+label+'</button>';
+
+  return '<div class="v2-region"><div class="v2-desk" id="desk-root">'
+    +'<div class="v2-page-head"><h1>Dispatch Desk</h1>'
+      +'<p>The whole fleet, worst first. Same data and the same rules as the Dispatch Board &mdash; this view just puts what is wrong at the top.</p></div>'
+    +'<div class="v2-desk-bar">'
+      +'<div class="v2-desk-search">'
+        +'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'
+        +'<label class="v2-sr-only" for="desk-q">Search truck, driver or dispatcher</label>'
+        +'<input id="desk-q" type="text" placeholder="Truck, driver, or dispatcher" autocomplete="off" spellcheck="false" value="'+esc(DESK.q)+'">'
+      +'</div>'
+      +'<div class="v2-desk-counts">'
+        +cnt('crit',c,'critical')+cnt('warn',w,'warning')+cnt('ok',k,'clear')
+        +'<span class="v2-desk-count" style="cursor:default"><b>'+pti+'</b> pre-trips open</span>'
+        +'<button class="v2-desk-rules" type="button" data-desk-rules="1">Status rules</button>'
+      +'</div>'
+      +'<div class="v2-desk-tabs">'+tab('desk','Desk')+tab('lanes','Lanes')+tab('roster','Roster')+'</div>'
+    +'</div>'
+    +'<div id="desk-body">'+deskBody()+'</div>'
+    +'<div class="v2-desk-keys"><span><kbd>/</kbd> search</span><span><kbd>J</kbd> <kbd>K</kbd> move</span>'
+      +'<span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></div>'
+    +'<div id="desk-sheet-host">'+deskSheet()+'</div>'
+    +'</div></div>';
+}
+
+// Only the list and the sheet are rebuilt, so the search box keeps focus and
+// the caret while a dispatcher types.
+function deskRerender(){
+  const b=document.getElementById('desk-body'); if(b) b.innerHTML=deskBody();
+  const s=document.getElementById('desk-sheet-host'); if(s) s.innerHTML=deskSheet();
+}
+
+// Written out in full because a dispatcher acting on "Critical" deserves to
+// know what the word means. Reuses the app's own confirm dialog.
+function deskRules(){
+  confirm2('Status rules',
+    'CRITICAL — brake test or yard service past its limit, an unrepaired defect reported on a pre-trip, or an expired annual certificate.\n\n'
+    +'WARNING — brake or service approaching its limit, tyre check past its limit, a minor defect, or an annual certificate expiring soon.\n\n'
+    +'CLEAR — everything inside its limit.\n\n'
+    +'Limits come from each truck\'s own schedule, so two trucks can have different ones. A pre-trip is filed daily and tracked separately: logging it does not clear an overdue clock.',
+    'Close','btn btn-primary');
+}
+
+function deskAfterRender(){
+  const root=document.getElementById('desk-root'); if(!root) return;
+  const q=document.getElementById('desk-q');
+  if(q){
+    q.addEventListener('input',()=>{ DESK.q=q.value; DESK.cursor=-1; deskRerender(); });
+  }
+  root.addEventListener('click',e=>{
+    const t=e.target.closest('[data-desk-view],[data-desk-only],[data-desk-open],[data-desk-close],[data-desk-sort],[data-desk-lane],[data-desk-vehicle],[data-desk-rules]');
+    if(!t) return;
+    if(t.dataset.deskView){ DESK.view=t.dataset.deskView; DESK.cursor=-1;
+      root.querySelectorAll('[data-desk-view]').forEach(b=>b.classList.toggle('is-active',b===t)); deskRerender(); return; }
+    if(t.dataset.deskOnly){ DESK.only=DESK.only===t.dataset.deskOnly?null:t.dataset.deskOnly; DESK.cursor=-1;
+      root.querySelectorAll('[data-desk-only]').forEach(b=>b.classList.toggle('is-on',b.dataset.deskOnly===DESK.only)); deskRerender(); return; }
+    if(t.dataset.deskSort){ const k=t.dataset.deskSort;
+      if(DESK.sortKey===k) DESK.sortDir=DESK.sortDir==='asc'?'desc':'asc'; else { DESK.sortKey=k; DESK.sortDir='asc'; }
+      deskRerender(); return; }
+    if(t.dataset.deskLane){ currentDispatcherFilter=t.dataset.deskLane; navigate('dispatcher-board'); return; }
+    if(t.dataset.deskVehicle){ const id=t.dataset.deskVehicle; DESK.open=null; navigate('vehicle',id); return; }
+    if(t.dataset.deskRules){ deskRules(); return; }
+    if(t.dataset.deskClose!==undefined&&t.dataset.deskClose!==null&&t.hasAttribute('data-desk-close')){ DESK.open=null; deskRerender(); return; }
+    if(t.dataset.deskOpen){ DESK.open=t.dataset.deskOpen; DESK.cursor=Number(t.dataset.deskI||-1); deskRerender(); return; }
+  });
+  if(!DESK.bound){
+    DESK.bound=true;
+    document.addEventListener('keydown',e=>{
+      if(currentPage!=='desk') return;
+      const typing=/^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName||''));
+      if(e.key==='/'&&!typing){ e.preventDefault(); const el=document.getElementById('desk-q'); if(el) el.focus(); return; }
+      if(e.key==='Escape'){
+        if(DESK.open){ DESK.open=null; deskRerender(); }
+        else if(typing){ e.target.blur(); }
+        return;
+      }
+      if(typing) return;
+      const rows=[...document.querySelectorAll('#desk-body [data-desk-open]')];
+      if(!rows.length) return;
+      if(e.key==='j'||e.key==='J'||e.key==='ArrowDown'){ e.preventDefault(); DESK.cursor=Math.min(rows.length-1,DESK.cursor+1); }
+      else if(e.key==='k'||e.key==='K'||e.key==='ArrowUp'){ e.preventDefault(); DESK.cursor=Math.max(0,DESK.cursor-1); }
+      else if(e.key==='Enter'&&DESK.cursor>=0){ e.preventDefault(); DESK.open=rows[DESK.cursor].dataset.deskOpen; deskRerender(); return; }
+      else return;
+      rows.forEach((el,i)=>el.classList.toggle('is-cursor',i===DESK.cursor));
+      const cur=rows[DESK.cursor]; if(cur) cur.scrollIntoView({block:'nearest'});
+    });
+  }
+}
+

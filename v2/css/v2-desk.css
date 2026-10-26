@@ -1,0 +1,279 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   DISPATCH DESK  —  triage view for the dispatch board
+   ════════════════════════════════════════════════════════════════════════════
+   A SECOND view of the same trucks, not a replacement: the existing Dispatch
+   Board groups by dispatcher and shows everything; this one ranks the whole
+   fleet worst-first and hides what is clear. Both read getVehicleStatus(), so
+   neither can disagree with the other about a truck.
+
+   Everything here is new and prefixed .v2-desk-. Nothing in this file touches
+   a class any other page uses, so deleting the file plus renderDesk() removes
+   the feature completely. Colours come from the accent tokens, so light mode
+   and the dark-island rules keep working untouched.                          */
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.v2-desk { display: grid; gap: var(--v2-s5); }
+
+/* Counts + search sit together above the list, sticky so a dispatcher
+   scrolling a long fleet keeps the totals and the search box in reach. */
+.v2-desk-bar {
+  position: sticky; top: 0; z-index: 5;
+  display: grid; gap: var(--v2-s3);
+  padding-block: var(--v2-s3);
+  background: var(--v2-bg);
+}
+
+.v2-desk-search { position: relative; display: flex; align-items: center; }
+.v2-desk-search svg {
+  position: absolute; left: 14px; width: 18px; height: 18px;
+  color: var(--v2-ink-3); pointer-events: none;
+}
+.v2-desk-search input {
+  width: 100%; padding: 12px 14px 12px 42px;
+  font: inherit; font-size: var(--v2-fs-sm); color: var(--v2-ink);
+  background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line); border-radius: var(--v2-r-md);
+  transition: border-color var(--v2-t-fast), box-shadow var(--v2-t-fast);
+}
+.v2-desk-search input:focus {
+  outline: none; border-color: var(--v2-primary-ring);
+  box-shadow: 0 0 0 3px var(--v2-primary-soft);
+}
+.v2-desk-search input::placeholder { color: var(--v2-ink-3); }
+
+/* The count row doubles as a filter: clicking "critical" shows only those. */
+.v2-desk-counts {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--v2-s5);
+  font-size: var(--v2-fs-sm);
+}
+.v2-desk-count {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 4px 8px; margin-inline: -8px;
+  background: none; border: 0; border-radius: var(--v2-r-sm);
+  font: inherit; color: var(--v2-ink-3); cursor: pointer;
+  transition: background var(--v2-t-fast), color var(--v2-t-fast);
+}
+.v2-desk-count:hover { background: var(--v2-surface-2); color: var(--v2-ink-2); }
+.v2-desk-count.is-on  { background: var(--v2-surface-3); color: var(--v2-ink); }
+.v2-desk-count b { font-size: var(--v2-fs-md); font-weight: var(--v2-fw-semibold); }
+.v2-desk-count.is-crit b { color: var(--v2-red-hi); }
+.v2-desk-count.is-warn b { color: var(--v2-amber-hi); }
+.v2-desk-count.is-ok   b { color: var(--v2-green-hi); }
+
+.v2-desk-tabs { display: flex; gap: var(--v2-s1); }
+.v2-desk-tab {
+  padding: 7px 14px; font: inherit; font-size: var(--v2-fs-sm);
+  font-weight: var(--v2-fw-medium); color: var(--v2-ink-3);
+  background: none; border: 1px solid transparent; border-radius: var(--v2-r-pill);
+  cursor: pointer; transition: all var(--v2-t-fast);
+}
+.v2-desk-tab:hover { color: var(--v2-ink-2); background: var(--v2-surface-2); }
+.v2-desk-tab.is-active {
+  color: var(--v2-primary-hi); background: var(--v2-primary-soft);
+  border-color: var(--v2-primary-ring);
+}
+
+.v2-desk-rules {
+  margin-left: auto; padding: 0; font: inherit; font-size: var(--v2-fs-sm);
+  color: var(--v2-ink-3); background: none; border: 0;
+  text-decoration: underline; text-underline-offset: 4px; cursor: pointer;
+}
+.v2-desk-rules:hover { color: var(--v2-ink-2); }
+
+/* ── Group headings (Critical · 5) ───────────────────────────────────────── */
+.v2-desk-group {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  margin: var(--v2-s5) 0 var(--v2-s3);
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug); text-transform: uppercase;
+  color: var(--v2-ink-3);
+}
+.v2-desk-group::after {
+  content: ''; flex: 1; height: 1px; background: var(--v2-line);
+}
+
+/* ── Truck rows ──────────────────────────────────────────────────────────── */
+.v2-desk-list { display: grid; gap: 2px; }
+
+.v2-desk-row {
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: var(--v2-s5);
+  width: 100%; padding: 12px 16px;
+  text-align: left; font: inherit; color: var(--v2-ink);
+  background: var(--v2-surface); border: 0;
+  border-left: 3px solid transparent; border-radius: var(--v2-r-sm);
+  cursor: pointer; transition: background var(--v2-t-fast);
+}
+.v2-desk-row:hover,
+.v2-desk-row:focus-visible { background: var(--v2-surface-3); outline: none; }
+.v2-desk-row.is-crit { border-left-color: var(--v2-red); }
+.v2-desk-row.is-warn { border-left-color: var(--v2-amber); }
+.v2-desk-row.is-ok   { border-left-color: var(--v2-green); }
+/* Keyboard cursor — J/K move this, and it must be visible without a mouse. */
+.v2-desk-row.is-cursor { background: var(--v2-surface-3); box-shadow: inset 0 0 0 1px var(--v2-line-strong); }
+
+.v2-desk-unit {
+  display: flex; align-items: baseline; gap: var(--v2-s3); flex-wrap: wrap;
+}
+.v2-desk-no {
+  font-family: var(--v2-font-mono); font-size: var(--v2-fs-sm);
+  font-weight: var(--v2-fw-semibold); color: var(--v2-ink);
+}
+.v2-desk-driver { font-size: var(--v2-fs-sm); color: var(--v2-ink-2); }
+.v2-desk-disp   { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+
+/* The one-line reason. This is the whole point of the view: a dispatcher
+   should not have to read four numbers to learn what is wrong. */
+.v2-desk-why {
+  margin-top: 3px; font-size: var(--v2-fs-xs); color: var(--v2-ink-3);
+}
+.v2-desk-row.is-crit .v2-desk-why { color: var(--v2-red-hi); }
+.v2-desk-row.is-warn .v2-desk-why { color: var(--v2-amber-hi); }
+
+.v2-desk-tag {
+  padding: 3px 9px; border-radius: var(--v2-r-pill);
+  font-size: var(--v2-fs-micro); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug); text-transform: uppercase;
+  white-space: nowrap;
+}
+.v2-desk-tag.is-crit { color: var(--v2-red-hi);   background: var(--v2-red-soft);   }
+.v2-desk-tag.is-warn { color: var(--v2-amber-hi); background: var(--v2-amber-soft); }
+.v2-desk-tag.is-ok   { color: var(--v2-green-hi); background: var(--v2-green-soft); }
+
+/* ── Lanes (by dispatcher, problems only) ────────────────────────────────── */
+.v2-desk-lanes {
+  display: grid; gap: var(--v2-s5);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.v2-desk-lane {
+  display: grid; align-content: start; gap: var(--v2-s3);
+  padding: var(--v2-s5);
+  background: var(--v2-surface); border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-lg);
+}
+.v2-desk-lane-head {
+  display: flex; align-items: center; gap: var(--v2-s3);
+  padding-bottom: var(--v2-s3); border-bottom: 1px solid var(--v2-line);
+}
+.v2-desk-lane-name { font-weight: var(--v2-fw-semibold); }
+.v2-desk-lane-meta { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+.v2-desk-lane-open {
+  margin-left: auto; padding: 0; font: inherit; font-size: var(--v2-fs-xs);
+  color: var(--v2-ink-3); background: none; border: 0;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.v2-desk-lane-open:hover { color: var(--v2-primary-hi); }
+/* "4 clear, kept off this card" — the quiet trucks are counted, not listed. */
+.v2-desk-lane-rest { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+
+/* ── Roster table ────────────────────────────────────────────────────────── */
+.v2-desk-table-wrap { overflow-x: auto; }
+.v2-desk-table { width: 100%; border-collapse: collapse; font-size: var(--v2-fs-sm); }
+.v2-desk-table th {
+  position: sticky; top: 0; z-index: 2;
+  padding: 10px 12px; text-align: left; white-space: nowrap;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold);
+  letter-spacing: var(--v2-track-snug); text-transform: uppercase;
+  color: var(--v2-ink-3); background: var(--v2-bg);
+  border-bottom: 1px solid var(--v2-line); cursor: pointer; user-select: none;
+}
+.v2-desk-table th:hover { color: var(--v2-ink); }
+.v2-desk-table th.is-sorted { color: var(--v2-primary-hi); }
+.v2-desk-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--v2-line);
+  color: var(--v2-ink-2); white-space: nowrap;
+}
+.v2-desk-table tbody tr { cursor: pointer; }
+.v2-desk-table tbody tr:hover td { background: var(--v2-surface-2); }
+.v2-desk-table .v2-desk-num { font-family: var(--v2-font-mono); text-align: right; }
+.v2-desk-table .is-crit { color: var(--v2-red-hi); }
+.v2-desk-table .is-warn { color: var(--v2-amber-hi); }
+.v2-desk-table .is-ok   { color: var(--v2-green-hi); }
+
+/* ── Detail sheet ────────────────────────────────────────────────────────── */
+.v2-desk-scrim {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(0, 0, 0, .55);
+  animation: v2-desk-fade var(--v2-t-fast) var(--v2-ease);
+}
+.v2-desk-sheet {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
+  width: min(440px, 92vw); overflow-y: auto;
+  display: grid; align-content: start; gap: var(--v2-s5);
+  padding: var(--v2-s7);
+  background: var(--v2-surface); border-left: 1px solid var(--v2-line);
+  box-shadow: var(--v2-shadow-hover);
+  animation: v2-desk-slide var(--v2-t-base) var(--v2-ease);
+}
+@keyframes v2-desk-fade  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes v2-desk-slide { from { transform: translateX(16px); opacity: .6 } to { transform: none; opacity: 1 } }
+@media (prefers-reduced-motion: reduce) {
+  .v2-desk-scrim, .v2-desk-sheet { animation: none; }
+}
+
+.v2-desk-sheet-head { display: grid; gap: 4px; }
+.v2-desk-sheet-close {
+  position: absolute; top: var(--v2-s5); right: var(--v2-s5);
+  display: grid; place-items: center; width: 34px; height: 34px;
+  color: var(--v2-ink-3); background: var(--v2-surface-2);
+  border: 1px solid var(--v2-line); border-radius: var(--v2-r-sm); cursor: pointer;
+}
+.v2-desk-sheet-close:hover { color: var(--v2-ink); background: var(--v2-surface-3); }
+.v2-desk-sheet h2 { margin: 0; font-size: var(--v2-fs-xl); font-weight: var(--v2-fw-semibold); }
+
+/* The verdict. Plain language, first thing read. */
+.v2-desk-verdict { display: grid; gap: 6px; }
+.v2-desk-verdict b { font-size: var(--v2-fs-md); font-weight: var(--v2-fw-semibold); }
+.v2-desk-verdict.is-crit b { color: var(--v2-red-hi); }
+.v2-desk-verdict.is-warn b { color: var(--v2-amber-hi); }
+.v2-desk-verdict.is-ok   b { color: var(--v2-green-hi); }
+.v2-desk-verdict span { font-size: var(--v2-fs-sm); color: var(--v2-ink-2); line-height: 1.55; }
+
+/* One clock: name, days, a bar showing how far through the interval it is. */
+.v2-desk-clock { display: grid; gap: 6px; }
+.v2-desk-clock-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--v2-s3);
+}
+.v2-desk-clock-name { font-size: var(--v2-fs-sm); font-weight: var(--v2-fw-medium); }
+.v2-desk-clock-days { font-family: var(--v2-font-mono); font-size: var(--v2-fs-sm); }
+.v2-desk-clock.is-crit .v2-desk-clock-days { color: var(--v2-red-hi); }
+.v2-desk-clock.is-warn .v2-desk-clock-days { color: var(--v2-amber-hi); }
+.v2-desk-clock.is-ok   .v2-desk-clock-days { color: var(--v2-green-hi); }
+.v2-desk-bar { height: 3px; border-radius: 2px; background: var(--v2-surface-3); overflow: hidden; }
+.v2-desk-bar i { display: block; height: 100%; background: var(--v2-green); }
+.v2-desk-clock.is-crit .v2-desk-bar i { background: var(--v2-red); }
+.v2-desk-clock.is-warn .v2-desk-bar i { background: var(--v2-amber); }
+.v2-desk-clock-sub { font-size: var(--v2-fs-xs); color: var(--v2-ink-3); }
+
+.v2-desk-note {
+  display: grid; gap: 4px; padding: var(--v2-s5);
+  background: var(--v2-surface-2); border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-md);
+}
+.v2-desk-note-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--v2-s3);
+  font-size: var(--v2-fs-sm); font-weight: var(--v2-fw-medium);
+}
+.v2-desk-note p { margin: 0; font-size: var(--v2-fs-xs); color: var(--v2-ink-3); line-height: 1.55; }
+
+.v2-desk-sheet-actions { display: grid; gap: var(--v2-s3); }
+
+/* ── Empty + help ────────────────────────────────────────────────────────── */
+.v2-desk-empty {
+  padding: var(--v2-s10); text-align: center;
+  color: var(--v2-ink-3); font-size: var(--v2-fs-sm);
+}
+.v2-desk-keys {
+  display: flex; gap: var(--v2-s5); flex-wrap: wrap;
+  padding-top: var(--v2-s3); font-size: var(--v2-fs-micro); color: var(--v2-ink-3);
+}
+.v2-desk-keys kbd {
+  padding: 1px 5px; font-family: var(--v2-font-mono); font-size: 10px;
+  background: var(--v2-surface-2); border: 1px solid var(--v2-line);
+  border-radius: var(--v2-r-xs);
+}
+
+@media (max-width: 640px) {
+  .v2-desk-row { grid-template-columns: 1fr; gap: var(--v2-s3); }
+  .v2-desk-keys { display: none; }
+}
