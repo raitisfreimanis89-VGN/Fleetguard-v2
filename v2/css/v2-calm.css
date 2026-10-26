@@ -1,0 +1,127 @@
+/* ════════════════════════════════════════════════════════════════════════════
+   CALM SKIN  —  the Dispatch Board in the palette from the Grok mock-up
+   ════════════════════════════════════════════════════════════════════════════
+   NOT a redesign. The board's markup, layout, cards, counts and filters are
+   exactly what renderDispatcherBoard() has always produced; only the values
+   behind the tokens change, inside one wrapper. That is possible because
+   v2-dispatch.css and v2-filter.css contain ZERO hardcoded colours — every
+   rule already reads a token — so re-pointing the tokens re-skins the whole
+   board and nothing else on the page.
+
+   The palette is taken verbatim from the mock-up's own theme file
+   (src/styles.css in the Grok workspace):
+
+     bg #0e1114 · surface #161b20 · raised #2a3540 · line #2c3640
+     fg #e8ebef · muted #a8b2bc · faint #8e99a4
+     accent #e4e7ec (near-white: no brand colour competing with status)
+     ok #7f9d86 · warn #c4a15a · crit #d06a62   (deliberately desaturated)
+
+   The calm comes from two decisions, both of which are the opposite of this
+   app's current ones:
+     1. The status colours are DULL. A muted brick red reads as serious
+        without the page looking like an alarm panel.
+     2. There is NO brand accent. The accent is near-white, so nothing
+        competes with the three status colours for attention.
+   That second point is the trade: adopting this means the orange goes.
+
+   Scope: `.v2-calm`, applied by render() around the dispatch board only. The
+   sidebar, top bar and every other page keep the current look — which is
+   exactly what makes the contrast visible while judging it.             */
+
+.v2-calm {
+  /* ── Surfaces: warm neutral greys, not navy ──────────────────────────── */
+  --v2-bg:            #0e1114;
+  --v2-surface:       #161b20;
+  --v2-surface-2:     #1b2127;
+  --v2-surface-3:     #2a3540;   /* "raised" in the source theme           */
+  --v2-surface-rgb:   22, 27, 32;
+  --v2-well-rgb:      14, 17, 20;
+  --v2-lift-rgb:      255, 255, 255;
+
+  --v2-line:          #2c3640;
+  --v2-line-strong:   #3a4653;
+  --v2-line-glass:    rgba(255, 255, 255, .07);
+  --v2-line-glass-hi: rgba(255, 255, 255, .14);
+
+  /* ── Text ────────────────────────────────────────────────────────────── */
+  --v2-ink:           #e8ebef;
+  --v2-ink-2:         #a8b2bc;
+  --v2-ink-3:         #8e99a4;
+  --v2-ink-on-accent: #12161a;   /* dark ink on the near-white accent      */
+
+  /* ── Status: muted on purpose ────────────────────────────────────────── */
+  --v2-red:         #d06a62;
+  --v2-red-hi:      #e08b84;
+  --v2-red-deep:    #b4544c;
+  --v2-red-soft:    rgba(208, 106, 98, .14);
+  --v2-red-ring:    rgba(208, 106, 98, .38);
+
+  --v2-amber:       #c4a15a;
+  --v2-amber-hi:    #d8b878;
+  --v2-amber-deep:  #a8873f;
+  --v2-amber-soft:  rgba(196, 161, 90, .14);
+  --v2-amber-ring:  rgba(196, 161, 90, .38);
+
+  --v2-green:       #7f9d86;
+  --v2-green-hi:    #9cb9a3;
+  --v2-green-soft:  rgba(127, 157, 134, .14);
+  --v2-green-ring:  rgba(127, 157, 134, .38);
+
+  /* The informational hues keep their jobs but lose their saturation, so a
+     blue chip no longer outshouts a critical truck. */
+  --v2-blue:        #7b8fa8;
+  --v2-blue-hi:     #9bafc6;
+  --v2-blue-soft:   rgba(123, 143, 168, .14);
+  --v2-blue-ring:   rgba(123, 143, 168, .38);
+  --v2-cyan:        #7fa3a8;
+  --v2-cyan-hi:     #9cc0c5;
+  --v2-cyan-deep:   #5d848a;
+  --v2-cyan-soft:   rgba(127, 163, 168, .14);
+  --v2-cyan-ring:   rgba(127, 163, 168, .38);
+
+  /* ── Accent: near-white. This is the big one. ────────────────────────── */
+  --v2-primary:       #e4e7ec;
+  --v2-primary-hi:    #f4f6f8;
+  --v2-primary-deep:  #c3c8d0;
+  --v2-primary-hover: #ffffff;
+  --v2-primary-soft:  rgba(228, 231, 236, .10);
+  --v2-primary-ring:  rgba(228, 231, 236, .28);
+  --v2-primary-glow:  rgba(228, 231, 236, .18);
+
+  /* ── Type: IBM Plex Sans, as in the mock-up. The stack degrades to the
+     app's existing faces if the webfont is blocked or slow, which changes
+     the texture slightly but nothing else. ─────────────────────────────── */
+  --v2-font-display: 'IBM Plex Sans', 'Inter', -apple-system, 'Segoe UI', Arial, sans-serif;
+  --v2-font-body:    'IBM Plex Sans', 'Inter', -apple-system, 'Segoe UI', Arial, sans-serif;
+  --v2-font-mono:    'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  /* ── Rounder corners, per the source theme (8 / 12 / 16 / 24). ───────── */
+  --v2-r-xs:  6px;
+  --v2-r-sm:  8px;
+  --v2-r-md:  12px;
+  --v2-r-lg:  16px;
+  --v2-r-xl:  24px;
+
+  /* Shadows go quieter: on a grey ground the heavy navy shadows read as
+     dirt rather than depth. */
+  --v2-shadow:       0 1px 2px rgba(0, 0, 0, .30);
+  --v2-shadow-sm:    0 1px 2px rgba(0, 0, 0, .22);
+  --v2-shadow-hover: 0 6px 20px rgba(0, 0, 0, .38);
+
+  /* The wrapper paints its own ground so the board sits on the calm grey
+     rather than the app's navy, and bleeds to the edges of the content
+     area instead of leaving a navy frame around itself. */
+  background: var(--v2-bg);
+  color: var(--v2-ink);
+  font-family: var(--v2-font-body);
+  margin: calc(var(--v2-content-gutter, 28px) * -1);
+  padding: var(--v2-content-gutter, 28px);
+  min-height: calc(100vh - var(--v2-topbar-h, 64px));
+}
+
+/* The focus ring in the source theme is a plain accent outline rather than a
+   coloured glow; with a near-white accent it is clearer than the orange one. */
+.v2-calm :focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+}

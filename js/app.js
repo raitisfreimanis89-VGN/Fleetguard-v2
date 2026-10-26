@@ -928,7 +928,10 @@ function render(){
   else if(currentPage==='inspections') c.innerHTML=renderInspections();
   else if(currentPage==='portal'&&currentRole!=='dispatcher') c.innerHTML=renderPortal();
   else if(currentPage==='users') renderUsersAsync();
-  else if(currentPage==='dispatcher-board') c.innerHTML=renderDispatcherBoard();
+  // The calm skin is a token override on this wrapper (v2-calm.css) while the
+  // look is being judged. renderDispatcherBoard() is unchanged; drop the wrapper
+  // and the stylesheet and the board is exactly as it was.
+  else if(currentPage==='dispatcher-board') c.innerHTML='<div class="v2-calm">'+renderDispatcherBoard()+'</div>';
   else if(currentPage==='reminders'&&isAdmin()){loadReminders().then(()=>{c.innerHTML=renderReminders();});}
   // Guides was a standalone document opened in a new tab. It renders in-app
   // now; the weather tile fills itself in afterwards, and the filter is
