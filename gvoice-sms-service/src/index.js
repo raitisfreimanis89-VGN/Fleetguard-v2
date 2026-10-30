@@ -119,11 +119,25 @@ app.get('/diag', requireSecret, async (req, res) => {
 
   // bot.log: launched as `node src\index.js >> logs\bot.log 2>&1`, so it sits
   // beside src/. Read the tail only — this file grows for months.
+  // bot.log carries contact PII that this endpoint would otherwise publish to
+  // anyone holding the API key: sendSMS dumps the Google Voice page's visible
+  // controls and inputs for debugging, and that scrape includes the contact
+  // list — real driver names beside full phone numbers. The bot masks its own
+  // sends (+13129****) but those dumps walk straight past it. Drop the scrape
+  // lines to a marker, then mask any phone-shaped digits left anywhere else.
+  const SCRAPE_LINE = /(Visible buttons|Inputs after compose|Suggestions visible|Visible controls):/i;
+  const redact = (line) => {
+    const hit = line.match(SCRAPE_LINE);
+    if (hit) return `${line.slice(0, hit.index + hit[0].length)} [redacted — contains contact data]`;
+    // Phone-shaped runs, including GV's digit-per-character spelling ("7 0 2 ...").
+    return line.replace(/\+?\d(?:[\s().‐-―-]*\d){6,}/g, '[number]');
+  };
+
   let logTail;
   try {
     const file = path.join(__dirname, '..', 'logs', 'bot.log');
     const buf  = await fs.readFile(file, 'utf8');
-    logTail    = buf.split(/\r?\n/).filter(Boolean).slice(-lines);
+    logTail    = buf.split(/\r?\n/).filter(Boolean).slice(-lines).map(redact);
   } catch (e) {
     logTail = [`unavailable: ${e.message}`];
   }
