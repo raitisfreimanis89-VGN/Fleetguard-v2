@@ -78,6 +78,29 @@ async function initBrowser() {
   log.info(`Browser ready — ${pages.length} tab(s) at launch, trimmed to 1`);
 }
 
+// The compose entry point. Google Voice only renders one of these once the
+// app has actually loaded AND the session can send — which is the whole point:
+// a URL check cannot tell a working session from a dead one, because GV serves
+// sign-in walls, account pickers and empty shells from voice.google.com too.
+//
+// On 2026-10-20 that cost a full day. The session died, every send failed, and
+// /health reported gvLoggedIn:true for 23 hours because page.url() still said
+// voice.google.com. UptimeRobot stayed quiet, 26 reminders never went out, and
+// the first honest error only appeared once the code tried to log in again.
+// Asserting the SAME control sendSMS depends on is what makes the check real.
+const GV_APP_READY = [
+  '[aria-label="Send new message"]',
+  '[data-e2e-new-conversation]',
+  'button[aria-label="New conversation"]',
+  'button[aria-label="New message"]',
+  'button[aria-label="Compose"]',
+  'gv-icon-button[icon="create"]',
+  '[mattooltip="New conversation"]',
+  'button:has-text("Send new message")',
+].join(', ');
+
+const GV_READY_TIMEOUT_MS = parseInt(process.env.GV_READY_TIMEOUT_MS || '20000', 10);
+
 // ── Ensure we are logged into Google Voice ────────────────────
 async function ensureLoggedIn(opts = {}) {
   try {
@@ -138,6 +161,30 @@ async function ensureLoggedIn(opts = {}) {
     if (!finalUrl.includes('voice.google.com')) {
       throw new Error(`Unexpected URL after login: ${finalUrl}`);
     }
+
+    // ...and that the app is genuinely usable, not just that the URL looks
+    // right. Only done on a forced check (the /health watchdog) so ordinary
+    // sends keep the fast path — a send proves this for itself by succeeding
+    // or failing, whereas the watchdog has nothing else to go on.
+    if (opts.force) {
+      try {
+        await page.waitForSelector(GV_APP_READY, { state: 'visible', timeout: GV_READY_TIMEOUT_MS });
+      } catch (_) {
+        // If GV ever renames the compose control this check would cry wolf on a
+        // healthy session, so dump what IS on the page. Either the list needs
+        // widening or the page really is a sign-in wall — this says which,
+        // without anyone having to remote into the machine to find out.
+        const visible = await page.$$eval(
+          'button, [role="button"], gv-icon-button',
+          (els) => els.filter((e) => e.offsetParent !== null)
+            .map((e) => e.getAttribute('aria-label') || e.textContent.trim().slice(0, 30))
+            .filter(Boolean).slice(0, 15)
+        ).catch(() => []);
+        log.error(`Compose control not found. Visible controls: ${JSON.stringify(visible)}`);
+        throw new Error('Google Voice loaded but the compose control never appeared — session cannot send');
+      }
+    }
+
     log.info('Google Voice session active');
     setLoginState(true, 'ok');
   } catch (err) {
@@ -145,7 +192,9 @@ async function ensureLoggedIn(opts = {}) {
     const first = err.message.split('\n')[0];
     // Couldn't get past Google sign-in (2FA/captcha/blocked auto-login) = a
     // logout a human must fix; anything else is a transient browser error.
-    setLoginState(false, /accounts\.google\.com|sign-?in|login|password|email|Unexpected URL/i.test(first)
+    // "compose control never appeared" belongs with the sign-in failures: the
+    // page loads but cannot send, which only a human re-login fixes.
+    setLoginState(false, /accounts\.google\.com|sign-?in|login|password|email|Unexpected URL|compose control/i.test(first)
       ? 'signed-out (auto-login blocked)'
       : first.slice(0, 120));
     throw err;

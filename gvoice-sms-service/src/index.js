@@ -94,6 +94,76 @@ app.get('/health', (req, res) => {
   });
 });
 
+// ── GET /diag — what /health cannot see ───────────────────────
+// Everything here previously required somebody to remote into the office PC.
+// During the 2026-10-20 outage the fix was gated on one line of bot.log that
+// took a day to reach; and the watchdog scheduled task — the thing that
+// restarts this bot after a reboot — is invisible from outside entirely, so a
+// disabled one stays silent until the next restart never happens (that is how
+// the bot sat dead for four weeks in July 2026).
+//
+// Behind the same x-api-key as /send. Commands are fixed strings with no
+// request input interpolated, and every one is allowed to fail without
+// taking the endpoint down.
+app.get('/diag', requireSecret, async (req, res) => {
+  const { execFile } = require('child_process');
+  const fs   = require('fs/promises');
+  const path = require('path');
+
+  const lines = Math.min(Math.max(parseInt(req.query.lines, 10) || 40, 1), 200);
+
+  const run = (cmd, args) => new Promise((resolve) => {
+    execFile(cmd, args, { timeout: 8000, windowsHide: true }, (err, stdout, stderr) =>
+      resolve(err ? `unavailable: ${(err.message || stderr || '').split('\n')[0]}` : stdout.trim()));
+  });
+
+  // bot.log: launched as `node src\index.js >> logs\bot.log 2>&1`, so it sits
+  // beside src/. Read the tail only — this file grows for months.
+  let logTail;
+  try {
+    const file = path.join(__dirname, '..', 'logs', 'bot.log');
+    const buf  = await fs.readFile(file, 'utf8');
+    logTail    = buf.split(/\r?\n/).filter(Boolean).slice(-lines);
+  } catch (e) {
+    logTail = [`unavailable: ${e.message}`];
+  }
+
+  const TASK = 'FleetGuard GVoice SMS watchdog';
+  const [taskRaw, nodeRaw] = await Promise.all([
+    run('schtasks', ['/query', '/tn', TASK, '/fo', 'list']),
+    run('tasklist', ['/fi', 'imagename eq node.exe', '/fo', 'csv', '/nh']),
+  ]);
+
+  // schtasks prints a localised "Status:" line; Disabled is the one that matters.
+  const taskStatus = /unavailable:/.test(taskRaw)
+    ? taskRaw
+    : (taskRaw.match(/^\s*Status:\s*(.+)$/mi)?.[1]?.trim() || 'unknown');
+
+  const nodeCount = /unavailable:/.test(nodeRaw)
+    ? null
+    : nodeRaw.split(/\r?\n/).filter((l) => /node\.exe/i.test(l)).length;
+
+  res.json({
+    service: 'fleetguard-gvoice',
+    time:    new Date().toISOString(),
+    watchdog: {
+      task:     TASK,
+      status:   taskStatus,
+      // The whole reason this endpoint exists: a disabled watchdog looks
+      // identical to a healthy one until the next reboot.
+      healthy:  /ready|running/i.test(taskStatus),
+    },
+    processes: {
+      node:     nodeCount,
+      // Two node processes means start.bat spawned a second one that cannot
+      // bind the port and sits idle while the original keeps serving stale
+      // code — the trap that wasted hours on 2026-08-04.
+      warning:  nodeCount > 1 ? 'more than one node process — stale bot may still be serving' : null,
+    },
+    log: { lines: logTail.length, tail: logTail },
+  });
+});
+
 // ── Graceful shutdown ─────────────────────────────────────────
 async function shutdown(signal) {
   log.info(`${signal} received — shutting down`);
