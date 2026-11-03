@@ -34,13 +34,14 @@ async function requireAdmin(req: Request): Promise<{ id: string; email: string |
 // Skip rules agreed 2026-06-11: vacation, PTI within RECENT_DAYS, sms_hold,
 // no phone, no assigned truck, already pending in the queue, and any link
 // (bulk or single) successfully sent within RESEND_HOURS — no double-texting.
+// Added 2026-11-03: a truck marked "in the shop" (vehicles.shop_since, 017).
 async function eligibility() {
   const since = new Date(Date.now() - RECENT_DAYS * 86_400_000).toISOString();
   const sinceResend = new Date(Date.now() - RESEND_HOURS * 3_600_000).toISOString();
   const [dr, ph, ve, insp, q, ls] = await Promise.all([
     svc.from("drivers").select("id, name, on_vacation"),
     svc.from("driver_phones").select("driver_id, phone_number, sms_hold"),
-    svc.from("vehicles").select("id, truck_number, assigned_driver_id"),
+    svc.from("vehicles").select("id, truck_number, assigned_driver_id, shop_since"),
     svc.from("inspections").select("driver_id").gte("submitted_at", since),
     svc.from("pti_send_queue").select("driver_id").eq("status", "pending"),
     svc.from("link_sends").select("driver_id").eq("status", "sent").gte("created_at", sinceResend),
@@ -49,15 +50,15 @@ async function eligibility() {
   if (errs.length) throw new Error("DB read failed: " + errs.join("; "));
 
   const phones = new Map((ph.data ?? []).map((p) => [p.driver_id, p]));
-  const vehByDriver = new Map<string, { id: string; truck_number: string }>();
+  const vehByDriver = new Map<string, { id: string; truck_number: string; shop_since: string | null }>();
   (ve.data ?? []).forEach((v) => {
-    if (v.assigned_driver_id) vehByDriver.set(v.assigned_driver_id, { id: v.id, truck_number: v.truck_number });
+    if (v.assigned_driver_id) vehByDriver.set(v.assigned_driver_id, { id: v.id, truck_number: v.truck_number, shop_since: v.shop_since });
   });
   const recent = new Set((insp.data ?? []).map((i) => i.driver_id));
   const queued = new Set((q.data ?? []).map((r) => r.driver_id));
   const recentLink = new Set((ls.data ?? []).map((r) => r.driver_id));
 
-  const skipped = { vacation: 0, recentPTI: 0, linkSentRecently: 0, smsHold: 0, noPhone: 0, noVehicle: 0, alreadyQueued: 0 };
+  const skipped = { vacation: 0, recentPTI: 0, linkSentRecently: 0, smsHold: 0, noPhone: 0, noVehicle: 0, inShop: 0, alreadyQueued: 0 };
   const eligible: { driver_id: string; name: string; vehicle_id: string; truck_number: string; phone: string }[] = [];
   for (const d of dr.data ?? []) {
     if (d.on_vacation)        { skipped.vacation++;         continue; }
@@ -68,6 +69,7 @@ async function eligibility() {
     if (p.sms_hold)           { skipped.smsHold++;          continue; }
     const v = vehByDriver.get(d.id);
     if (!v?.truck_number)     { skipped.noVehicle++;        continue; }
+    if (v.shop_since)         { skipped.inShop++;           continue; }
     if (queued.has(d.id))     { skipped.alreadyQueued++;    continue; }
     eligible.push({ driver_id: d.id, name: d.name, vehicle_id: v.id, truck_number: v.truck_number, phone: p.phone_number });
   }

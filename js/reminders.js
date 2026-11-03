@@ -102,6 +102,7 @@ function remRenderOverview() {
     const s = getVehicleStatus(v.id);
     const driver = DRIVERS.find(d => d.id === v.assignedDriverId);
     if (!driver) return;
+    if (inShop(v)) return;   // in the shop: send-reminders skips it, so it is not "due a text" here either
     const phone = DRIVER_PHONES.find(p => p.driver_id === driver.id);
     const phoneStr = phone ? maskPhone(phone.phone_number) : '— no phone';
 

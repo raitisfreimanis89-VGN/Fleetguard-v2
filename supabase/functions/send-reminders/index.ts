@@ -208,7 +208,8 @@ serve(async (req) => {
   let   sent            = 0;
   let   skipped         = 0;
   let   vacationSkipped = 0;
-  let   retried         = 0;   // today's failed row re-used and sent again
+  let   shopSkipped     = 0;   // truck marked "in the shop" (migration 017)
+  let   retried        = 0;   // today's failed row re-used and sent again
   let   pendingSkipped  = 0;   // left alone: delivery genuinely unknown
   const errors: string[] = [];
 
@@ -221,7 +222,7 @@ serve(async (req) => {
   // Load all vehicles with their assigned driver
   const { data: vehicles, error: vErr } = await sb
     .from("vehicles")
-    .select("id, truck_number, trailer_number, assigned_driver_id");
+    .select("id, truck_number, trailer_number, assigned_driver_id, shop_since");
 
   if (vErr || !vehicles) {
     return new Response(JSON.stringify({ error: "Failed to load vehicles" }), { status: 500 });
@@ -230,6 +231,10 @@ serve(async (req) => {
   for (const v of vehicles) {
     if (sent >= MAX_PER_RUN) break;   // batch limit reached — stop this run
     if (!v.assigned_driver_id) { skipped++; continue; }
+
+    // Truck off the road for a repair: nothing to inspect, so don't text the
+    // driver about it. Reminders resume the first wave after it is cleared.
+    if (v.shop_since) { skipped++; shopSkipped++; continue; }
 
     // Skip drivers currently marked on vacation
     const { data: driverRow } = await sb
@@ -376,7 +381,7 @@ serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ ok: true, sent, retried, skipped, vacationSkipped, pendingSkipped, errors }),
+    JSON.stringify({ ok: true, sent, retried, skipped, vacationSkipped, shopSkipped, pendingSkipped, errors }),
     { headers: { "Content-Type": "application/json" } }
   );
 });

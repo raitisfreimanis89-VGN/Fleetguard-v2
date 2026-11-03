@@ -349,7 +349,28 @@
 }
 .v2-sample-note svg { width: 16px; height: 16px; flex-shrink: 0; }
 
+/* ── In the shop (migration 017) ─────────────────────────────────────────────
+   Blue, not red: a truck in the shop is a state to remember, not a breach.
+   Kept in this sheet although it also styles the Vehicles, vehicle-detail,
+   Dispatch and Reports pages, so the whole feature lives in one place. */
+.v2-shop-row { cursor: pointer; }
+.v2-shop-row.is-late { border-color: var(--v2-amber-ring); }
+.v2-shop-row .v2-btn-ghost { padding: 4px var(--v2-s3); white-space: nowrap; flex-shrink: 0; }
+.v2-shop-row .v2-badge + .v2-badge { margin-left: calc(-1 * var(--v2-s2)); }
+.v2-shop-note { color: var(--v2-ink); font-style: italic; }
+.v2-shop-opt { color: var(--v2-ink-3); font-weight: var(--v2-fw-regular, 400); text-transform: none; letter-spacing: 0; }
+.v2-shop-card { max-width: 760px; margin-bottom: var(--v2-s6); }
+.v2-shop-paused { display: flex; flex-wrap: wrap; gap: var(--v2-s2); margin-top: var(--v2-s3); }
+.v2-shop-actions { display: flex; flex-wrap: wrap; gap: var(--v2-s2); margin-top: var(--v2-s4); }
+.v2-btn-primary.v2-shop-go   { background: var(--v2-blue);  box-shadow: none; }
+.v2-btn-primary.v2-shop-back { background: var(--v2-green); box-shadow: none; }
+.v2-chip-status.is-shop { background: var(--v2-blue); color: var(--v2-ink-on-accent); }
+.v2-veh-status.is-shop  { background: var(--v2-blue-soft); border: 1px solid var(--v2-blue-ring); color: var(--v2-blue-hi); }
+.v2-veh.is-in-shop .v2-pills { opacity: .45; }
+.v2-vac-tag.is-late { background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+
 @media (max-width: 900px) {
   .v2-panel-grid { grid-template-columns: minmax(0, 1fr); }
   .v2-banner-meta { display: none; }
+  .v2-shop-row { flex-wrap: wrap; }
 }

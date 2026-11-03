@@ -108,6 +108,8 @@ let DRIVERS=[], VEHICLES=[], MAINTENANCE=[], BRAKE_TESTS=[], TYRE_RECORDS=[], DO
 let REPAIRS_AVAILABLE=false;
 // Same idea for vehicles.annual_inspection_expiry (migration 012).
 let ANNUAL_AVAILABLE=false;
+// And for the "in the shop" columns on vehicles (migration 017).
+let SHOP_AVAILABLE=false;
 // Driver cell numbers (migration 002). Two things worth knowing here:
 //
 //   1. driver_phones is admin-only by RLS ("phones_select_admin" USING is_admin()),
@@ -162,7 +164,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch,ph] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch,ph,shp] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -202,6 +204,9 @@ async function loadAll() {
     // fleet everywhere. Split, a refused read costs only the Cell column.
     // Same shape js/reminders.js has read since migration 002.
     sb.from('driver_phones').select('driver_id,phone_number,verified'),
+    // "In the shop" (migration 017). Separate for the same reason as the
+    // annual column: a missing column must cost only this feature.
+    sb.from('vehicles').select('id,shop_since,shop_until,shop_note').order('created_at'),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -226,6 +231,13 @@ async function loadAll() {
   if (ANNUAL_AVAILABLE) {
     const byId = new Map(vex.data.map(r=>[r.id,r.annual_inspection_expiry]));
     VEHICLES.forEach(v=>{ v.annualExpiry = byId.get(v.id) ?? null; });
+  }
+  // Until migration 017 is applied SHOP_AVAILABLE stays false, inShop() is
+  // false for every truck, and the app behaves exactly as before.
+  SHOP_AVAILABLE = !shp.error && !!shp.data;
+  if (SHOP_AVAILABLE) {
+    const byId = new Map(shp.data.map(r=>[r.id,r]));
+    VEHICLES.forEach(v=>{ const x=byId.get(v.id); v.shopSince=x?.shop_since??null; v.shopUntil=x?.shop_until??null; v.shopNote=x?.shop_note??''; });
   }
   // Defect tracking switches itself on only once migration 011 has been applied.
   // Until then REPAIRS_AVAILABLE stays false and isOpenDefect() returns false for
@@ -356,6 +368,72 @@ async function deleteVehicle(id) {
   VEHICLES=VEHICLES.filter(v=>v.id!==id); MAINTENANCE=MAINTENANCE.filter(r=>r.vehicleId!==id); BRAKE_TESTS=BRAKE_TESTS.filter(r=>r.vehicleId!==id);
   TYRE_RECORDS=TYRE_RECORDS.filter(r=>r.vehicleId!==id); DOT_INSPECTIONS=DOT_INSPECTIONS.filter(r=>r.vehicleId!==id); MILEAGE=MILEAGE.filter(r=>r.vehicleId!==id); SERVICE_RECORDS=SERVICE_RECORDS.filter(r=>r.vehicleId!==id);
   await Promise.all([sb.from('vehicles').delete().eq('id',id),sb.from('maintenance_records').delete().eq('vehicle_id',id),sb.from('brake_tests').delete().eq('vehicle_id',id),sb.from('tyre_records').delete().eq('vehicle_id',id),sb.from('dot_inspections').delete().eq('vehicle_id',id),sb.from('mileage_records').delete().eq('vehicle_id',id),sb.from('service_records').delete().eq('vehicle_id',id)]);
+}
+
+// ── In the shop (migration 017) ─────────────────────────────────────────────
+// A truck off the road for a long repair. send-reminders and pti-queue skip it
+// server-side; in here it leaves the overdue lists and gets its own blue card,
+// so it is neither nagged about nor forgotten. shop_since is the switch;
+// shop_until (expected back) is optional.
+const SHOP_NODATE_WARN_DAYS=14;   // no expected-back date: amber after this
+let shopFormFor=null;             // vehicle id whose in-shop form is open
+function inShop(v){ return !!(SHOP_AVAILABLE&&v&&v.shopSince); }
+// Chicago's calendar date, not today(): that one is UTC, which would make a
+// truck marked in the shop at 7 PM read "day 2" straight away.
+function localToday(){ return new Date().toLocaleDateString('en-CA'); }
+// Built from the date parts: new Date('2026-11-03') is UTC midnight, which is
+// the previous evening here, so it would print Nov 2.
+function shopDate(iso){ const p=String(iso).split('-'); return new Date(+p[0],+p[1]-1,+p[2]).toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function shopInfo(v){
+  const now=localToday();
+  const day=Math.max((daysBetween(v.shopSince,now)??0)+1,1);   // the day it went in is day 1
+  const late=v.shopUntil?daysBetween(v.shopUntil,now):null;     // > 0 once past the expected date
+  return {day,late,overdue:v.shopUntil?late>0:day>SHOP_NODATE_WARN_DAYS};
+}
+async function setVehicleShop(id,since,until,note){
+  // .select() so an update that RLS quietly filters to zero rows reads as the
+  // failure it is, rather than a green toast over nothing saved.
+  const {data,error}=await sb.from('vehicles').update({shop_since:since,shop_until:until,shop_note:note}).eq('id',id).select('id');
+  if(error||!data||!data.length) return error?.message||'not saved';
+  VEHICLES=VEHICLES.map(v=>v.id===id?{...v,shopSince:since,shopUntil:until,shopNote:note||''}:v);
+  return null;
+}
+function openShopForm(vid){ if(!isAdmin())return; shopFormFor=vid; render(); }
+function closeShopForm(){ shopFormFor=null; render(); }
+async function doShopSave(vid){
+  if(!isAdmin())return;
+  const v=VEHICLES.find(x=>x.id===vid); if(!v)return;
+  const since=document.getElementById('shop-since').value;
+  const until=document.getElementById('shop-until').value||null;
+  const note=document.getElementById('shop-note').value.trim().slice(0,120)||null;
+  if(!since){ showToast('Pick the date it went into the shop','danger'); return; }
+  if(until&&until<since){ showToast('Expected back is before the date it went in','danger'); return; }
+  const was=inShop(v);
+  const err=await setVehicleShop(vid,since,until,note);
+  if(err){ showToast('Could not save: '+err,'danger'); return; }
+  shopFormFor=null;
+  showToast(was?'Saved':'Truck #'+v.truckNumber+' is in the shop. Reminders and PTI links are paused','success');
+  render();
+}
+async function doShopReturn(vid){
+  if(!isAdmin())return;
+  const v=VEHICLES.find(x=>x.id===vid); if(!v)return;
+  const ok=await confirm2('Truck #'+v.truckNumber+' back on the road?',
+    'Reminders and PTI links start again with the next wave. If a brake, yard or tyre check came due while it was in the shop, the driver gets that reminder right away.',
+    'Back on road','btn btn-primary');
+  if(!ok)return;
+  const err=await setVehicleShop(vid,null,null,null);
+  if(err){ showToast('Could not save: '+err,'danger'); return; }
+  shopFormFor=null;
+  showToast('Truck #'+v.truckNumber+' is back on the road','success');
+  render();
+}
+// Hand-sent texts to a truck in the shop are asked about, not blocked: the
+// office may know something the status doesn't.
+async function shopSendOk(vehicleId,driverId,what){
+  const v=VEHICLES.find(x=>x.id===vehicleId)||VEHICLES.find(x=>x.assignedDriverId===driverId);
+  if(!inShop(v)) return true;
+  return confirm2('Truck #'+v.truckNumber+' is in the shop','Send the '+what+' anyway?','Send anyway','btn btn-primary');
 }
 async function addMaintenance(vehicleId,serviceDate,notes) {
   const next=new Date(serviceDate); next.setDate(next.getDate()+60);
@@ -664,6 +742,7 @@ async function doSendLink(driverId,vehicleId,truck){
   // admin OR dispatcher may send — server (driver-send-link) is the real gate. Governance updated 2026-07-01.
   if(!currentRole){ showToast('Sign in to send','danger'); return; }
   if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
+  if(!(await shopSendOk(vehicleId,driverId,'pre-trip link'))) return;
   try{
     const { data:{ session } } = await sb.auth.getSession();
     const token=session&&session.access_token;
@@ -682,6 +761,7 @@ async function doSendPM(driverId,vehicleId,truck){
   // UX — the function rejects non-admins regardless of what the browser does.
   if(!isAdmin()){ showToast('Admins only','danger'); return; }
   if(!driverId){ showToast('That truck has no assigned driver','danger'); return; }
+  if(!(await shopSendOk(vehicleId,driverId,'PM text'))) return;
   const ok=await confirm2(
     `Text the driver about PM service${truck?` on Truck #${truck}`:''}?`,
     'Asks them to route to any TA or Love\'s for an oil change ASAP and send the receipt. Sends immediately, and records you as the sender.',
@@ -724,7 +804,7 @@ async function doBulkSendAll(){
     if(!p.eligible){ showToast('No eligible drivers — everyone is covered or on hold','info'); return; }
     const s=p.skipped||{};
     const ok=await confirm2(`Queue PTI links for ${p.eligible} of ${p.total} drivers?`,
-      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.linkSentRecently||0} got a link in last 24h · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`,
+      `Skipped: ${s.recentPTI||0} inspected in last 3 days · ${s.linkSentRecently||0} got a link in last 24h · ${s.vacation||0} on vacation · ${s.smsHold||0} SMS hold · ${s.noPhone||0} no phone · ${s.noVehicle||0} no truck · ${s.inShop||0} truck in shop · ${s.alreadyQueued||0} already queued. Links go out 5 every 5 minutes (~${Math.ceil(p.eligible/5)*5} min total).`,
       '📨 Queue '+p.eligible+' links','btn btn-primary');
     if(!ok) return;
     const j=await ptiQueueCall(token,'enqueue');
@@ -904,6 +984,7 @@ function navigate(page,vehicleId){
   if((page==='vehicles'||page==='drivers')&&!isAdmin()) return;
   if(page==='leads'&&!isAdmin()) return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
+  shopFormFor=null;   // a half-filled in-shop form doesn't follow you to the next page
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const navEl=document.getElementById('nav-'+page);
@@ -1389,6 +1470,19 @@ function renderDispatcherBoard(){
     fleet.forEach(v=>{
       const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
       const isVac=_vacSet.has(v.assignedDriverId);
+      if(inShop(v)){
+        const si=shopInfo(v);
+        html+='<article class="v2-disp-card" style="opacity:.75;cursor:pointer" onclick="navigate(\'vehicle\',\''+v.id+'\')">'
+          +'<header class="v2-disp-head"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+          +'<span class="v2-disp-id"><span class="v2-disp-name">Truck #'+esc(v.truckNumber)+'</span>'
+          +'<span class="v2-disp-meta">Trailer #'+esc(v.trailerNumber||'—')+(driver?' &middot; '+esc(driver.name):'')+'</span></span>'
+          +'<span class="v2-vac-tag'+(si.overdue?' is-late':'')+'">In shop</span></header>'
+          +'<div class="v2-disp-stats"><span class="v2-disp-meta">Day '+si.day
+            +(v.shopUntil?(si.overdue?' &mdash; '+si.late+' day'+(si.late===1?'':'s')+' past '+shopDate(v.shopUntil):' &mdash; back ~'+shopDate(v.shopUntil)):'')
+            +' &middot; no alerts while in the shop</span></div>'
+          +'</article>';
+        return;
+      }
       if(isVac){
         html+='<article class="v2-disp-card" style="opacity:.6;cursor:pointer" onclick="navigate(\'vehicle\',\''+v.id+'\')">'
           +'<header class="v2-disp-head"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
@@ -1440,12 +1534,15 @@ function renderDispatcherBoard(){
   // to be the number of cards you will be left looking at. A dispatcher with a
   // critical truck and a warning truck is in both buckets, which is why these
   // sum to more than the card count.
-  let tOk=0,tWarn=0,tCrit=0,tVac=0;
+  let tOk=0,tWarn=0,tCrit=0,tVac=0,tShop=0;
   let dOk=0,dWarn=0,dCrit=0;
   const cards=names.map(name=>{
     const trucks=VEHICLES.filter(v=>v.assignedDispatcher===name);
-    const active=trucks.filter(v=>!_vacSet.has(v.assignedDriverId));
-    const vac=trucks.filter(v=>_vacSet.has(v.assignedDriverId));
+    // In the shop wins over vacation, so a truck is counted in one bucket only.
+    const shop=trucks.filter(inShop);
+    const active=trucks.filter(v=>!_vacSet.has(v.assignedDriverId)&&!inShop(v));
+    const vac=trucks.filter(v=>_vacSet.has(v.assignedDriverId)&&!inShop(v));
+    tShop+=shop.length;
     const sts=active.map(v=>getVehicleStatus(v.id));
     const crit=sts.filter(s=>s.critical).length;
     const warn=sts.filter(s=>s.warning&&!s.critical).length;
@@ -1476,6 +1573,14 @@ function renderDispatcherBoard(){
         +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span>'
         +(d?'<span class="v2-truck-sub">'+esc(d.name)+'</span>':'')+'</span>'
         +'<span class="v2-vac-tag">Vacation</span></div>';
+    }).join('')
+    +shop.map(v=>{
+      const d=DRIVERS.find(x=>x.id===v.assignedDriverId);
+      const si=shopInfo(v);
+      return '<div class="v2-truck-row" style="opacity:.6"><span class="v2-truck-ic">'+_sv(_IC.truck)+'</span>'
+        +'<span class="v2-truck-main"><span class="v2-truck-no">#'+esc(v.truckNumber)+'</span>'
+        +(d?'<span class="v2-truck-sub">'+esc(d.name)+'</span>':'')+'</span>'
+        +'<span class="v2-vac-tag'+(si.overdue?' is-late':'')+'">In shop &middot; day '+si.day+'</span></div>';
     }).join('');
 
     return '<article class="v2-disp-card '+tone+'" data-hay="'+esc(hay)+'" data-crit="'+crit+'" data-warn="'+warn+'" data-ok="'+ok+'"'
@@ -1489,6 +1594,7 @@ function renderDispatcherBoard(){
         +(warn>0?'<span class="v2-disp-chip is-warn">'+warn+' Warn</span>':'')
         +(crit>0?'<span class="v2-disp-chip is-crit">'+crit+' Critical</span>':'')
         +(vac.length>0?'<span class="v2-disp-chip">'+vac.length+' Vacation</span>':'')
+        +(shop.length>0?'<span class="v2-disp-chip">'+shop.length+' In shop</span>':'')
       +'</div><div class="v2-health"><div class="v2-health-track" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100" aria-label="'+esc(name)+' fleet health">'
       +'<div class="v2-health-fill" style="width:'+pct+'%"></div></div><span class="v2-health-pct">'+pct+'%</span></div></div>'
       +'<div class="v2-fleet-list">'+rows+'</div></article>';
@@ -1515,7 +1621,7 @@ function renderDispatcherBoard(){
     +'<span class="v2-legend-item"><span class="v2-legend-key">T</span>Tyre check</span>'
     +'<span class="v2-legend-item"><span class="v2-legend-key">S</span>Yard service</span>'
     +'<span class="v2-legend-item"><span class="v2-legend-key">P</span>Pre-trip today</span>'
-    +'<span class="v2-legend-tail">'+rated+' rated &middot; '+tVac+' frozen on vacation &middot; '+unassigned.length+' unassigned &middot; '+VEHICLES.length+' total</span></div>';
+    +'<span class="v2-legend-tail">'+rated+' rated &middot; '+tVac+' frozen on vacation &middot; '+(tShop?tShop+' in the shop &middot; ':'')+unassigned.length+' unassigned &middot; '+VEHICLES.length+' total</span></div>';
 
   html+='<div class="v2-board" id="db-board">'+cards;
 
@@ -1570,7 +1676,10 @@ function dbSetStatus(btn){
 function renderDashboard(){
   const statuses=VEHICLES.map(v=>({v,s:getVehicleStatus(v.id)}));
   const _vacSet=new Set(DRIVERS.filter(d=>d.on_vacation).map(d=>d.id));
-  const activeStatuses=statuses.filter(x=>!_vacSet.has(x.v.assignedDriverId));
+  // A truck in the shop is off the road, so it is neither roadworthy nor
+  // overdue. It gets the "In the shop" card below instead.
+  const activeStatuses=statuses.filter(x=>!_vacSet.has(x.v.assignedDriverId)&&!inShop(x.v));
+  const shopTrucks=VEHICLES.filter(inShop).sort((a,b)=>String(a.shopSince).localeCompare(String(b.shopSince)));
   const roadworthy=activeStatuses.filter(x=>!x.s.critical&&!x.s.tyreOverdue).length;
   const critical=activeStatuses.filter(x=>x.s.critical).length;
   const oos=activeStatuses.filter(x=>x.s.hasOOS);
@@ -1640,6 +1749,31 @@ function renderDashboard(){
     +'</div>';
 
   // ── Tier 2: banners ───────────────────────────────────────────────────────
+  // In the shop first: it is the one list the office has to remember on its
+  // own, since nothing texts anybody about these trucks. A row turns amber once
+  // the expected-back date passes, or after SHOP_NODATE_WARN_DAYS without one.
+  if(shopTrucks.length>0){
+    html+='<div class="v2-banner v2-accent-blue"><span class="v2-banner-ic">'+_sv(_I.wrench,'1.8')+'</span>'
+      +'<div class="v2-banner-body"><div class="v2-banner-title">In the shop &mdash; off the road</div>'
+      +'<div class="v2-banner-sub">No reminder or PTI texts go to these drivers. These trucks are left out of the overdue lists until they&rsquo;re back.</div><div class="v2-banner-rows">'
+      +shopTrucks.map(v=>{
+        const dr=DRIVERS.find(d=>d.id===v.assignedDriverId);
+        const si=shopInfo(v);
+        const meta=[dr?esc(dr.name):'No driver',esc(v.assignedDispatcher||'Unassigned'),'since '+shopDate(v.shopSince)]
+          .concat(v.shopNote?['<span class="v2-shop-note">'+esc(v.shopNote)+'</span>']:[]).join(' &nbsp;&middot;&nbsp; ');
+        const due=v.shopUntil
+          ?(si.overdue?'<span class="v2-badge is-solid">'+si.late+' day'+(si.late===1?'':'s')+' past '+shopDate(v.shopUntil)+'</span>'
+            :'<span class="v2-badge">Back ~'+shopDate(v.shopUntil)+'</span>')
+          :(si.overdue?'<span class="v2-badge is-solid">Check on it</span>':'');
+        return '<div class="v2-banner-row v2-shop-row'+(si.overdue?' v2-accent-amber is-late':'')+'" onclick="navigate(\'vehicle\',\''+v.id+'\')">'
+          +'<a class="v2-banner-truck" href="#" onclick="event.stopPropagation();navigate(\'vehicle\',\''+v.id+'\');return false">Truck #'+esc(v.truckNumber)+'</a>'
+          +'<span class="v2-banner-meta">'+meta+'</span>'
+          +'<span class="v2-badge is-muted">Day '+si.day+'</span>'+due
+          +(isAdmin()?'<button class="v2-btn-ghost" type="button" onclick="event.stopPropagation();doShopReturn(\''+v.id+'\')">Back on road</button>':'')
+          +'</div>';
+      }).join('')
+      +'</div></div></div>';
+  }
   if(serviceOverdue.length>0){
     html+='<div class="v2-banner v2-accent-red"><span class="v2-banner-ic">'+_sv(_I.alert,'1.8')+'</span>'
       +'<div class="v2-banner-body"><div class="v2-banner-title">Service overdue &mdash; yard visit ASAP</div>'
@@ -1789,10 +1923,13 @@ function renderVehicles(){
   VEHICLES.forEach(v=>{
     const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
     const s=getVehicleStatus(v.id);
-    const accent=s.critical?'v2-accent-red':s.warning?'v2-accent-amber':'v2-accent-green';
-    const statusTone=s.critical?'is-crit':s.warning?'is-warn':'is-ok';
-    const statusText=s.critical?'Critical':s.warning?'Warning':'OK';
-    html+='<article class="v2-veh '+accent+'" id="vcard-'+v.id+'">'
+    // In the shop overrides the roll-up: the checks keep their colours but are
+    // faded, since nothing is due on a truck that is off the road.
+    const shop=inShop(v);
+    const accent=shop?'v2-accent-blue':s.critical?'v2-accent-red':s.warning?'v2-accent-amber':'v2-accent-green';
+    const statusTone=shop?'is-shop':s.critical?'is-crit':s.warning?'is-warn':'is-ok';
+    const statusText=shop?'In shop &middot; day '+shopInfo(v).day:s.critical?'Critical':s.warning?'Warning':'OK';
+    html+='<article class="v2-veh '+accent+(shop?' is-in-shop':'')+'" id="vcard-'+v.id+'">'
       +(s.newTruck?'<span class="v2-veh-mark" aria-hidden="true">NEW TRUCK</span>':'')
       // ── view mode ──
       +'<div id="vview-'+v.id+'">'
@@ -2544,10 +2681,52 @@ function renderVehicleDetail(){
         +(driver?' &middot; '+esc(driver.name):'')
         +(v.assignedDispatcher?' &middot; '+esc(v.assignedDispatcher):'')+'</span></span>'
     +'</span>'
-    +'<span class="v2-chip-status '+(s.critical?'is-defect':s.warning?'is-minor':'is-pass')+'" style="margin-left:auto">'+label+'</span>'
+    +(inShop(v)
+      ?'<span class="v2-chip-status is-shop" style="margin-left:auto">In shop</span>'
+      :'<span class="v2-chip-status '+(s.critical?'is-defect':s.warning?'is-minor':'is-pass')+'" style="margin-left:auto">'+label+'</span>'
+       +(isAdmin()&&SHOP_AVAILABLE&&shopFormFor!==v.id?'<button class="v2-btn-ghost" type="button" onclick="openShopForm(\''+v.id+'\')">'+_sv(_IC.wrench,'1.8')+'Mark in shop</button>':''))
   +'</div>';
 
   if(!isAdmin()) html+=dispatcherNotice();
+
+  // ── In the shop: the open form, or the status panel while it is in ────────
+  if(isAdmin()&&shopFormFor===v.id){
+    const editing=inShop(v);
+    const drv=driver?esc(driver.name):'the driver';
+    html+='<section class="v2-form-card v2-accent-blue v2-shop-card" aria-label="In the shop">'
+      +'<div class="v2-form-head"><span class="v2-form-ic">'+_sv(_IC.wrench)+'</span>'
+      +'<h2>Truck #'+esc(v.truckNumber)+' &mdash; '+(editing?'in the shop':'mark in shop')+'</h2></div>'
+      +'<div class="v2-form-body"><div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="shop-since">In the shop since</label>'
+        +'<input class="v2-input" type="date" id="shop-since" value="'+esc(v.shopSince||localToday())+'"></div>'
+        +'<div class="v2-field"><label for="shop-until">Expected back <span class="v2-shop-opt">(optional)</span></label>'
+        +'<input class="v2-input" type="date" id="shop-until" value="'+esc(v.shopUntil||'')+'"></div>'
+      +'</div>'
+      +'<div class="v2-field" style="margin-top:var(--v2-s4)"><label for="shop-note">Note for yourself</label>'
+      +'<input class="v2-input" type="text" id="shop-note" maxlength="120" placeholder="e.g. Engine repair at the dealer" value="'+esc(v.shopNote||'')+'"></div>'
+      +'<p class="v2-form-hint">While it&rsquo;s in the shop, '+drv+' won&rsquo;t get brake / yard / tyre reminders or PTI links for this truck. Messages you send to all drivers still go out.</p>'
+      +'<div class="v2-shop-actions">'
+        +'<button class="v2-btn-primary v2-shop-go" type="button" onclick="doShopSave(\''+v.id+'\')">'+(editing?'Save':'Mark in shop')+'</button>'
+        +'<button class="v2-btn-ghost" type="button" onclick="closeShopForm()">Cancel</button>'
+      +'</div></div></section>';
+  } else if(inShop(v)){
+    const si=shopInfo(v);
+    const late=si.overdue?(v.shopUntil?si.late+' day'+(si.late===1?'':'s')+' past the expected date':'No return date yet, check on it'):'';
+    html+='<div class="v2-banner v2-accent-blue v2-shop-card">'
+      +'<span class="v2-banner-ic">'+_sv(_IC.wrench,'1.8')+'</span>'
+      +'<div class="v2-banner-body">'
+        +'<div class="v2-banner-title">In the shop since '+shopDate(v.shopSince)+' &mdash; day '+si.day+'</div>'
+        +'<div class="v2-banner-sub" style="margin-bottom:0">'
+          +(v.shopUntil?'Expected back '+shopDate(v.shopUntil):'No expected-back date')
+          +(v.shopNote?' &nbsp;&middot;&nbsp; <span class="v2-shop-note">'+esc(v.shopNote)+'</span>':'')+'</div>'
+        +'<div class="v2-shop-paused">'
+          +(late?'<span class="v2-accent-amber"><span class="v2-badge is-solid">'+late+'</span></span>':'')
+          +'<span class="v2-badge is-muted">Reminders paused</span><span class="v2-badge is-muted">PTI links paused</span></div>'
+        +(isAdmin()?'<div class="v2-shop-actions">'
+          +'<button class="v2-btn-primary v2-shop-back" type="button" onclick="doShopReturn(\''+v.id+'\')">Back on road</button>'
+          +'<button class="v2-btn-ghost" type="button" onclick="openShopForm(\''+v.id+'\')">Edit</button></div>':'')
+      +'</div></div>';
+  }
 
   // setVTab only sets currentVehicleTab and re-renders, so the active state is
   // decided here rather than by class juggling in the handler.
@@ -3049,16 +3228,19 @@ function renderCalendar(){
   const _calAdd=(iso,n)=>{const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().split('T')[0];};
   VEHICLES.forEach(v=>{
     if(_calVacSet.has(v.assignedDriverId)) return;
+    // In the shop: no brake or yard dates to plan around, but the annual
+    // certificate keeps running out on the calendar, so that one stays.
+    const _shop=inShop(v);
     const brakes=BRAKE_TESTS.filter(b=>b.vehicleId===v.id).sort((a,b)=>b.testDate.localeCompare(a.testDate));
     const maint=MAINTENANCE.filter(m=>m.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const svcs=SERVICE_RECORDS.filter(x=>x.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
     const tn=esc(v.truckNumber);
-    if(brakes[0]){
+    if(brakes[0]&&!_shop){
       const iv=vehSched(v.id,'brake_service').interval;
       events.push({date:_calAdd(brakes[0].testDate,iv),label:'Truck #'+tn+' brake inspection due ('+iv+'-day)',short:'#'+tn+' Brake',type:'brake',truck:tn,kind:'Brake inspection due',iv:iv});
     }
     const svcRefDate=(svcs[0]&&svcs[0].serviceDate)||(maint[0]&&maint[0].serviceDate)||null;
-    if(svcRefDate){
+    if(svcRefDate&&!_shop){
       const iv=vehSched(v.id,'dot_inspection').interval;
       events.push({date:_calAdd(svcRefDate,iv),label:'Truck #'+tn+' yard / periodic inspection due ('+iv+'-day)',short:'#'+tn+' Yard',type:'yard',truck:tn,kind:'Yard / periodic inspection',iv:iv});
     }
@@ -3245,7 +3427,8 @@ function _driverSafetyCard(scopeIds){
   // scopeIds, when passed, narrows that to the drivers on those vehicles, so a
   // report scoped to one truck does not show the whole fleet's compliance.
   const _pool=scopeIds?VEHICLES.filter(v=>scopeIds.has(v.id)):VEHICLES;
-  const eligible=DRIVERS.filter(d=>!d.on_vacation&&_pool.some(v=>v.assignedDriverId===d.id));
+  // A truck in the shop can't be inspected either, so its driver is left out too.
+  const eligible=DRIVERS.filter(d=>!d.on_vacation&&_pool.some(v=>v.assignedDriverId===d.id&&!inShop(v)));
   const rows=eligible.map(d=>{
     const st=driverPtiStats(d.id);
     return {d,st,sc:driverSafetyScore(st)};
@@ -3331,7 +3514,7 @@ function repExportCSV(){
       st.lastBrake?st.lastBrake.testDate:'',
       st.lastTyre?st.lastTyre.photoDate:'',
       st.lastService?st.lastService.serviceDate:(st.maint?st.maint.serviceDate:''),
-      st.critical?'Critical':st.warning?'Warning':'OK'].map(q).join(',');
+      inShop(v)?'In shop':st.critical?'Critical':st.warning?'Warning':'OK'].map(q).join(',');
   });
   const csv=head.map(q).join(',')+'\r\n'+body.join('\r\n');
   const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'});
@@ -3392,7 +3575,7 @@ function renderReports(){
   const stillOpen=defects.length-resolved;
   const resPct=defects.length?Math.round(resolved/defects.length*100):0;
   // Driver compliance, same population the compliance table scores.
-  const compDrivers=DRIVERS.filter(d=>!d.on_vacation&&scopeVeh.some(v=>v.assignedDriverId===d.id));
+  const compDrivers=DRIVERS.filter(d=>!d.on_vacation&&scopeVeh.some(v=>v.assignedDriverId===d.id&&!inShop(v)));
   const compStats=compDrivers.map(d=>driverPtiStats(d.id));
   const compPct=compStats.length?Math.round(compStats.reduce((t,x)=>t+(x.pct||0),0)/compStats.length):null;
   const caughtTotal=compStats.reduce((t,x)=>t+x.defectsFound,0);
@@ -3530,8 +3713,8 @@ function renderReports(){
   }
   scopeVeh.forEach(v=>{
     const st=getVehicleStatus(v.id);
-    const tone=st.critical?'is-defect':st.warning?'is-minor':'is-pass';
-    const label=st.critical?'Critical':st.warning?'Warning':'OK';
+    const tone=inShop(v)?'is-shop':st.critical?'is-defect':st.warning?'is-minor':'is-pass';
+    const label=inShop(v)?'In shop':st.critical?'Critical':st.warning?'Warning':'OK';
     html+='<tr onclick="navigate(\'vehicle\',\''+v.id+'\')" style="cursor:pointer" title="Open truck">'
       +'<td class="v2-cell-strong">Truck #'+esc(v.truckNumber)+'</td>'
       +'<td class="v2-cell-num">'+(st.lastBrake?fmtDate(st.lastBrake.testDate):'<span class="v2-cell-dim">&mdash;</span>')+'</td>'

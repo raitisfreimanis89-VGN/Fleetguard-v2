@@ -33,7 +33,29 @@ type Row = {
   driver_name: string | null; on_vacation: boolean;
   brake_days: number | null; service_days: number | null; tyre_days: number | null;
   pti_yesterday: boolean;
+  // Not from dispatcher_digest_data(): merged in from vehicles (migration 017).
+  shop_since?: string | null; shop_until?: string | null;
 };
+
+// "In the shop" dates. Day counts use the Chicago calendar date, the same day
+// the dispatcher is reading the text on; the day it went in is day 1.
+function chicagoToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Chicago" }).format(new Date());
+}
+function dayDiff(from: string, to: string): number {
+  return Math.round((Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86_400_000);
+}
+function md(iso: string): string {
+  return new Date(iso + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+function shopLine(t: Row, todayIso: string): string {
+  const day = Math.max(dayDiff(t.shop_since!, todayIso) + 1, 1);
+  if (!t.shop_until) return `Truck #${t.truck_number} (day ${day})`;
+  const late = dayDiff(t.shop_until, todayIso);
+  return late > 0
+    ? `Truck #${t.truck_number} (day ${day}, ${days(late)} past expected ${md(t.shop_until)})`
+    : `Truck #${t.truck_number} (day ${day}, expected back ${md(t.shop_until)})`;
+}
 
 // Per-vehicle interval overrides: vehicle_id -> { reminder_type: interval_days }.
 // A truck without its own row falls back to the fleet default row, then to the
@@ -50,8 +72,13 @@ function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Recor
   // overdue items, but still counted toward the header total and the pre-trip
   // ratio — so a dispatcher with 2 of 8 parked up read "(8 trucks)" and
   // "3 of 8 completed" when only 6 could ever have completed one.
-  const active = trucks.filter((t) => !t.on_vacation);
-  if (active.length === 0) return null;
+  // Trucks in the shop are left out the same way, and listed on their own so
+  // the dispatcher still sees them every morning instead of forgetting them.
+  const shop = trucks.filter((t) => t.shop_since);
+  const active = trucks.filter((t) => !t.on_vacation && !t.shop_since);
+  const todayIso = chicagoToday();
+  const shopList = shop.map((t) => shopLine(t, todayIso)).join("\n");
+  if (active.length === 0) return shop.length ? `Good morning, ${disp} - fleet report.\n\nIN SHOP:\n${shopList}` : null;
 
   const n = active.length;
   const overdueByTruck = new Map<string, string[]>();
@@ -88,7 +115,8 @@ function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Recor
     : "";
 
   if (overdueByTruck.size === 0 && soonByTruck.size === 0) {
-    return CLEAR[new Date().getUTCDate() % CLEAR.length](disp, n) + ptiLine;
+    return CLEAR[new Date().getUTCDate() % CLEAR.length](disp, n)
+      + (shop.length ? `\n\nIN SHOP:\n${shopList}` : "") + ptiLine;
   }
 
   let msg = `Good morning, ${disp} - fleet report (${n} trucks).`;
@@ -106,6 +134,8 @@ function buildMessage(disp: string, trucks: Row[], sched: SchedMap, fleet: Recor
       msg += `Truck #${tn}: ${items.join(", ")}\n`;
     }
   }
+
+  if (shop.length) msg += `\nIN SHOP:\n${shopList}\n`;
 
   return msg + `\nPlease follow up with your drivers today.` + ptiLine;
 }
@@ -143,8 +173,20 @@ serve(async (req) => {
     if (f.interval_days > 0) fleet[f.reminder_type] = f.interval_days;
   }
 
+  // In-shop trucks (migration 017). Read here rather than added to
+  // dispatcher_digest_data(), so that function never has to be recreated.
+  // Non-fatal like the schedules: on failure every truck reads as on the road.
+  const shopById = new Map<string, { since: string; until: string | null }>();
+  const { data: shopRows } = await sb
+    .from("vehicles")
+    .select("id,shop_since,shop_until")
+    .not("shop_since", "is", null);
+  for (const s of shopRows ?? []) shopById.set(s.id, { since: s.shop_since, until: s.shop_until });
+
   const byDisp = new Map<string, { phone: string; trucks: Row[] }>();
   for (const r of (rows ?? []) as Row[]) {
+    const sh = shopById.get(r.vehicle_id);
+    if (sh) { r.shop_since = sh.since; r.shop_until = sh.until; }
     if (!byDisp.has(r.dispatcher_name)) byDisp.set(r.dispatcher_name, { phone: r.phone_number, trucks: [] });
     byDisp.get(r.dispatcher_name)!.trucks.push(r);
   }
