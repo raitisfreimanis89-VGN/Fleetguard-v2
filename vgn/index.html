@@ -9,7 +9,23 @@
   <link rel="preload" href="assets/fonts/barlow-condensed-800.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="assets/fonts/dm-sans-400.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="styles.css?v=20261028a">
-  <script src="app.js?v=20261028a" defer></script>
+  <script src="app.js?v=20261106a" defer></script>
+  <!-- Meta Pixel Code -->
+  <script>
+  (function(){
+    // Production only — skip local/dev hosts (matches the first-party analytics
+    // trackOK guard) so dev visits never reach Meta. The fbq stub below is still
+    // defined on production even if fbevents.js is blocked, so the form's Lead
+    // call stays safe; on skipped hosts window.fbq is simply undefined (guarded).
+    var h = location.hostname;
+    if (/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])$/.test(h) || /\.localhost$/.test(h)) return;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init','536143989171835');
+    fbq('track','PageView');
+  })();
+  </script>
+  <noscript><img height="1" width="1" style="display:none" alt="" src="https://www.facebook.com/tr?id=536143989171835&ev=PageView&noscript=1"/></noscript>
+  <!-- End Meta Pixel Code -->
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>

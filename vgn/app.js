@@ -363,6 +363,10 @@
         if (res.ok && res.j && res.j.ok) {
           const who = recruiter === 'Either' ? 'Ray or Carl' : recruiter;
           markEvent('submit_success'); sendVA(false);
+          // Meta Pixel: a genuine Lead — fired ONCE, only after driver-apply
+          // confirmed the save (not on click/validation/error, not for IntelliApp).
+          // No PII in the event. Guarded so a blocked/absent pixel never breaks submit.
+          if (window.fbq) { try { fbq('track', 'Lead'); } catch (e) {} }
           form.reset(); programSelect.value = program; updateSelectedProgram();
           setStatus(`Thanks, ${name.split(' ')[0]}. Your request is in — ${who} will call you${bestTime ? ' (' + bestTime + ')' : ''}. Prefer to call now? Ray 708-232-8523 · Carl 515-603-0686.`, true);
         } else {
