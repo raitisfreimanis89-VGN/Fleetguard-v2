@@ -101,6 +101,38 @@ const GV_APP_READY = [
 
 const GV_READY_TIMEOUT_MS = parseInt(process.env.GV_READY_TIMEOUT_MS || '20000', 10);
 
+// The message box. Google renames these strings without warning: this was
+// placeholder="Type a message" until 2026-11-18, when it became "Text
+// message" and every send died on "Message textarea not found" — 426
+// consecutive failures over 25 hours, with the session perfectly healthy and
+// the textarea sitting right there, visible, under a new name.
+//
+// Ordered specific-first so an exact match wins; the two *="message" entries
+// are the safety net that should survive the next rename on its own.
+const GV_MSG_BOX = [
+  'textarea[placeholder="Text message"]',
+  'textarea[aria-label="Text message"]',
+  'textarea[placeholder="Type a message"]',
+  'textarea[aria-label="Type a message"]',
+  'textarea[placeholder*="message" i]',
+  'textarea[aria-label*="message" i]',
+].join(', ');
+
+// The recipient field. Same fragility, same reason — module level so both
+// places that wait for it share one list instead of pinning the string twice.
+const GV_TO_BOX = [
+  'input[placeholder="Type a name or phone number"]',
+  'input[placeholder*="name or phone"]',
+  'input[placeholder*="phone number"]',
+  'input[aria-label="Search contacts or type a number"]',
+  'input[aria-label="Search contacts"]',
+  'gv-recipient-picker input',
+  'input[aria-label="To"]',
+  'input[placeholder*="phone"]',
+  'input[placeholder*="name"]',
+  'input[placeholder*="number"]',
+].join(', ');
+
 // ── Ensure we are logged into Google Voice ────────────────────
 async function ensureLoggedIn(opts = {}) {
   try {
@@ -260,7 +292,7 @@ async function sendSMS(to, body) {
     await sendNewMsgBtn.click();
     // Wait up to 15 seconds for "To" field to become active
     log.info('Waiting for To field to become active...');
-    await page.waitForSelector('input[placeholder="Type a name or phone number"]', { timeout: 15000 }).catch(() => {});
+    await page.waitForSelector(GV_TO_BOX, { state: 'visible', timeout: 15000 }).catch(() => {});
     await page.waitForTimeout(1000);
   } else {
     // Try other compose selectors
@@ -287,30 +319,20 @@ async function sendSMS(to, body) {
   }))).catch(() => []);
   log.info(`Inputs after compose: ${JSON.stringify(inputs)}`);
 
-  // Type recipient phone number
-  const recipientSelectors = [
-    'input[placeholder="Type a name or phone number"]',
-    'input[placeholder*="name or phone"]',
-    'input[placeholder*="phone number"]',
-    'input[aria-label="Search contacts or type a number"]',
-    'input[aria-label="Search contacts"]',
-    'gv-recipient-picker input',
-    'input[aria-label="To"]',
-    'input[placeholder*="phone"]',
-    'input[placeholder*="name"]',
-    'input[placeholder*="number"]',
-  ];
-  // Wait for recipient input to be ready then fill it
+  // Type recipient phone number. A fallback list for this field existed here
+  // but was never wired up — the wait pinned one exact string instead, giving
+  // it the same single point of failure that took the message box out on
+  // 2026-11-18. Both now share GV_TO_BOX at module level.
   const toInput = await page.waitForSelector(
-    'input[placeholder="Type a name or phone number"]',
-    { timeout: 10000 }
+    GV_TO_BOX,
+    { state: 'visible', timeout: 10000 }
   ).catch(() => null);
 
   if (toInput) {
     log.info('Found "To" input — typing phone number');
 
     // Click with force to bypass overlay backdrop (part of GV compose UI)
-    const toLocator = page.locator('input[placeholder="Type a name or phone number"]');
+    const toLocator = page.locator(GV_TO_BOX).first();
     await toLocator.click({ force: true });
     await page.waitForTimeout(1000);
 
@@ -339,13 +361,13 @@ async function sendSMS(to, body) {
 
   // Wait for message textarea then type
   const msgInput = await page.waitForSelector(
-    'textarea[placeholder="Type a message"]',
-    { timeout: 10000 }
+    GV_MSG_BOX,
+    { state: 'visible', timeout: 10000 }
   ).catch(() => null);
 
   if (msgInput) {
     log.info('Found message textarea — typing message');
-    const msgLocator = page.locator('textarea[placeholder="Type a message"]');
+    const msgLocator = page.locator(GV_MSG_BOX).first();
     await msgLocator.click({ force: true });
     await page.waitForTimeout(500);
 
@@ -369,7 +391,15 @@ async function sendSMS(to, body) {
     log.info('Enter pressed — single message sent');
     await page.waitForTimeout(2000);
   } else {
-    log.error('Could not find message textarea');
+    // Name every textarea actually on the page. The 2026-11-18 outage was one
+    // renamed placeholder, and it took a day to spot because the failure said
+    // only "not found" — this line turns the next rename into a one-minute fix.
+    const seen = await page.$$eval('textarea', (els) => els.map((e) => ({
+      placeholder: e.getAttribute('placeholder'),
+      ariaLabel:   e.getAttribute('aria-label'),
+      visible:     e.offsetParent !== null,
+    }))).catch(() => []);
+    log.error(`Could not find message textarea. Textareas present: ${JSON.stringify(seen)}`);
     throw new Error('Message textarea not found');
   }
 
