@@ -182,7 +182,7 @@
   };
   const statements = {
     '3714': {date: 'November 2–8, 2026', net: '$3,714.48', gross: '$11,600'},
-    '2963': {date: 'November 9–15, 2026', net: '$2,963.81', gross: '$9,362.50'},
+    '3410': {date: 'November 9–15, 2026', net: '$3,410.33', gross: '$9,750'},
     '3161': {date: 'November 9–15, 2026', net: '$3,161.91', gross: '$12,150'}
   };
   const dialog = $('#media-dialog');
