@@ -181,10 +181,9 @@
     arnulfo: {title: 'Arnulfo’s story', src: 'assets/testimonials/driver-arnulfo.mp4', poster: 'assets/driver-arnulfo.png'}
   };
   const statements = {
-    '3158': {date: 'September 13–19, 2026', net: '$3,158.88', gross: '$10,000'},
-    '4703': {date: 'September 13–19, 2026', net: '$4,703.72', gross: '$11,200'},
-    '3413': {date: 'September 6–12, 2026', net: '$3,413.20', gross: '$10,200'},
-    '4511': {date: 'September 6–12, 2026', net: '$4,511.20', gross: '$11,550'}
+    '3714': {date: 'November 2–8, 2026', net: '$3,714.48', gross: '$11,600'},
+    '2963': {date: 'November 9–15, 2026', net: '$2,963.81', gross: '$9,362.50'},
+    '3161': {date: 'November 9–15, 2026', net: '$3,161.91', gross: '$12,150'}
   };
   const dialog = $('#media-dialog');
   const dialogBody = $('#dialog-body');
