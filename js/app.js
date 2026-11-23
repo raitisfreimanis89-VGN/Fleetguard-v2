@@ -487,6 +487,17 @@ const SAFETY_LADDER=['coached','verbal','written','final','suspended','terminate
 const SAFETY_LADDER_SHORT={coached:'Coached',verbal:'Verbal',written:'Written',final:'Final',suspended:'Suspended',terminated:'Let go'};
 const SAFETY_WATCH_SERIOUS=2;   // major-or-worse events in 12 months that put a driver "on watch"
 const SAFETY_FILE_MAX=10*1024*1024;
+// What can be attached, by type, and the extension it is stored under. Samsara
+// clips download as MP4; an iPhone video arrives as video/quicktime (.mov).
+// Must match allowed_mime_types on the safety-files bucket (migration 020).
+const SAFETY_FILE_TYPES={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','application/pdf':'pdf','video/mp4':'mp4','video/quicktime':'mov','video/webm':'webm'};
+// Some Windows setups hand over a file with no type at all; go by the name then.
+function safetyFileType(f){
+  if(f.type) return f.type;
+  const ext=String(f.name.split('.').pop()||'').toLowerCase();
+  if(ext==='jpeg') return 'image/jpeg';
+  return Object.keys(SAFETY_FILE_TYPES).find(t=>SAFETY_FILE_TYPES[t]===ext)||'';
+}
 let safetyFilter='all';
 let safetyForm=null;            // null, or {id: event id or null for a new one, driverId}
 let safetySeverity='minor';     // severity picked in the open form
@@ -630,8 +641,8 @@ function safetyFormHTML(){
       +'<div class="v2-form-grid fg-sf-row">'
         +'<div class="v2-field"><label for="sf-clip">Samsara clip link <span class="v2-shop-opt">(optional)</span></label>'
           +'<input class="v2-input" type="url" id="sf-clip" placeholder="Paste the link from Samsara" value="'+esc(ev?ev.clip_url||'':'')+'"></div>'
-        +'<div class="v2-field"><label for="sf-file">Photo or report <span class="v2-shop-opt">(optional, 10 MB)</span></label>'
-          +'<input class="v2-input" type="file" id="sf-file" accept="image/jpeg,image/png,image/webp,application/pdf">'
+        +'<div class="v2-field"><label for="sf-file">Photo, video or report <span class="v2-shop-opt">(optional, 10 MB)</span></label>'
+          +'<input class="v2-input" type="file" id="sf-file" accept="'+Object.keys(SAFETY_FILE_TYPES).join(',')+',.mp4,.mov">'
           +(ev&&ev.attachment_path?'<span class="v2-form-hint" style="margin:4px 0 0">Attached: <a href="#" onclick="openSafetyFile(\''+ev.id+'\');return false">'+esc(ev.attachment_name||'file')+'</a>. Pick a new one to replace it.</span>':'')
         +'</div>'
         +'<div class="v2-field"><label for="sf-action">Action taken</label><span class="v2-select-wrap"><select class="v2-select" id="sf-action">'
@@ -686,8 +697,10 @@ async function doSaveSafety(){
   const clip=g('sf-clip').value.trim();
   if(clip&&!/^https:\/\/\S+$/i.test(clip)){ showToast('The clip link should start with https://','danger'); return; }
   const f=g('sf-file').files[0]||null;
-  if(f&&!/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(f.type)){ showToast('Attach a photo (JPG/PNG) or a PDF','danger'); return; }
-  if(f&&f.type==='application/pdf'&&f.size>SAFETY_FILE_MAX){ showToast('That PDF is over 10 MB','danger'); return; }
+  const ftype=f?safetyFileType(f):'';
+  if(f&&!SAFETY_FILE_TYPES[ftype]){ showToast('Attach a photo (JPG/PNG), a video (MP4) or a PDF','danger'); return; }
+  // Photos are shrunk before upload, so only videos and PDFs can be too big here.
+  if(f&&!ftype.startsWith('image/')&&f.size>SAFETY_FILE_MAX){ showToast('That file is over 10 MB','danger'); return; }
   const row={event_date:date,event_type:type,category:ti[1],severity:safetySeverity,
     source:g('sf-source').value||null,
     description:g('sf-desc').value.trim().slice(0,2000)||null,
@@ -724,12 +737,13 @@ async function doSaveSafety(){
   }
   let rec=data[0], fileFailed=false;
   if(f){
-    const blob=f.type.startsWith('image/')?await shrinkSafetyImage(f):f;
+    const blob=ftype.startsWith('image/')?await shrinkSafetyImage(f):f;
+    // A shrunk photo is a JPEG now; anything else keeps the type it came with.
+    const btype=(blob!==f&&blob.type)||ftype;
     if(blob.size>SAFETY_FILE_MAX){ fileFailed=true; }
     else{
-      const ext=blob.type==='application/pdf'?'pdf':blob.type==='image/png'?'png':blob.type==='image/webp'?'webp':'jpg';
-      const path=rec.id+'/'+Date.now()+'.'+ext;
-      const up=await sb.storage.from('safety-files').upload(path,blob,{contentType:blob.type,upsert:false});
+      const path=rec.id+'/'+Date.now()+'.'+(SAFETY_FILE_TYPES[btype]||'bin');
+      const up=await sb.storage.from('safety-files').upload(path,blob,{contentType:btype,upsert:false});
       if(up.error){ console.error('safety file upload failed',up.error); fileFailed=true; }
       else{
         const old=rec.attachment_path;
@@ -838,7 +852,8 @@ function renderSafetyLog(){
     const sv=e.category==='crash'&&e.severity!=='critical'?['crash','Crash']:sev[e.severity]||sev.minor;
     const due=e.status==='open'&&e.follow_up_on&&e.follow_up_on<=t;
     const links=(e.clip_url?'<a href="'+esc(e.clip_url)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">'+_ssv(_SAFETY_IC.play)+'Clip</a>':'')
-      +(e.attachment_path?'<a href="#" onclick="event.stopPropagation();openSafetyFile(\''+e.id+'\');return false">'+_ssv(_SAFETY_IC.file)+esc(e.attachment_name||'File')+'</a>':'');
+      +(e.attachment_path?'<a href="#" onclick="event.stopPropagation();openSafetyFile(\''+e.id+'\');return false">'
+        +_ssv(/\.(mp4|mov|webm)$/i.test(e.attachment_path)?_SAFETY_IC.play:_SAFETY_IC.file)+esc(e.attachment_name||'File')+'</a>':'');
     html+='<tr class="fg-sf-tr" tabindex="0" onclick="openSafetyForm(\''+e.id+'\')" onkeydown="if(event.key===\'Enter\')openSafetyForm(\''+e.id+'\')">'
       +'<td class="v2-td-when">'+safetyDate(e.event_date)+'</td>'
       +'<td class="v2-td-driver">'+esc(e.driver_name)+(e.truck_number?'<small>#'+esc(e.truck_number)+'</small>':'')+'</td>'
