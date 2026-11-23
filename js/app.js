@@ -110,6 +110,12 @@ let REPAIRS_AVAILABLE=false;
 let ANNUAL_AVAILABLE=false;
 // And for the "in the shop" columns on vehicles (migration 017).
 let SHOP_AVAILABLE=false;
+// Cameras on trucks and the safety log (migration 019). safety_events is
+// admin only by RLS: a dispatcher's read returns no rows and no error, and
+// every safety screen is gated on isAdmin() as well.
+let CAMERA_AVAILABLE=false;
+let SAFETY_AVAILABLE=false;
+let SAFETY_EVENTS=[];
 // Driver cell numbers (migration 002). Two things worth knowing here:
 //
 //   1. driver_phones is admin-only by RLS ("phones_select_admin" USING is_admin()),
@@ -164,7 +170,7 @@ function onNewTruckLadder(vehicleId){
 
 async function loadAll() {
   if (!sb) return;
-  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch,ph,shp] = await Promise.all([
+  const [d,v,m,b,t,dot,mil,svc,insp,vex,rep,ls,sch,gsch,ph,shp,cam,saf] = await Promise.all([
     sb.from('drivers').select('id,name,on_vacation,created_at').order('created_at'),
     sb.from('vehicles').select('id,truck_number,trailer_number,assigned_driver_id,assigned_dispatcher,created_at').order('created_at'),
     sb.from('maintenance_records').select('id,vehicle_id,service_date,next_inspection_date,notes').order('created_at'),
@@ -207,6 +213,9 @@ async function loadAll() {
     // "In the shop" (migration 017). Separate for the same reason as the
     // annual column: a missing column must cost only this feature.
     sb.from('vehicles').select('id,shop_since,shop_until,shop_note').order('created_at'),
+    // Cameras and the safety log (migration 019), guarded the same way.
+    sb.from('vehicles').select('id,camera_type,camera_installed_on,camera_provider,camera_serial').order('created_at'),
+    sb.from('safety_events').select('*').order('event_date',{ascending:false}).limit(1000),
   ]);
   // Guard: only overwrite each array if the query succeeded.
   // Supabase returns {data:null, error:{...}} on failure — never wipe live data with a failed response.
@@ -239,6 +248,13 @@ async function loadAll() {
     const byId = new Map(shp.data.map(r=>[r.id,r]));
     VEHICLES.forEach(v=>{ const x=byId.get(v.id); v.shopSince=x?.shop_since??null; v.shopUntil=x?.shop_until??null; v.shopNote=x?.shop_note??''; });
   }
+  CAMERA_AVAILABLE = !cam.error && !!cam.data;
+  if (CAMERA_AVAILABLE) {
+    const byId = new Map(cam.data.map(r=>[r.id,r]));
+    VEHICLES.forEach(v=>{ const x=byId.get(v.id); v.cameraType=x?.camera_type??null; v.cameraOn=x?.camera_installed_on??null; v.cameraProvider=x?.camera_provider??''; v.cameraSerial=x?.camera_serial??''; });
+  }
+  SAFETY_AVAILABLE = !saf.error && !!saf.data;
+  if (SAFETY_AVAILABLE) SAFETY_EVENTS = saf.data;
   // Defect tracking switches itself on only once migration 011 has been applied.
   // Until then REPAIRS_AVAILABLE stays false and isOpenDefect() returns false for
   // everything, so status, pills and buttons behave exactly as they do today —
@@ -435,6 +451,445 @@ async function shopSendOk(vehicleId,driverId,what){
   if(!inShop(v)) return true;
   return confirm2('Truck #'+v.truckNumber+' is in the shop','Send the '+what+' anyway?','Send anyway','btn btn-primary');
 }
+
+// ── Cameras + safety log (migration 019) ────────────────────────────────────
+// A camera lives on the truck row: rental trucks come and go, so it is set in
+// the Edit form and cleared there when the camera comes out. The safety log is
+// admin only by RLS and starts empty. Entries are added by hand, one per
+// violation, ticket, crash or coaching talk, and keep their own copy of the
+// driver name and truck number so they outlive both (DOT wants crash records
+// kept 3 years, 49 CFR 390.15).
+const CAMERA_TYPES={road:'Road-facing',dual:'Road + driver-facing'};
+const SAFETY_CATS={camera:'Camera / driving',roadside:'Roadside / law',crash:'Crash',other:'Other'};
+// [label, category, default severity, DOT-recordable crash]
+const SAFETY_TYPES=[
+  ['Following distance','camera','minor'],
+  ['Speeding','camera','major'],
+  ['Harsh braking','camera','minor'],
+  ['Phone / distracted','camera','critical'],
+  ['No seatbelt','camera','major'],
+  ['Ran stop sign / red light','camera','major'],
+  ['Roadside inspection violation','roadside','major'],
+  ['Out-of-service order','roadside','critical'],
+  ['Ticket / citation','roadside','major'],
+  ['Hours of service','roadside','major'],
+  ['Crash — DOT-recordable','crash','critical',true],
+  ['Crash / damage — not recordable','crash','major'],
+  ['Cargo damage / claim','crash','minor'],
+  ['Customer complaint','other','minor'],
+  ['Drug / alcohol','other','critical'],
+  ['Other','other','minor'],
+];
+const SAFETY_SOURCES=['Samsara camera','Roadside inspection','Police','Customer','Dispatcher','Other'];
+const SAFETY_ACTIONS=[['none','Not yet'],['coached','Coached'],['verbal','Verbal warning'],['written','Written warning'],['final','Final warning'],['suspended','Suspended'],['terminated','Let go']];
+// The warning steps, mildest first ('none' sits outside the ladder).
+const SAFETY_LADDER=['coached','verbal','written','final','suspended','terminated'];
+const SAFETY_LADDER_SHORT={coached:'Coached',verbal:'Verbal',written:'Written',final:'Final',suspended:'Suspended',terminated:'Let go'};
+const SAFETY_WATCH_SERIOUS=2;   // major-or-worse events in 12 months that put a driver "on watch"
+const SAFETY_FILE_MAX=10*1024*1024;
+let safetyFilter='all';
+let safetyForm=null;            // null, or {id: event id or null for a new one, driverId}
+let safetySeverity='minor';     // severity picked in the open form
+let vehFilter='all';            // Vehicles page: all / cam / nocam / safety
+
+function hasCamera(v){ return !!(CAMERA_AVAILABLE&&v&&v.cameraType); }
+function cameraTitle(v){
+  return (v.cameraProvider||'Camera')+' camera, '+(CAMERA_TYPES[v.cameraType]||'').toLowerCase()
+    +(v.cameraOn?', installed '+safetyDate(v.cameraOn):'');
+}
+// "Nov 18", with the year when it isn't this year. Built from the date parts:
+// new Date('2026-11-18') is UTC midnight, which prints as Nov 17 here.
+function safetyDate(iso){
+  if(!iso) return '—';
+  const p=String(iso).split('-'), d=new Date(+p[0],+p[1]-1,+p[2]);
+  const o={month:'short',day:'numeric'};
+  if(d.getFullYear()!==new Date().getFullYear()) o.year='numeric';
+  return d.toLocaleDateString('en-US',o);
+}
+function safetyDaysAgo(n){ const d=new Date(); d.setDate(d.getDate()-n); return d.toLocaleDateString('en-CA'); }
+function safetyTypeInfo(label){ return SAFETY_TYPES.find(t=>t[0]===label)||null; }
+function safetyActionLabel(k){ const a=SAFETY_ACTIONS.find(x=>x[0]===k); return a?a[1]:'Not yet'; }
+// One driver's record: the last 12 months decide how many serious events he
+// has, which warning step he is on (the most serious action taken) and what
+// the next step would be. FleetGuard only suggests; the owner decides.
+function driverSafety(driverId){
+  const since=safetyDaysAgo(365);
+  const all=SAFETY_EVENTS.filter(e=>e.driver_id===driverId)
+    .sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date)));
+  const year=all.filter(e=>e.event_date>=since);
+  const serious=year.filter(e=>e.severity!=='minor').length;
+  const step=year.reduce((m,e)=>Math.max(m,SAFETY_LADDER.indexOf(e.action_taken)),-1);
+  return {all,year,serious,step,
+    open:all.filter(e=>e.status==='open'),
+    next:step+1<SAFETY_LADDER.length?SAFETY_LADDER[step+1]:null,
+    onWatch:serious>=SAFETY_WATCH_SERIOUS};
+}
+function safetyFollowUpsDue(){
+  const t=localToday();
+  return SAFETY_EVENTS.filter(e=>e.status==='open'&&e.follow_up_on&&e.follow_up_on<=t)
+    .sort((a,b)=>String(a.follow_up_on).localeCompare(String(b.follow_up_on)));
+}
+const _SAFETY_IC={
+  shield:'<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>',
+  alert:'<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  camera:'<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  file:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/>',
+  play:'<path d="m16 13 5.2 3.5a.5.5 0 0 0 .8-.4V7.9a.5.5 0 0 0-.8-.4L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+  plus:'<path d="M12 5v14M5 12h14"/>',
+  history:'<path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/>',
+};
+function _ssv(d,w){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(w||'2')+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+d+'</svg>'; }
+// The green camera under a card's edit/delete icons. Only trucks that have
+// one show it; an admin clicking it lands in the Edit form's camera fields.
+function cameraBadge(v){
+  if(!hasCamera(v)) return '';
+  const t=esc(cameraTitle(v));
+  return isAdmin()
+    ?'<button class="fg-cam" type="button" title="'+t+'" aria-label="'+t+' (edit)" onclick="event.stopPropagation();editVehicleCamera(\''+v.id+'\')">'+_ssv(_SAFETY_IC.camera)+'</button>'
+    :'<span class="fg-cam" title="'+t+'" role="img" aria-label="'+t+'">'+_ssv(_SAFETY_IC.camera)+'</span>';
+}
+function editVehicleCamera(id){
+  startEditVehicle(id);
+  const el=document.getElementById('ve-camtype-'+id);
+  if(el){ el.scrollIntoView({behavior:'smooth',block:'center'}); el.focus(); }
+}
+// The small flag on a truck card: open items first, then "on watch". Admin only.
+function safetyFlag(v){
+  if(!(isAdmin()&&SAFETY_AVAILABLE&&v.assignedDriverId)) return '';
+  const s=driverSafety(v.assignedDriverId);
+  const fu=s.open.map(e=>e.follow_up_on).filter(Boolean).sort()[0];
+  const txt=s.open.length
+    ?s.open.length+' safety item'+(s.open.length===1?'':'s')+' open'+(fu?' &middot; follow up '+safetyDate(fu):'')
+    :s.onWatch?s.serious+' major in 12 months &middot; on watch':'';
+  if(!txt) return '';
+  return '<button type="button" class="fg-safety-flag'+(s.onWatch?' is-crit':'')+'" onclick="event.stopPropagation();openVehicleSafety(\''+v.id+'\')">'
+    +_ssv(_SAFETY_IC.alert,'2.2')+'<span>'+txt+'</span></button>';
+}
+function openVehicleSafety(vid){ currentVehicleTab='safety'; navigate('vehicle',vid); }
+function setVehFilter(f){ vehFilter=f; render(); }
+function setSafetyFilter(f){ safetyFilter=f; render(); }
+
+function openSafetyForm(id,driverId){
+  if(!isAdmin()) return;
+  const ev=id?SAFETY_EVENTS.find(e=>e.id===id):null;
+  safetyForm={id:ev?ev.id:null,driverId:ev?ev.driver_id:(driverId||null)};
+  safetySeverity=ev?ev.severity:'minor';
+  if(currentPage!=='safety') navigate('safety'); else render();
+  setTimeout(()=>{ const el=document.getElementById('sf-card'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },60);
+}
+function closeSafetyForm(){ safetyForm=null; render(); }
+function setSafetySeverity(s){
+  safetySeverity=s;
+  document.querySelectorAll('#sf-sev button').forEach(b=>{
+    const on=b.dataset.sev===s; b.className=on?'is-on-'+s:''; b.setAttribute('aria-pressed',on?'true':'false');
+  });
+}
+function onSafetyTypeChange(){
+  const ti=safetyTypeInfo(document.getElementById('sf-type').value);
+  if(ti) setSafetySeverity(ti[2]);
+  const box=document.getElementById('sf-crash');
+  if(box) box.style.display=ti&&ti[3]?'block':'none';
+}
+function safetyFormHTML(){
+  const ev=safetyForm.id?SAFETY_EVENTS.find(e=>e.id===safetyForm.id):null;
+  const drvId=ev?ev.driver_id:safetyForm.driverId;
+  const ti=safetyTypeInfo(ev?ev.event_type:'');
+  const crash=!!(ti&&ti[3]);
+  const opt=(val,label,sel)=>'<option value="'+esc(val)+'"'+(sel?' selected':'')+'>'+esc(label)+'</option>';
+  const truckOf=id=>{ const v=VEHICLES.find(x=>x.assignedDriverId===id); return v?' — Truck #'+v.truckNumber:''; };
+  // A saved entry whose driver has since been deleted keeps its name, read-only.
+  const driverField=(ev&&!ev.driver_id)
+    ?'<input class="v2-input" type="text" value="'+esc(ev.driver_name)+'" disabled>'
+    :'<span class="v2-select-wrap"><select class="v2-select" id="sf-driver">'
+      +'<option value="">&mdash; pick a driver &mdash;</option>'
+      +DRIVERS.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(d=>opt(d.id,d.name+truckOf(d.id),d.id===drvId)).join('')
+      +'</select></span>';
+  let typeOpts='<option value="">&mdash; pick one &mdash;</option>';
+  Object.keys(SAFETY_CATS).forEach(c=>{
+    typeOpts+='<optgroup label="'+esc(SAFETY_CATS[c])+'">'
+      +SAFETY_TYPES.filter(t=>t[1]===c).map(t=>opt(t[0],t[0],ev&&ev.event_type===t[0])).join('')+'</optgroup>';
+  });
+  const sevBtn=(s,l)=>'<button type="button" data-sev="'+s+'" class="'+(safetySeverity===s?'is-on-'+s:'')+'" aria-pressed="'+(safetySeverity===s)+'" onclick="setSafetySeverity(\''+s+'\')">'+l+'</button>';
+  return '<section class="v2-form-card v2-accent-primary fg-sf-card" id="sf-card" aria-label="Safety log entry">'
+    +'<div class="v2-form-head"><span class="v2-form-ic">'+_ssv(_SAFETY_IC.shield)+'</span>'
+    +'<h2>'+(ev?'Edit safety entry':'Log violation')+'</h2><span class="v2-form-note">Admin only</span></div>'
+    +'<div class="v2-form-body">'
+      +'<div class="v2-form-grid">'
+        +'<div class="v2-field"><label for="sf-date">Date <span class="v2-field-req">*</span></label>'
+          +'<input class="v2-input" type="date" id="sf-date" max="'+localToday()+'" value="'+esc(ev?ev.event_date:localToday())+'"></div>'
+        +'<div class="v2-field"><label for="sf-driver">Driver <span class="v2-field-req">*</span></label>'+driverField+'</div>'
+        +'<div class="v2-field"><label for="sf-type">What happened <span class="v2-field-req">*</span></label>'
+          +'<span class="v2-select-wrap"><select class="v2-select" id="sf-type" onchange="onSafetyTypeChange()">'+typeOpts+'</select></span></div>'
+        +'<div class="v2-field"><label for="sf-source">Where it came from</label><span class="v2-select-wrap"><select class="v2-select" id="sf-source">'
+          +'<option value="">&mdash;</option>'+SAFETY_SOURCES.map(s=>opt(s,s,ev&&ev.source===s)).join('')+'</select></span></div>'
+      +'</div>'
+      +'<div class="v2-field fg-sf-row"><label>Severity</label>'
+        +'<span class="fg-seg" id="sf-sev" role="group" aria-label="Severity">'+sevBtn('minor','Minor')+sevBtn('major','Major')+sevBtn('critical','Critical')+'</span></div>'
+      +'<div class="v2-field fg-sf-row"><label for="sf-desc">Details</label>'
+        +'<textarea class="v2-input" id="sf-desc" maxlength="2000" placeholder="What happened, where, what the driver said">'+esc(ev?ev.description||'':'')+'</textarea></div>'
+      +'<div class="v2-form-grid fg-sf-row">'
+        +'<div class="v2-field"><label for="sf-clip">Samsara clip link <span class="v2-shop-opt">(optional)</span></label>'
+          +'<input class="v2-input" type="url" id="sf-clip" placeholder="Paste the link from Samsara" value="'+esc(ev?ev.clip_url||'':'')+'"></div>'
+        +'<div class="v2-field"><label for="sf-file">Photo or report <span class="v2-shop-opt">(optional, 10 MB)</span></label>'
+          +'<input class="v2-input" type="file" id="sf-file" accept="image/jpeg,image/png,image/webp,application/pdf">'
+          +(ev&&ev.attachment_path?'<span class="v2-form-hint" style="margin:4px 0 0">Attached: <a href="#" onclick="openSafetyFile(\''+ev.id+'\');return false">'+esc(ev.attachment_name||'file')+'</a>. Pick a new one to replace it.</span>':'')
+        +'</div>'
+        +'<div class="v2-field"><label for="sf-action">Action taken</label><span class="v2-select-wrap"><select class="v2-select" id="sf-action">'
+          +SAFETY_ACTIONS.map(a=>opt(a[0],a[1],(ev?ev.action_taken:'none')===a[0])).join('')+'</select></span></div>'
+        +'<div class="v2-field"><label for="sf-follow">Check again on <span class="v2-shop-opt">(optional)</span></label>'
+          +'<input class="v2-input" type="date" id="sf-follow" value="'+esc(ev?ev.follow_up_on||'':'')+'"></div>'
+        +(ev?'<div class="v2-field"><label for="sf-status">Status</label><span class="v2-select-wrap"><select class="v2-select" id="sf-status">'
+          +opt('open','Open — still needs something',ev.status==='open')+opt('closed','Closed — dealt with',ev.status==='closed')+'</select></span></div>':'')
+      +'</div>'
+      +'<div class="fg-crash" id="sf-crash" style="display:'+(crash?'block':'none')+'">'
+        +'<h3>DOT accident register</h3>'
+        +'<p>DOT asks for these on every recordable crash (49 CFR 390.15). FleetGuard keeps them and the Excel export has an accident-register sheet.</p>'
+        +'<div class="v2-form-grid">'
+          +'<div class="v2-field"><label for="sf-loc">City, state <span class="v2-field-req">*</span></label><input class="v2-input" type="text" id="sf-loc" maxlength="120" placeholder="e.g. Memphis, TN" value="'+esc(ev?ev.crash_location||'':'')+'"></div>'
+          +'<div class="v2-field"><label for="sf-inj">Injuries</label><input class="v2-input" type="number" min="0" id="sf-inj" value="'+esc(ev&&ev.injuries!=null?ev.injuries:'')+'" placeholder="0"></div>'
+          +'<div class="v2-field"><label for="sf-fat">Deaths</label><input class="v2-input" type="number" min="0" id="sf-fat" value="'+esc(ev&&ev.fatalities!=null?ev.fatalities:'')+'" placeholder="0"></div>'
+          +'<div class="v2-field"><label for="sf-hazmat">Hazmat spilled?</label><span class="v2-select-wrap"><select class="v2-select" id="sf-hazmat">'
+            +opt('no','No',!(ev&&ev.hazmat_released))+opt('yes','Yes',!!(ev&&ev.hazmat_released))+'</select></span></div>'
+        +'</div></div>'
+      +'<div class="v2-shop-actions">'
+        +'<button class="v2-btn-primary" type="button" id="sf-save" onclick="doSaveSafety()">'+(ev?'Save changes':'Save to safety log')+'</button>'
+        +'<button class="v2-btn-ghost" type="button" onclick="closeSafetyForm()">Cancel</button>'
+        +(ev?'<button class="v2-btn-ghost fg-sf-del" type="button" onclick="doDeleteSafety(\''+ev.id+'\')">Delete entry</button>':'')
+      +'</div>'
+    +'</div></section>';
+}
+function _sfInt(v){ const n=parseInt(v,10); return isNaN(n)?null:Math.max(0,n); }
+// Phone photos are 3-8 MB; 1600px JPEG is plenty to read a ticket and keeps
+// the bucket small. Anything that fails to decode goes up as it is.
+async function shrinkSafetyImage(file){
+  try{
+    const bmp=await createImageBitmap(file);
+    const k=Math.min(1,1600/Math.max(bmp.width,bmp.height));
+    const cv=document.createElement('canvas'); cv.width=Math.round(bmp.width*k); cv.height=Math.round(bmp.height*k);
+    cv.getContext('2d').drawImage(bmp,0,0,cv.width,cv.height);
+    const blob=await new Promise(r=>cv.toBlob(r,'image/jpeg',0.82));
+    return blob||file;
+  }catch(e){ return file; }
+}
+async function doSaveSafety(){
+  if(!isAdmin()||!safetyForm) return;
+  const g=id=>document.getElementById(id);
+  const ev=safetyForm.id?SAFETY_EVENTS.find(e=>e.id===safetyForm.id):null;
+  const date=g('sf-date').value, type=g('sf-type').value, drvSel=g('sf-driver');
+  const driverId=drvSel?drvSel.value:(ev?ev.driver_id:null);
+  if(!date){ showToast('Pick the date','danger'); return; }
+  if(date>localToday()){ showToast('That date is in the future','danger'); return; }
+  if(drvSel&&!driverId){ showToast('Pick the driver','danger'); return; }
+  if(!type){ showToast('Pick what happened','danger'); return; }
+  const ti=safetyTypeInfo(type)||[type,'other','minor'];
+  const dot=!!ti[3];
+  const clip=g('sf-clip').value.trim();
+  if(clip&&!/^https:\/\/\S+$/i.test(clip)){ showToast('The clip link should start with https://','danger'); return; }
+  const f=g('sf-file').files[0]||null;
+  if(f&&!/^(image\/(jpeg|png|webp)|application\/pdf)$/.test(f.type)){ showToast('Attach a photo (JPG/PNG) or a PDF','danger'); return; }
+  if(f&&f.type==='application/pdf'&&f.size>SAFETY_FILE_MAX){ showToast('That PDF is over 10 MB','danger'); return; }
+  const row={event_date:date,event_type:type,category:ti[1],severity:safetySeverity,
+    source:g('sf-source').value||null,
+    description:g('sf-desc').value.trim().slice(0,2000)||null,
+    clip_url:clip||null,
+    action_taken:g('sf-action').value,
+    follow_up_on:g('sf-follow').value||null,
+    status:g('sf-status')?g('sf-status').value:'open',
+    dot_recordable:dot,
+    crash_location:dot?(g('sf-loc').value.trim().slice(0,120)||null):null,
+    injuries:dot?_sfInt(g('sf-inj').value):null,
+    fatalities:dot?_sfInt(g('sf-fat').value):null,
+    hazmat_released:dot?g('sf-hazmat').value==='yes':null,
+    updated_at:new Date().toISOString()};
+  if(dot&&!row.crash_location){ showToast('A DOT-recordable crash needs the city and state','danger'); return; }
+  if(drvSel){
+    const d=DRIVERS.find(x=>x.id===driverId);
+    row.driver_id=driverId; row.driver_name=d?d.name:'';
+    // The truck is recorded as it was on the day. Editing an entry keeps it,
+    // unless the entry is moved to a different driver.
+    if(!ev||ev.driver_id!==driverId){
+      const v=VEHICLES.find(x=>x.assignedDriverId===driverId);
+      row.vehicle_id=v?v.id:null; row.truck_number=v?v.truckNumber:null;
+    }
+  }
+  const btn=g('sf-save'); if(btn) btn.disabled=true;
+  // .select() so an insert or update that RLS quietly refuses reads as the
+  // failure it is, not a green toast over nothing saved.
+  const q=ev?sb.from('safety_events').update(row).eq('id',ev.id):sb.from('safety_events').insert(row);
+  const {data,error}=await q.select();
+  if(error||!data||!data.length){
+    console.error('safety save failed',error);
+    showToast('Not saved: '+(error?.message||'no permission'),'danger');
+    if(btn) btn.disabled=false; return;
+  }
+  let rec=data[0], fileFailed=false;
+  if(f){
+    const blob=f.type.startsWith('image/')?await shrinkSafetyImage(f):f;
+    if(blob.size>SAFETY_FILE_MAX){ fileFailed=true; }
+    else{
+      const ext=blob.type==='application/pdf'?'pdf':blob.type==='image/png'?'png':blob.type==='image/webp'?'webp':'jpg';
+      const path=rec.id+'/'+Date.now()+'.'+ext;
+      const up=await sb.storage.from('safety-files').upload(path,blob,{contentType:blob.type,upsert:false});
+      if(up.error){ console.error('safety file upload failed',up.error); fileFailed=true; }
+      else{
+        const old=rec.attachment_path;
+        const r2=await sb.from('safety_events').update({attachment_path:path,attachment_name:f.name.slice(0,120)}).eq('id',rec.id).select();
+        if(!r2.error&&r2.data&&r2.data.length){ rec=r2.data[0]; if(old) await sb.storage.from('safety-files').remove([old]); }
+        else { fileFailed=true; await sb.storage.from('safety-files').remove([path]); }
+      }
+    }
+  }
+  SAFETY_EVENTS=[rec].concat(SAFETY_EVENTS.filter(e=>e.id!==rec.id));
+  safetyForm=null;
+  showToast(fileFailed?'Saved, but the file did not attach. Open the entry to try again.':(ev?'Safety entry updated':'Saved to the safety log'),fileFailed?'danger':'success');
+  render();
+}
+async function doSafetyStatus(id,status){
+  if(!isAdmin()) return;
+  const {data,error}=await sb.from('safety_events').update({status,updated_at:new Date().toISOString()}).eq('id',id).select();
+  if(error||!data||!data.length){ showToast('Not saved: '+(error?.message||'no permission'),'danger'); return; }
+  SAFETY_EVENTS=SAFETY_EVENTS.map(e=>e.id===id?data[0]:e);
+  showToast(status==='closed'?'Marked as dealt with':'Reopened','success'); render();
+}
+async function doDeleteSafety(id){
+  if(!isAdmin()) return;
+  const ev=SAFETY_EVENTS.find(e=>e.id===id); if(!ev) return;
+  const keep=ev.dot_recordable&&ev.event_date>=safetyDaysAgo(3*365);
+  const ok=await confirm2('Delete this safety entry?',
+    (keep?'This is a DOT-recordable crash. DOT requires the accident register to be kept for 3 years. ':'')
+    +'The entry'+(ev.attachment_path?' and its attached file':'')+' will be gone for good.','Delete','btn btn-danger');
+  if(!ok) return;
+  const {data,error}=await sb.from('safety_events').delete().eq('id',id).select('id');
+  if(error||!data||!data.length){ showToast('Not deleted: '+(error?.message||'no permission'),'danger'); return; }
+  if(ev.attachment_path) await sb.storage.from('safety-files').remove([ev.attachment_path]);
+  SAFETY_EVENTS=SAFETY_EVENTS.filter(e=>e.id!==id);
+  safetyForm=null; showToast('Safety entry deleted','warning'); render();
+}
+async function openSafetyFile(id){
+  const ev=SAFETY_EVENTS.find(e=>e.id===id);
+  if(!ev||!ev.attachment_path) return;
+  // Open the tab first: a window.open after an await is a popup blockers' favourite.
+  const w=window.open('','_blank');
+  const {data,error}=await sb.storage.from('safety-files').createSignedUrl(ev.attachment_path,300);
+  if(error||!data){ if(w) w.close(); showToast('Could not open the file','danger'); return; }
+  if(w){ w.opener=null; w.location.href=data.signedUrl; } else window.location.href=data.signedUrl;
+}
+async function exportSafetyLog(){
+  if(!isAdmin()) return;
+  try{
+    if(!window.XLSX){ await loadScriptOnce('js/xlsx.min.js'); }
+    const rows=SAFETY_EVENTS.slice().sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date)));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows.map(e=>({
+      'Date':e.event_date,'Driver':e.driver_name,'Truck':e.truck_number||'','What happened':e.event_type,
+      'Severity':e.severity,'Source':e.source||'','Details':e.description||'','Action taken':safetyActionLabel(e.action_taken),
+      'Check again on':e.follow_up_on||'','Status':e.status,'Samsara clip':e.clip_url||'','File attached':e.attachment_path?'yes':''
+    })):[{'Date':'Nothing logged yet'}]),'Safety log');
+    // 49 CFR 390.15: date, location, driver, injuries, fatalities, hazmat. Kept 3 years.
+    const reg=rows.filter(e=>e.dot_recordable&&e.event_date>=safetyDaysAgo(3*365));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(reg.length?reg.map(e=>({
+      'Date':e.event_date,'City, state':e.crash_location||'','Driver':e.driver_name,'Truck':e.truck_number||'',
+      'Injuries':e.injuries??0,'Fatalities':e.fatalities??0,'Hazmat released':e.hazmat_released?'Yes':'No','Notes':e.description||''
+    })):[{'Date':'No DOT-recordable crashes in the last 3 years'}]),'Accident register');
+    XLSX.writeFile(wb,'vgn-safety-log-'+localToday()+'.xlsx');
+  }catch(e){ console.error('safety export failed',e); showToast('Export failed','danger'); }
+}
+function renderSafetyLog(){
+  let html='<div class="v2-region">'
+    +'<div class="v2-page-head"><h1>Safety log</h1>'
+    +'<p>Violations, tickets, crashes and coaching talks, one line each. Only admins can see this page.</p></div>';
+  if(!SAFETY_AVAILABLE){
+    return html+'<div class="v2-form-card"><div class="v2-form-body" style="color:var(--v2-ink-3)">The safety log is not set up in the database yet.</div></div></div>';
+  }
+  const ev=SAFETY_EVENTS;
+  const open=ev.filter(e=>e.status==='open');
+  const serious90=ev.filter(e=>e.severity!=='minor'&&e.event_date>=safetyDaysAgo(90)).length;
+  const crashes12=ev.filter(e=>e.dot_recordable&&e.event_date>=safetyDaysAgo(365)).length;
+  const watch=[...new Set(ev.map(e=>e.driver_id).filter(Boolean))].filter(id=>driverSafety(id).onWatch).length;
+  const tile=(acc,n,l)=>'<div class="v2-pulse-stat '+acc+'"><span class="v2-pulse-num">'+n+'</span><span class="v2-pulse-label">'+l+'</span></div>';
+  html+='<div class="fg-sf-tiles">'
+    +tile(open.length?'v2-accent-amber':'v2-accent-green',open.length,'Open &mdash; need follow-up')
+    +tile(serious90?'v2-accent-red':'v2-accent-green',serious90,'Major or worse, last 90 days')
+    +tile(crashes12?'v2-accent-red':'v2-accent-green',crashes12,'DOT-recordable crashes, 12 months')
+    +tile(watch?'v2-accent-amber':'v2-accent-green',watch,'Drivers on watch')
+    +'</div>';
+  const F={all:['All',ev.length,'v2-accent-cyan'],open:['Open',open.length,'v2-accent-amber'],
+    camera:['Camera / driving',ev.filter(e=>e.category==='camera').length,'v2-accent-blue'],
+    roadside:['Roadside / law',ev.filter(e=>e.category==='roadside').length,'v2-accent-blue'],
+    crash:['Crashes',ev.filter(e=>e.category==='crash').length,'v2-accent-red']};
+  html+='<div class="fg-strip">'
+    +Object.keys(F).map(k=>'<button type="button" class="v2-chip '+F[k][2]+(safetyFilter===k?' is-on':'')+'" aria-pressed="'+(safetyFilter===k)+'" onclick="setSafetyFilter(\''+k+'\')">'+F[k][0]+' '+F[k][1]+'</button>').join('')
+    +'<span class="fg-strip-gap"></span>'
+    +(safetyForm?'':'<button class="v2-btn-primary" type="button" onclick="openSafetyForm()">'+_ssv(_SAFETY_IC.plus)+'Log violation</button>')
+    +(ev.length?'<button class="v2-btn-ghost" type="button" onclick="exportSafetyLog()">Export to Excel</button>':'')
+    +'</div>';
+  if(safetyForm) html+=safetyFormHTML();
+  const rows=ev.filter(e=>safetyFilter==='all'||(safetyFilter==='open'?e.status==='open':e.category===safetyFilter))
+    .slice().sort((a,b)=>String(b.event_date).localeCompare(String(a.event_date))||String(b.created_at).localeCompare(String(a.created_at)));
+  const sev={minor:['minor','Minor'],major:['major','Major'],critical:['crit','Critical']};
+  html+='<section class="v2-table-card" aria-label="Safety log entries"><div class="v2-table-wrap"><table class="v2-table fg-sf-table"><thead><tr>'
+    +'<th>Date</th><th>Driver &middot; truck</th><th>What happened</th><th>Severity</th><th>Source</th><th>Action taken</th><th>Status</th>'
+    +'</tr></thead><tbody>';
+  if(rows.length===0){
+    html+='<tr><td colspan="7" class="fg-sf-empty">'+(ev.length?'Nothing matches this filter.':'Nothing logged yet. Use &ldquo;Log violation&rdquo; when something happens.')+'</td></tr>';
+  }
+  const t=localToday();
+  rows.forEach(e=>{
+    const sv=e.category==='crash'&&e.severity!=='critical'?['crash','Crash']:sev[e.severity]||sev.minor;
+    const due=e.status==='open'&&e.follow_up_on&&e.follow_up_on<=t;
+    const links=(e.clip_url?'<a href="'+esc(e.clip_url)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">'+_ssv(_SAFETY_IC.play)+'Clip</a>':'')
+      +(e.attachment_path?'<a href="#" onclick="event.stopPropagation();openSafetyFile(\''+e.id+'\');return false">'+_ssv(_SAFETY_IC.file)+esc(e.attachment_name||'File')+'</a>':'');
+    html+='<tr class="fg-sf-tr" tabindex="0" onclick="openSafetyForm(\''+e.id+'\')" onkeydown="if(event.key===\'Enter\')openSafetyForm(\''+e.id+'\')">'
+      +'<td class="v2-td-when">'+safetyDate(e.event_date)+'</td>'
+      +'<td class="v2-td-driver">'+esc(e.driver_name)+(e.truck_number?'<small>#'+esc(e.truck_number)+'</small>':'')+'</td>'
+      +'<td><span class="fg-what">'+esc(e.event_type)+(e.dot_recordable?' <span class="fg-reg">Accident register</span>':'')
+        +(e.description?'<small>'+esc(e.description)+'</small>':'')+(links?'<span class="fg-links">'+links+'</span>':'')+'</span></td>'
+      +'<td><span class="fg-sev '+sv[0]+'">'+sv[1]+'</span></td>'
+      +'<td class="fg-src">'+esc(e.source||'—')+'</td>'
+      +'<td>'+esc(safetyActionLabel(e.action_taken))+'</td>'
+      +'<td>'+(e.status==='open'
+        ?'<span class="fg-st open'+(due?' is-due':'')+'">Open'+(e.follow_up_on?' &middot; '+(due?'check now':'check '+safetyDate(e.follow_up_on)):'')+'</span>'
+          +'<button class="v2-btn-ghost fg-st-btn" type="button" onclick="event.stopPropagation();doSafetyStatus(\''+e.id+'\',\'closed\')">Close</button>'
+        :'<span class="fg-st closed">Closed</span>')+'</td>'
+      +'</tr>';
+  });
+  html+='</tbody></table></div></section></div>';
+  return html;
+}
+// The Safety tab on a truck page: the driver's warning step and history.
+function vehicleSafetyHTML(v){
+  const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
+  if(!driver) return '<div class="v2-form-card"><div class="v2-form-body" style="color:var(--v2-ink-3)">No driver on this truck, so there is no safety record to show.</div></div>';
+  const s=driverSafety(driver.id);
+  const ladder=SAFETY_LADDER.map((k,i)=>'<span class="'+(i<s.step?'done':i===s.step?'now':k===s.next&&s.step>=0?'next':'')+'">'+SAFETY_LADDER_SHORT[k]+'</span>').join('');
+  const where=s.step<0
+    ?'No warnings in the last 12 months.'
+    :'On <b>'+esc(safetyActionLabel(SAFETY_LADDER[s.step]).toLowerCase())+'</b>'+(s.next?'. Next step if it happens again: <b>'+esc(safetyActionLabel(s.next).toLowerCase())+'</b>.':'.');
+  let html='<div class="fg-sf-two">'
+    +'<article class="v2-panel '+(s.onWatch?'v2-accent-red':s.step>=0?'v2-accent-amber':'v2-accent-green')+'">'
+      +'<div class="v2-panel-head"><span class="v2-panel-ic">'+_ssv(_SAFETY_IC.shield)+'</span><h2>'+esc(driver.name)+'</h2>'
+      +'<span class="v2-panel-count">'+s.year.length+' in 12 mo</span></div>'
+      +'<div class="v2-panel-body">'
+        +'<p class="fg-note">Warning steps, last 12 months'+(s.onWatch?' &middot; <b class="fg-watch">on watch: '+s.serious+' major or worse</b>':'')+'</p>'
+        +'<div class="fg-ladder">'+ladder+'</div>'
+        +'<p class="fg-note">'+where+' You decide; FleetGuard only suggests.</p>'
+        +'<div class="v2-shop-actions"><button class="v2-btn-primary" type="button" onclick="openSafetyForm(null,\''+driver.id+'\')">'+_ssv(_SAFETY_IC.plus)+'Log violation</button></div>'
+      +'</div></article>'
+    +'<article class="v2-panel v2-accent-blue">'
+      +'<div class="v2-panel-head"><span class="v2-panel-ic">'+_ssv(_SAFETY_IC.history)+'</span><h2>History</h2><span class="v2-panel-count">'+s.all.length+'</span></div>'
+      +'<div class="v2-panel-body">';
+  if(!s.all.length) html+='<p class="fg-note">Nothing logged for '+esc(driver.name)+'.</p>';
+  else html+='<div class="v2-timeline">'+s.all.map(e=>{
+      const acc=e.severity==='critical'||e.category==='crash'?'v2-accent-red':e.severity==='major'?'v2-accent-amber':'v2-accent-blue';
+      return '<a class="v2-tl-row '+acc+' fg-tl-link" href="#" onclick="openSafetyForm(\''+e.id+'\');return false"><span class="v2-tl-dot"></span>'
+        +'<span class="v2-tl-label">'+esc(e.event_type)+' &middot; '+esc(e.severity)+' &middot; '+esc(safetyActionLabel(e.action_taken).toLowerCase())
+        +(e.status==='open'?' &middot; <b>open</b>':'')+'</span>'
+        +'<span class="v2-tl-date">'+safetyDate(e.event_date)+'</span></a>';
+    }).join('')+'</div>';
+  html+='</div></article></div>';
+  return html;
+}
+
 async function addMaintenance(vehicleId,serviceDate,notes) {
   const next=new Date(serviceDate); next.setDate(next.getDate()+60);
   const rec={id:crypto.randomUUID(),vehicleId,serviceDate,nextInspectionDate:next.toISOString().split('T')[0],notes:notes||null};
@@ -939,7 +1394,7 @@ function closeInspectionModal(){ const m=document.getElementById('insp-modal'); 
 let currentPage='dashboard',currentVehicleId=null,currentVehicleTab='maintenance';
 let currentDispatcherFilter=null;
 let calendarMonth=new Date(); calendarMonth.setDate(1);
-const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides',leads:'Driver Leads'};
+const PAGE_TITLES={dashboard:'Dashboard',vehicles:'Vehicles',drivers:'Drivers',calendar:'Calendar',reports:'Reports',inspections:'Pre-Trip Inspections',portal:'Driver Portal',vehicle:'Vehicle Detail',users:'User Management','dispatcher-board':'Dispatch Board',reminders:'Reminders',guides:'Guides',leads:'Driver Leads',safety:'Safety Log'};
 
 // ── Navigation state persistence ──
 // Remember where the user was so a manual refresh doesn't dump them back on the
@@ -983,8 +1438,10 @@ function navigate(page,vehicleId){
   // Dispatchers may only see Dashboard, Calendar, Reports, Dispatch Board
   if((page==='vehicles'||page==='drivers')&&!isAdmin()) return;
   if(page==='leads'&&!isAdmin()) return;
+  if(page==='safety'&&!isAdmin()) return;
   if(page!=='dispatcher-board') currentDispatcherFilter=null;
   shopFormFor=null;   // a half-filled in-shop form doesn't follow you to the next page
+  if(page!=='safety') safetyForm=null;
   currentPage=page; currentVehicleId=vehicleId||null;
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   const navEl=document.getElementById('nav-'+page);
@@ -1000,7 +1457,9 @@ function render(){
   // Dispatchers may not open Vehicles list or Drivers — redirect
   if(!isAdmin()&&(currentPage==='vehicles'||currentPage==='drivers')) currentPage='dashboard';
   if(currentPage==='leads'&&!isAdmin()) currentPage='dashboard';
+  if(currentPage==='safety'&&!isAdmin()) currentPage='dashboard';
   if(currentPage==='dashboard') c.innerHTML=renderDashboard();
+  else if(currentPage==='safety') c.innerHTML=renderSafetyLog();
   else if(currentPage==='vehicles') c.innerHTML=renderVehicles();
   else if(currentPage==='vehicle') c.innerHTML=renderVehicleDetail();
   else if(currentPage==='drivers') c.innerHTML=renderDrivers();
@@ -1035,6 +1494,8 @@ function render(){
   if(driversNav) driversNav.style.display=isAdmin()?'flex':'none';
   const leadsNav=document.getElementById('nav-leads');
   if(leadsNav) leadsNav.style.display=isAdmin()?'flex':'none';   // Driver Leads: admin only (Ray uses leads.html)
+  const safetyNav=document.getElementById('nav-safety');
+  if(safetyNav) safetyNav.style.display=isAdmin()?'flex':'none'; // Safety Log: admin only (RLS agrees)
   saveNavState();
 }
 
@@ -1752,6 +2213,23 @@ function renderDashboard(){
   // In the shop first: it is the one list the office has to remember on its
   // own, since nothing texts anybody about these trucks. A row turns amber once
   // the expected-back date passes, or after SHOP_NODATE_WARN_DAYS without one.
+  // Safety log entries whose "check again on" date has come. Admin only, like
+  // the log. Each stays here until it is closed.
+  const _sfDue=isAdmin()&&SAFETY_AVAILABLE?safetyFollowUpsDue():[];
+  if(_sfDue.length>0){
+    const _t=localToday();
+    html+='<div class="v2-banner v2-accent-amber"><span class="v2-banner-ic">'+_ssv(_SAFETY_IC.shield,'1.8')+'</span>'
+      +'<div class="v2-banner-body"><div class="v2-banner-title">Safety follow-up due</div>'
+      +'<div class="v2-banner-sub">The &ldquo;check again&rdquo; date has come. Close each one once it&rsquo;s dealt with.</div><div class="v2-banner-rows">'
+      +_sfDue.map(e=>'<div class="v2-banner-row fg-sf-due" onclick="openSafetyForm(\''+e.id+'\')">'
+        +'<a class="v2-banner-truck" href="#" onclick="event.stopPropagation();openSafetyForm(\''+e.id+'\');return false">'+esc(e.driver_name)+'</a>'
+        +'<span class="v2-banner-meta">'+esc(e.event_type)+(e.truck_number?' &nbsp;&middot;&nbsp; Truck #'+esc(e.truck_number):'')
+          +' &nbsp;&middot;&nbsp; '+esc(safetyActionLabel(e.action_taken))+'</span>'
+        +'<span class="v2-badge'+(e.follow_up_on<_t?' is-solid':'')+'">'+(e.follow_up_on===_t?'Today':'Since '+safetyDate(e.follow_up_on))+'</span>'
+        +'<button class="v2-btn-ghost" type="button" onclick="event.stopPropagation();doSafetyStatus(\''+e.id+'\',\'closed\')">Close</button>'
+        +'</div>').join('')
+      +'</div></div></div>';
+  }
   if(shopTrucks.length>0){
     html+='<div class="v2-banner v2-accent-blue"><span class="v2-banner-ic">'+_sv(_I.wrench,'1.8')+'</span>'
       +'<div class="v2-banner-body"><div class="v2-banner-title">In the shop &mdash; off the road</div>'
@@ -1915,12 +2393,32 @@ function renderVehicles(){
       +'<h2>View only</h2><span class="v2-form-note">Contact an admin to make changes</span></div></div>';
   }
 
+  // Camera count and filter. Shown once migration 019 is in; the safety chip
+  // only for admins, since the safety log is theirs alone.
+  const _camN=VEHICLES.filter(hasCamera).length;
+  const _safetyIds=new Set(isAdmin()&&SAFETY_AVAILABLE
+    ?VEHICLES.filter(v=>v.assignedDriverId&&(()=>{const s=driverSafety(v.assignedDriverId);return s.open.length||s.onWatch;})()).map(v=>v.id):[]);
+  if(CAMERA_AVAILABLE&&VEHICLES.length){
+    const chip=(k,label,acc)=>'<button type="button" class="v2-chip '+acc+(vehFilter===k?' is-on':'')+'" aria-pressed="'+(vehFilter===k)+'" onclick="setVehFilter(\''+k+'\')">'+label+'</button>';
+    html+='<div class="fg-strip">'
+      +'<span class="fg-strip-label">'+_ssv(_SAFETY_IC.camera)+'<b>'+_camN+' of '+VEHICLES.length+'</b>&nbsp;trucks have a camera</span>'
+      +chip('all','All '+VEHICLES.length,'v2-accent-cyan')
+      +chip('cam','With camera '+_camN,'v2-accent-green')
+      +chip('nocam','No camera '+(VEHICLES.length-_camN),'v2-accent-amber')
+      +(_safetyIds.size||vehFilter==='safety'?chip('safety','Safety follow-up '+_safetyIds.size,'v2-accent-red'):'')
+      +'</div>';
+  }
+  const _vehShown=VEHICLES.filter(v=>vehFilter==='cam'?hasCamera(v):vehFilter==='nocam'?!hasCamera(v):vehFilter==='safety'?_safetyIds.has(v.id):true);
+
   html+='<div class="v2-fleet-grid">';
   if(VEHICLES.length===0){
     html+='<div class="v2-form-card" style="grid-column:1/-1"><div class="v2-form-body" style="color:var(--v2-ink-3)">'
       +'No vehicles yet'+(isAdmin()?' &mdash; add one above.':'.')+'</div></div>';
+  } else if(_vehShown.length===0){
+    html+='<div class="v2-form-card" style="grid-column:1/-1"><div class="v2-form-body" style="color:var(--v2-ink-3)">'
+      +'No trucks match this filter. <a href="#" onclick="setVehFilter(\'all\');return false">Show all</a></div></div>';
   }
-  VEHICLES.forEach(v=>{
+  _vehShown.forEach(v=>{
     const driver=DRIVERS.find(d=>d.id===v.assignedDriverId);
     const s=getVehicleStatus(v.id);
     // In the shop overrides the roll-up: the checks keep their colours but are
@@ -1939,9 +2437,14 @@ function renderVehicles(){
             +'<span class="v2-veh-trailer">Trailer #'+esc(v.trailerNumber)+'</span>'
           +'</span>'
           +'<span class="v2-veh-status '+statusTone+'">'+statusText+'</span>'
-          +(isAdmin()?'<span style="display:flex;gap:var(--v2-s1);flex-shrink:0">'
-            +'<button class="v2-icon-btn" type="button" title="Edit" aria-label="Edit vehicle" onclick="startEditVehicle(\''+v.id+'\')">'+_sv(_IC.pencil,'1.8')+'</button>'
-            +'<button class="v2-icon-btn" type="button" title="Delete" aria-label="Delete vehicle" onclick="event.stopPropagation();doDeleteVehicle(\''+v.id+'\',\''+esc(v.truckNumber)+'\')">'+_sv(_IC.trash,'1.8')+'</button>'
+          // Edit / delete for admins, and under them the green camera on trucks
+          // that have one. A truck without a camera shows nothing there.
+          +((isAdmin()||hasCamera(v))?'<span class="fg-veh-tools">'
+            +(isAdmin()?'<span class="fg-veh-tools-row">'
+              +'<button class="v2-icon-btn" type="button" title="Edit" aria-label="Edit vehicle" onclick="startEditVehicle(\''+v.id+'\')">'+_sv(_IC.pencil,'1.8')+'</button>'
+              +'<button class="v2-icon-btn" type="button" title="Delete" aria-label="Delete vehicle" onclick="event.stopPropagation();doDeleteVehicle(\''+v.id+'\',\''+esc(v.truckNumber)+'\')">'+_sv(_IC.trash,'1.8')+'</button>'
+              +'</span>':'')
+            +cameraBadge(v)
             +'</span>':'')
         +'</div>'
         +((driver||v.assignedDispatcher)?'<div class="v2-veh-people">'
@@ -1956,6 +2459,7 @@ function renderVehicles(){
           +_annual(s)
           +(s.openDefect?'<span class="v2-pill '+(s.defectCritical?'is-crit':'is-warn')+'">'+(s.defectCritical?'DEFECT':'Minor')+' unrepaired</span>':'')
         +'</div>'
+        +safetyFlag(v)
       +'</div>'
       // ── edit mode (toggled by startEditVehicle / cancelEditVehicle) ──
       +'<div id="vedit-'+v.id+'" style="display:none">'
@@ -1973,6 +2477,17 @@ function renderVehicles(){
           +'<input class="v2-input" type="text" id="ve-dispatcher-'+v.id+'" value="'+esc(v.assignedDispatcher||'')+'"></div>'
           +(ANNUAL_AVAILABLE?'<div class="v2-field"><label for="ve-annual-'+v.id+'">Annual DOT expiry</label>'
             +'<input class="v2-input" type="date" id="ve-annual-'+v.id+'" value="'+esc(v.annualExpiry||'')+'"></div>':'')
+          // Camera: set when one goes in, back to "No camera" when the rental
+          // truck goes back or the camera is moved.
+          +(CAMERA_AVAILABLE?'<div class="v2-field"><label for="ve-camtype-'+v.id+'">Camera</label><span class="v2-select-wrap">'
+            +'<select class="v2-select" id="ve-camtype-'+v.id+'">'
+            +'<option value="">No camera</option>'
+            +Object.keys(CAMERA_TYPES).map(k=>'<option value="'+k+'"'+(v.cameraType===k?' selected':'')+'>'+CAMERA_TYPES[k]+'</option>').join('')
+            +'</select>'+_sv('<path d="m6 9 6 6 6-6"/>','1.8')+'</span></div>'
+            +'<div class="v2-field"><label for="ve-camon-'+v.id+'">Camera installed on</label>'
+            +'<input class="v2-input" type="date" id="ve-camon-'+v.id+'" max="'+localToday()+'" value="'+esc(v.cameraOn||'')+'"></div>'
+            +'<div class="v2-field"><label for="ve-camserial-'+v.id+'">Camera serial <span class="v2-shop-opt">(optional)</span></label>'
+            +'<input class="v2-input" type="text" id="ve-camserial-'+v.id+'" maxlength="60" value="'+esc(v.cameraSerial||'')+'"></div>':'')
         +'</div>'
         +'<div style="display:flex;gap:var(--v2-s2)">'
           +'<button class="v2-btn-primary" type="button" onclick="doSaveVehicle(\''+v.id+'\')">Save</button>'
@@ -2048,16 +2563,34 @@ async function doSaveVehicle(id){
   await updateVehicle(id,truck,trailer,driver||null,dispatcher||'');
   // Written separately so the core vehicle save still works if migration 012
   // has not been applied — the input only exists when the column does.
+  // A partial failure keeps its own red toast: the green one used to follow
+  // straight after and cover it.
+  let partial=false;
   if(ANNUAL_AVAILABLE){
     const el=document.getElementById('ve-annual-'+id);
     if(el){
       const val=el.value||null;
       const {error}=await sb.from('vehicles').update({annual_inspection_expiry:val}).eq('id',id);
-      if(error){ console.error('annual expiry save failed',error); showToast('Vehicle saved, but the annual expiry did not','danger'); }
+      if(error){ console.error('annual expiry save failed',error); showToast('Vehicle saved, but the annual expiry did not','danger'); partial=true; }
       else { const veh=VEHICLES.find(x=>x.id===id); if(veh) veh.annualExpiry=val; }
     }
   }
-  showToast('Vehicle updated!','success'); render();
+  if(CAMERA_AVAILABLE){
+    const te=document.getElementById('ve-camtype-'+id);
+    if(te){
+      const veh=VEHICLES.find(x=>x.id===id);
+      const type=te.value||null;
+      // No date given = it went in today. Clearing the type clears the rest.
+      const on=type?(document.getElementById('ve-camon-'+id).value||localToday()):null;
+      const serial=type?(document.getElementById('ve-camserial-'+id).value.trim().slice(0,60)||null):null;
+      const provider=type?((veh&&veh.cameraProvider)||'Samsara'):null;
+      const {data,error}=await sb.from('vehicles').update({camera_type:type,camera_installed_on:on,camera_provider:provider,camera_serial:serial}).eq('id',id).select('id');
+      if(error||!data||!data.length){ console.error('camera save failed',error); showToast('Vehicle saved, but the camera did not','danger'); partial=true; }
+      else if(veh){ veh.cameraType=type; veh.cameraOn=on; veh.cameraProvider=provider||''; veh.cameraSerial=serial||''; }
+    }
+  }
+  if(!partial) showToast('Vehicle updated!','success');
+  render();
 }
 async function doDeleteVehicle(id,num){
   if(!isAdmin()) return;
@@ -2654,6 +3187,10 @@ function renderVehicleDetail(){
   const svcs=SERVICE_RECORDS.filter(r=>r.vehicleId===v.id).sort((a,b)=>b.serviceDate.localeCompare(a.serviceDate));
 
   const tabs=[['maintenance','Service',_IC.wrench],['brakes','Brakes',_IC.brake],['tyres','Tyres',_IC.tyre],['dot','DOT',_IC.clip],['pti','PTI',_IC.truck]];
+  // Safety: the driver's warning steps and history. Admin only, like the log.
+  const _safetyTab=isAdmin()&&SAFETY_AVAILABLE;
+  if(_safetyTab) tabs.push(['safety','Safety',_SAFETY_IC.shield]);
+  else if(currentVehicleTab==='safety') currentVehicleTab='maintenance';
   const tone=s.critical?'is-crit':s.warning?'is-warn':'is-ok';
   const label=s.critical?'Critical':s.warning?'Warning':'Roadworthy';
   const _ini=n=>String(n||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
@@ -2681,6 +3218,7 @@ function renderVehicleDetail(){
         +(driver?' &middot; '+esc(driver.name):'')
         +(v.assignedDispatcher?' &middot; '+esc(v.assignedDispatcher):'')+'</span></span>'
     +'</span>'
+    +(hasCamera(v)?'<span class="fg-cam-chip" title="'+esc(cameraTitle(v))+'">'+_ssv(_SAFETY_IC.camera)+'Camera</span>':'')
     +(inShop(v)
       ?'<span class="v2-chip-status is-shop" style="margin-left:auto">In shop</span>'
       :'<span class="v2-chip-status '+(s.critical?'is-defect':s.warning?'is-minor':'is-pass')+'" style="margin-left:auto">'+label+'</span>'
@@ -2737,6 +3275,8 @@ function renderVehicleDetail(){
       +' onclick="setVTab(\''+t[0]+'\')">'+_sv(t[2],'1.8')+t[1]+'</button>';
   });
   html+='</nav>';
+
+  if(currentVehicleTab==='safety'&&_safetyTab) html+=vehicleSafetyHTML(v);
 
   // ── Service ───────────────────────────────────────────────────────────────
   if(currentVehicleTab==='maintenance'){
@@ -3854,6 +4394,9 @@ let _refreshing=false,_lastRefresh=0;
 function isUserBusy(){
   const ae=document.activeElement;
   if(ae&&/^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) return true;
+  // An open form counts too, even with focus on one of its buttons: a refresh
+  // re-renders the page and would wipe whatever has been typed into it.
+  if(safetyForm||shopFormFor) return true;
   for(const m of document.querySelectorAll('.modal-overlay')){
     if(getComputedStyle(m).display!=='none') return true;
   }

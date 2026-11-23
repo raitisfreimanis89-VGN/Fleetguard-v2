@@ -50,6 +50,7 @@
   <link rel="stylesheet" href="v2/css/v2-reminders.css?v=20260923b"/>
   <link rel="stylesheet" href="v2/css/v2-hero.css?v=20260923b"/>
   <link rel="stylesheet" href="v2/css/v2-cards.css?v=20260923b"/>
+  <link rel="stylesheet" href="v2/css/v2-safety.css?v=20261123a"/>
 </head>
 <body>
 
@@ -133,6 +134,10 @@
       <button class="nav-item v2-nav-item" onclick="navigate('inspections')" id="nav-inspections">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2h-2"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 13 2 2 4-4"/></svg>
         Pre-Trip Inspections
+      </button>
+      <button class="nav-item v2-nav-item" onclick="navigate('safety')" id="nav-safety" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        Safety Log
       </button>
       <!-- Was an anchor to guides.html with target="_blank". The Guides INDEX
            renders in-app now, so this is a route like every other nav item and
@@ -256,7 +261,7 @@
 </script>
 
 <link rel="stylesheet" href="css/reminders.css"/>
-<script src="js/app.js?v=20261103a"></script>
+<script src="js/app.js?v=20261123a"></script>
 <script src="js/reminders.js?v=20261103a"></script>
 </body>
 </html>

@@ -1,0 +1,121 @@
+/* ================================================================
+   Cameras on trucks + the safety log (migration 019)
+   Vehicles card camera, filter strip, Safety log page, the Log violation
+   form, and the Safety tab on a truck page. Builds on v2-tokens + the
+   card/table/banner components already in v2-dash / v2-inspections.
+   ================================================================ */
+
+/* ── Vehicles card: edit/delete with the camera under them ── */
+.fg-veh-tools { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.fg-veh-tools-row { display: flex; gap: var(--v2-s1); }
+.fg-cam {
+  display: grid; place-items: center;
+  width: 32px; height: 26px; padding: 0;
+  border-radius: var(--v2-r-md);
+  background: var(--v2-green-soft); border: 1px solid var(--v2-green-ring); color: var(--v2-green-hi);
+}
+button.fg-cam { cursor: pointer; }
+button.fg-cam:hover { background: var(--v2-green); color: var(--v2-ink-on-accent); }
+.fg-cam svg { width: 16px; height: 16px; }
+.fg-cam-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: var(--v2-r-pill);
+  background: var(--v2-green-soft); border: 1px solid var(--v2-green-ring); color: var(--v2-green-hi);
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold); white-space: nowrap;
+}
+.fg-cam-chip svg { width: 14px; height: 14px; }
+
+/* The safety flag under a card's pills (admin only) */
+.fg-safety-flag {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; justify-self: start;
+  margin-top: var(--v2-s3); padding: 3px 10px;
+  border-radius: var(--v2-r-pill); cursor: pointer; font: inherit;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold); text-align: left;
+  background: var(--v2-amber-soft); border: 1px solid var(--v2-amber-ring); color: var(--v2-amber-hi);
+}
+.fg-safety-flag.is-crit { background: var(--v2-red-soft); border-color: var(--v2-red-ring); color: var(--v2-red-hi); }
+.fg-safety-flag svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ── Filter strip (Vehicles + Safety log) ── */
+.fg-strip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--v2-s3); margin: 0 0 var(--v2-s5); }
+.fg-strip .v2-chip { cursor: pointer; font-family: inherit; }
+.fg-strip .v2-chip.is-on { background: var(--tc-soft); box-shadow: inset 0 0 0 1px var(--tc-hi); }
+.fg-strip-label { display: inline-flex; align-items: center; gap: 6px; font-size: var(--v2-fs-sm); color: var(--v2-ink-2); }
+.fg-strip-label svg { width: 16px; height: 16px; color: var(--v2-green-hi); }
+.fg-strip-gap { flex: 1; }
+
+/* ── Safety log page ── */
+.fg-sf-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--v2-s4); margin-bottom: var(--v2-s5); }
+.fg-sf-table td { vertical-align: top; }
+.fg-sf-tr { cursor: pointer; }
+.fg-sf-tr:hover td, .fg-sf-tr:focus-visible td { background: var(--v2-surface-2); }
+.fg-sf-tr:focus-visible { outline: 2px solid var(--v2-primary-ring); outline-offset: -2px; }
+.fg-sf-table .v2-td-driver small { display: block; color: var(--v2-ink-3); font-size: var(--v2-fs-xs); }
+.fg-sf-empty { padding: var(--v2-s8) !important; text-align: center; color: var(--v2-ink-3); }
+.fg-what { display: block; color: var(--v2-ink); font-weight: var(--v2-fw-semibold); min-width: 240px; max-width: 420px; }
+.fg-what small { display: block; margin-top: 2px; color: var(--v2-ink-3); font-weight: var(--v2-fw-regular); font-size: var(--v2-fs-xs); white-space: pre-line; }
+.fg-links { display: flex; flex-wrap: wrap; gap: var(--v2-s3); margin-top: 4px; font-weight: var(--v2-fw-regular); font-size: var(--v2-fs-xs); }
+.fg-links a { display: inline-flex; align-items: center; gap: 4px; color: var(--v2-blue-hi); }
+.fg-links svg { width: 13px; height: 13px; }
+.fg-reg {
+  display: inline-block; margin-left: 4px; padding: 0 6px; border-radius: var(--v2-r-pill);
+  font-size: 10px; letter-spacing: .04em; text-transform: uppercase; vertical-align: 1px;
+  border: 1px solid var(--v2-red-ring); color: var(--v2-red-hi);
+}
+.fg-sev {
+  display: inline-block; padding: 2px 9px; border-radius: var(--v2-r-pill); white-space: nowrap;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+}
+.fg-sev.minor { background: var(--v2-blue-soft);  color: var(--v2-blue-hi);  border: 1px solid var(--v2-blue-ring); }
+.fg-sev.major { background: var(--v2-amber-soft); color: var(--v2-amber-hi); border: 1px solid var(--v2-amber-ring); }
+.fg-sev.crash { background: var(--v2-red-soft);   color: var(--v2-red-hi);   border: 1px solid var(--v2-red-ring); }
+/* Dark ink on red, not white: white on the red fails AA (same call as .v2-badge.is-solid). */
+.fg-sev.crit  { background: var(--v2-red); color: var(--v2-ink-on-accent); border: 1px solid var(--v2-red); }
+.fg-src { color: var(--v2-ink-2); white-space: nowrap; }
+.fg-st { display: block; font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold); white-space: nowrap; }
+.fg-st.open { color: var(--v2-amber-hi); }
+.fg-st.open.is-due { color: var(--v2-red-hi); }
+.fg-st.closed { color: var(--v2-ink-3); }
+.fg-st-btn { margin-top: 6px; padding: 2px 10px !important; font-size: var(--v2-fs-xs) !important; }
+
+/* ── Log violation form ── */
+.fg-sf-card { margin-bottom: var(--v2-s6); max-width: 980px; }
+.fg-sf-row { margin-top: var(--v2-s4); }
+.fg-sf-card textarea.v2-input { min-height: 78px; resize: vertical; font: inherit; }
+.fg-sf-card input[type=file].v2-input { padding: 7px 10px; }
+.fg-seg { display: inline-flex; align-self: flex-start; border: 1px solid var(--v2-line-strong); border-radius: var(--v2-r-md); overflow: hidden; }
+.fg-seg button { background: transparent; border: 0; padding: 8px 18px; color: var(--v2-ink-2); font: inherit; font-weight: var(--v2-fw-semibold); cursor: pointer; }
+.fg-seg button + button { border-left: 1px solid var(--v2-line-strong); }
+.fg-seg button.is-on-minor    { background: var(--v2-blue-soft);  color: var(--v2-blue-hi); }
+.fg-seg button.is-on-major    { background: var(--v2-amber-soft); color: var(--v2-amber-hi); }
+.fg-seg button.is-on-critical { background: var(--v2-red);        color: var(--v2-ink-on-accent); }
+.fg-crash {
+  margin-top: var(--v2-s4); padding: var(--v2-s4);
+  border: 1px solid var(--v2-red-ring); background: var(--v2-red-soft); border-radius: var(--v2-r-lg);
+}
+.fg-crash h3 { margin: 0 0 4px; font-size: var(--v2-fs-md); color: var(--v2-red-hi); }
+.fg-crash p { margin: 0 0 var(--v2-s3); font-size: var(--v2-fs-sm); color: var(--v2-ink-2); }
+.fg-sf-del { margin-left: auto; color: var(--v2-red-hi) !important; }
+
+/* ── Safety tab on a truck page ── */
+.fg-sf-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--v2-s5); }
+.fg-note { margin: 0; font-size: var(--v2-fs-sm); color: var(--v2-ink-2); }
+.fg-watch { color: var(--v2-red-hi); }
+.fg-ladder { display: flex; margin: var(--v2-s3) 0; }
+.fg-ladder span {
+  flex: 1; padding: 8px 2px; text-align: center;
+  font-size: var(--v2-fs-xs); font-weight: var(--v2-fw-semibold); color: var(--v2-ink-3);
+  border-top: 4px solid var(--v2-line-strong);
+}
+.fg-ladder span.done { color: var(--v2-ink-2); border-top-color: var(--v2-amber); }
+.fg-ladder span.now  { color: var(--v2-amber-hi); border-top-color: var(--v2-amber-hi); }
+.fg-ladder span.next { color: var(--v2-red-hi); border-top: 4px dashed var(--v2-red-ring); }
+.fg-tl-link { text-decoration: none; color: inherit; }
+.fg-tl-link:hover .v2-tl-label { text-decoration: underline; }
+.fg-sf-due { cursor: pointer; }
+
+@media (max-width: 900px) {
+  .fg-sf-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fg-sf-two { grid-template-columns: 1fr; }
+  .fg-sf-del { margin-left: 0; }
+}
