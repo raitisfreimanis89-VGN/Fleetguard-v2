@@ -221,8 +221,7 @@
   <script>
   (function(){
     var ov=document.getElementById('xmas-overlay'); if(!ov) return;
-    var KEY='vgnXmasBonus2026', lastFocus=null;
-    try{ if(sessionStorage.getItem(KEY)==='closed'){ ov.parentNode.removeChild(ov); return; } }catch(e){}
+    var lastFocus=null;  // shows on every page load (no dismissal memory) — reappears on refresh
     function foci(){ return ov.querySelectorAll('a[href],button'); }
     function onKey(e){
       if(e.key==='Escape'){ e.preventDefault(); close(); return; }
@@ -240,7 +239,6 @@
       if(ov.hidden) return;
       ov.classList.remove('is-open'); document.body.classList.remove('xmas-lock');
       document.removeEventListener('keydown',onKey,true);
-      try{ sessionStorage.setItem(KEY,'closed'); }catch(e){}
       var done=function(){ ov.hidden=true; }, t=setTimeout(done,350);
       ov.addEventListener('transitionend',function h(){ clearTimeout(t); done(); ov.removeEventListener('transitionend',h); });
       if(lastFocus&&lastFocus.focus){ try{ lastFocus.focus(); }catch(e){} }
