@@ -189,5 +189,67 @@
 
   <nav class="mobile-action-bar" aria-label="Quick recruiting contact"><a class="mobile-contact-link" href="#vgn-contact-details"><svg><use href="#i-phone"/></svg>Call / text</a><a class="button button-orange" href="#callback-form">Request a callback</a></nav>
   <dialog class="media-dialog" id="media-dialog" aria-labelledby="dialog-title"><div class="dialog-head"><h2 id="dialog-title">Driver review</h2><button class="icon-button dialog-close" type="button" aria-label="Close preview"><svg><use href="#i-close"/></svg></button></div><div class="dialog-body" id="dialog-body"></div></dialog>
+
+  <!-- ===== Christmas promo popup (SEASONAL — delete this whole block to take it down) ===== -->
+  <style>
+    .xmas-overlay{position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px 16px;opacity:0;transition:opacity .25s ease}
+    .xmas-overlay.is-open{opacity:1}
+    .xmas-overlay[hidden]{display:none}
+    .xmas-backdrop{position:absolute;inset:0;background:rgba(4,20,17,.80);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+    .xmas-dialog{position:relative;transform:scale(.94);transition:transform .25s ease}
+    .xmas-overlay.is-open .xmas-dialog{transform:scale(1)}
+    .xmas-banner{display:block;padding:0;border:0;background:transparent;cursor:pointer;border-radius:20px;line-height:0;box-shadow:0 0 0 3px rgba(243,196,92,.9),0 0 36px rgba(243,196,92,.45),0 22px 60px rgba(0,0,0,.6)}
+    .xmas-banner img{display:block;width:auto;height:auto;max-width:min(440px,92vw);max-height:86vh;border-radius:18px}
+    .xmas-banner:focus-visible{outline:3px solid #fff;outline-offset:4px}
+    .xmas-close{position:absolute;top:-14px;right:-14px;width:42px;height:42px;border-radius:50%;background:#0d3b33;border:2px solid rgba(255,255,255,.92);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 6px 18px rgba(0,0,0,.5)}
+    .xmas-close svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+    .xmas-close:hover{background:#12544a}
+    .xmas-close:focus-visible{outline:3px solid #f3c45c;outline-offset:2px}
+    @media (max-width:420px){.xmas-close{top:-10px;right:-10px;width:38px;height:38px}}
+    body.xmas-lock{overflow:hidden}
+    @media (prefers-reduced-motion:reduce){.xmas-overlay,.xmas-dialog{transition:none}.xmas-dialog{transform:none}}
+  </style>
+  <div class="xmas-overlay" id="xmas-overlay" role="dialog" aria-modal="true" aria-label="VGN Trucking Christmas Special Bonus" hidden>
+    <div class="xmas-backdrop" data-xmas-close></div>
+    <div class="xmas-dialog">
+      <button class="xmas-banner" type="button" data-xmas-close>
+        <img src="assets/christmas-bonus-2026.webp" width="1122" height="1402" alt="VGN Trucking Christmas Special Bonus — sign up before Christmas and receive $400 within your first two weeks: $200 the first week and $200 the second week.">
+      </button>
+      <button class="xmas-close" type="button" aria-label="Close" data-xmas-close><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var ov=document.getElementById('xmas-overlay'); if(!ov) return;
+    var KEY='vgnXmasBonus2026', lastFocus=null;
+    try{ if(sessionStorage.getItem(KEY)==='closed'){ ov.parentNode.removeChild(ov); return; } }catch(e){}
+    function foci(){ return ov.querySelectorAll('a[href],button'); }
+    function onKey(e){
+      if(e.key==='Escape'){ e.preventDefault(); close(); return; }
+      if(e.key==='Tab'){ var f=foci(); if(!f.length) return; var a=f[0],b=f[f.length-1];
+        if(e.shiftKey&&document.activeElement===a){ e.preventDefault(); b.focus(); }
+        else if(!e.shiftKey&&document.activeElement===b){ e.preventDefault(); a.focus(); } }
+    }
+    function open(){
+      lastFocus=document.activeElement; ov.hidden=false; void ov.offsetWidth; ov.classList.add('is-open');
+      document.body.classList.add('xmas-lock');
+      var c=ov.querySelector('.xmas-close'); if(c) c.focus();
+      document.addEventListener('keydown',onKey,true);
+    }
+    function close(){
+      if(ov.hidden) return;
+      ov.classList.remove('is-open'); document.body.classList.remove('xmas-lock');
+      document.removeEventListener('keydown',onKey,true);
+      try{ sessionStorage.setItem(KEY,'closed'); }catch(e){}
+      var done=function(){ ov.hidden=true; }, t=setTimeout(done,350);
+      ov.addEventListener('transitionend',function h(){ clearTimeout(t); done(); ov.removeEventListener('transitionend',h); });
+      if(lastFocus&&lastFocus.focus){ try{ lastFocus.focus(); }catch(e){} }
+    }
+    ov.querySelectorAll('[data-xmas-close]').forEach(function(el){ el.addEventListener('click',function(e){ e.preventDefault(); close(); }); });
+    var start=function(){ setTimeout(open,650); };
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',start); else start();
+  })();
+  </script>
+  <!-- ===== end Christmas promo popup ===== -->
 </body>
 </html>
